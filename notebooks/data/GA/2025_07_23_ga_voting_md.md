@@ -20,6 +20,8 @@ United Nations
 
 This dataset is a compilation of the voting data related to the resolutions adopted by the General Assembly at its regular, special, emergency special sessions from its inception until July 2025. It is derived from the UN Digital Library voting records and provides information on Member States' votes related to resolutions adopted through a recorded vote. Votes on individual paragraphs of draft resolutions or drafts that failed to be adopted are not included. The dataset comprises 914,624 entries, with each entry representing the vote of one Member State on a particular resolution.
 Copyright, United Nations; Non commercial use, with attribution.
+## Additional Dataset: Resolution-Level Voting Data
+In addition to the Member State-level voting dataset, a transformed dataset has been created with one entry per resolution. This dataset aggregates voting information for each resolution and includes columns for resolution metadata and voting results. For each country, there is a dedicated column indicating its vote (Y/N/A/X) for that resolution.
 
 ## Citation
 
@@ -52,6 +54,25 @@ Older versions: Version 2 (March 2025)
 * total_non_voting: number of non-voting members.
 * total_ms: total number of Member States.
 * undl_link: link to the voting record in the UN Digital Library.
+
+## Data Dictionary: Transformed Resolution-Level Dataset
+* undl_id: UN Digital Library control number for the resolution.
+* resolution: Symbol of the adopted resolution.
+* date: Date of the vote.
+* session: Session number.
+* draft: symbol of the draft resolution (433,659 empty rows).
+* committee_report: Symbol of the report of the main General Assembly Committee, transmitting texts of draft resolutions.
+* meeting: Symbol of the meeting record during which the resolution was adopted.
+* title: Title of the resolution.
+* agenda_title: Title of the agenda item.
+* subjects: Concept or combination of concepts describing the subject of the resolution.
+* total_yes: Number of "yes" votes.
+* total_no: Number of "no" votes.
+* total_abstentions: Number of abstentions.
+* total_non_voting: Number of non-voting members.
+* total_ms: Total number of Member States.
+* undl_link: Link to the voting record in the UN Digital Library.
+* For each country: A column with the country name or code, indicating the specific vote (Y/N/A/X) for that resolution.
 
 ## Applicable Terms of Use
 
