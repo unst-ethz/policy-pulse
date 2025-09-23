@@ -26,6 +26,7 @@ def fetch_UN_data(dir_path=None):
     Notes:
     ------
     - Currently, the Security Council data does not include veto information explicitly.
+    - The filenames and URLs are hardcoded for the 2025 voting sessions. Must be updated when they change.
     """
 
     df_ga = None
@@ -61,12 +62,12 @@ def fetch_UN_data(dir_path=None):
     
     # Transform ga data
     ga_index_columns = ["undl_id", "date", "session", "resolution", "draft", "committee_report", "meeting", "title", "agenda_title", "subjects", "total_yes", "total_no", "total_abstentions", "total_non_voting", "total_ms", "undl_link"]
-    df_ga_transformed = df_ga.pivot(index=ga_index_columns, columns='ms_name', values='ms_vote').reset_index()
+    df_ga_transformed = df_ga.pivot(index=ga_index_columns, columns='ms_code', values='ms_vote').reset_index()
     df_ga_transformed.columns.name = None
 
     # Transform sc data
     sc_index_columns = ["undl_id", "date", "resolution", "draft", "meeting", "description", "agenda", "subjects", "modality", "total_yes", "total_no", "total_abstentions", "total_non_voting", "total_ms", "undl_link"]
-    df_sc_transformed = df_sc.pivot(index=sc_index_columns, columns='ms_name', values='ms_vote').reset_index()
+    df_sc_transformed = df_sc.pivot(index=sc_index_columns, columns='ms_code', values='ms_vote').reset_index()
     df_sc_transformed.columns.name = None
 
     return df_ga, df_ga_transformed, df_sc, df_sc_transformed
