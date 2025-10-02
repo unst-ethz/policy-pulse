@@ -64,7 +64,7 @@ class DashMovingAverageApp:
         self.setup_layout()
         self.setup_callbacks()
 
-    def _calculate_data_uncached(self, country1: str, country2: str, time_span: str):
+    def _calculate_data_uncached(self, country1: str, country2: str, time_span: int):
         """Calculate moving average data for country pair (cached)."""
         print(f"🔄 Calculating {country1} vs {country2} (span: {time_span})")
         start_time = time.time()
@@ -290,7 +290,7 @@ class DashMovingAverageApp:
                 Input("timespan-dropdown", "value"),
             ],
         )
-        def update_chart(country1: str, country2: str, time_span: float | None):
+        def update_chart(country1: str, country2: str, time_span: int):
             """Update chart when countries or time span changes."""
 
             # Validation
@@ -647,6 +647,11 @@ def fetch_UN_data(dir_path: str | None = None):
 df_ga, df_ga_transformed, df_sc, df_sc_transformed = fetch_UN_data(
     dir_path="C:\\Users\\janic\\OneDrive\\Desktop\\ETH\\UN Projekt\\data"
 )
+
+
+if df_ga_transformed is None:
+    print("Failed to retrieve UN data")
+    exit(1)
 
 app = create_dash_app(df_ga_transformed, time_span=365, cache_size=100)
 app.run(debug=True, port=8050)
