@@ -1,0 +1,28 @@
+# config/data_sources.yaml
+version: "1.0"
+last_updated: "2025-10-07"
+debug: true
+logs: true
+
+data_sources:
+  ga_resolutions:
+    description: "UN General Assembly Resolution voting data"
+    source_type: "file"
+    url: "https://digitallibrary.un.org/record/4060887/files/2025_9_19_ga_voting.csv"
+    format: "csv"
+    
+  sc_resolutions:
+    description: "UN Security Council Resolution voting data"
+    source_type: "file"
+    url: "https://digitallibrary.un.org/record/4055387/files/2025_7_21_sc_voting.csv?ln=en"
+    format: "csv"
+  
+  thesaurus:
+    description: "UNBIS Thesaurus hierarchy"
+    source_type: "file"
+    url: "https://digitallibrary.un.org/record/4075456/files/unbist-20250708_2.ttl"
+    format: "ttl"
+    
+paths:
+  data: "data/"
+  logs: "logs/"
