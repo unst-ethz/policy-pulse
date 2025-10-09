@@ -16,6 +16,17 @@ class UNResolutionAnalyzer:
     
     This class handles data loading, caching, and querying of UN resolutions
     using the UNBIS thesaurus for hierarchical subject classification.
+    
+    TODO:
+    - Add Security Council Data
+    - Add check if data is up to date
+    - Maybe add more query options here? (for instance countries)
+    - Add more utility functions (like subjects that we can use for the selection options in the frontend)
+    - Improve logging and error handling
+    - Add Unit tests
+    - Think about other matching strategies, or filling missing subjects
+    - Long term: Move the data from local to whatever database/method we will use
+    - Think about structure of classes/project. Maybe it makes sense to have a class that is just about fetching and transforming the data. Then another for querying it?
     """
     
     def __init__(
