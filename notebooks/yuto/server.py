@@ -1,9 +1,11 @@
+import json
 import dash
-from dash import dcc, html, Input, Output
-import plotly.graph_objects as go
+from dash import callback, dcc, html, Input, Output
 import pandas as pd
 from functools import lru_cache
 import time
+
+from .components import agreement_graph
 
 # Global variables (in production, you'd load this properly)
 df_global = None  # Your dataframe goes here
@@ -55,17 +57,32 @@ class DashMovingAverageApp:
         ]
 
         # Set up caching for expensive calculations
-        self.calculate_data = lru_cache(maxsize=cache_size)(
-            self._calculate_data_uncached
-        )
+        callback(
+            [
+                Output("status-display", "children"),
+                Output("moving-average-data", "data"),
+                Output("moving-average-calc-time", "data"),
+            ],
+            [
+                Input("country1-dropdown", "value"),
+                Input("country2-dropdown", "value"),
+                Input("timespan-dropdown", "value"),
+            ],
+        )(lru_cache(maxsize=cache_size)(self._calculate_data_uncached))
 
         # Initialize Dash app
         self.app = dash.Dash(__name__)
         self.setup_layout()
-        self.setup_callbacks()
 
     def _calculate_data_uncached(self, country1: str, country2: str, time_span: int):
         """Calculate moving average data for country pair (cached)."""
+        if country1 == country2:
+            return (
+                "Same country selected for both dropdowns. Please choose different countries.",
+                None,
+                None,
+            )
+
         print(f"🔄 Calculating {country1} vs {country2} (span: {time_span})")
         start_time = time.time()
 
@@ -110,16 +127,20 @@ class DashMovingAverageApp:
             calc_time = time.time() - start_time
             print(f"✅ Calculated in {calc_time:.2f}s ({len(df_subset):,} points)")
 
-            return df_subset, calc_time
+            return None, df_subset.to_json(), calc_time
 
         except Exception as e:
             print(f"❌ Calculation error: {e}")
-            raise
+            return str(e), None, None
 
     def setup_layout(self):
         """Set up the Dash app layout."""
         self.app.layout = html.Div(
             [
+                # Store intermediate results from callbacks.
+                # Graphs can read from this by using Input("moving-average-data", "data")
+                dcc.Store(id="moving-average-data"),
+                dcc.Store(id="moving-average-calc-time"),
                 # Header
                 html.Div(
                     [
@@ -239,22 +260,7 @@ class DashMovingAverageApp:
                     ],
                     style={"padding": "0 20px", "marginBottom": "20px"},
                 ),
-                # Loading indicator and chart
-                html.Div(
-                    [
-                        dcc.Loading(
-                            id="loading-chart",
-                            children=[
-                                dcc.Graph(
-                                    id="agreement-chart", style={"height": "600px"}
-                                )
-                            ],
-                            type="cube",
-                            color="#3498db",
-                        )
-                    ],
-                    style={"padding": "0 20px"},
-                ),
+                *agreement_graph.layout,
                 # Footer with instructions
                 html.Div(
                     [
@@ -279,191 +285,11 @@ class DashMovingAverageApp:
             ]
         )
 
-    def setup_callbacks(self):
-        """Set up Dash callbacks for interactivity."""
-
-        @self.app.callback(
-            [Output("agreement-chart", "figure"), Output("status-display", "children")],
-            [
-                Input("country1-dropdown", "value"),
-                Input("country2-dropdown", "value"),
-                Input("timespan-dropdown", "value"),
-            ],
-        )
-        def update_chart(country1: str, country2: str, time_span: int):
-            """Update chart when countries or time span changes."""
-
-            # Validation
-            if country1 == country2:
-                error_msg = html.Div(
-                    [
-                        html.I(
-                            className="fas fa-exclamation-triangle",
-                            style={"color": "orange", "marginRight": "5px"},
-                        ),
-                        html.Strong("Warning: "),
-                        "Same country selected for both dropdowns. Please choose different countries.",
-                    ],
-                    style={"color": "orange"},
-                )
-
-                return (
-                    go.Figure().add_annotation(
-                        text="Please select different countries",
-                        xref="paper",
-                        yref="paper",
-                        x=0.5,
-                        y=0.5,
-                        showarrow=False,
-                        font_size=20,
-                    ),
-                    error_msg,
-                )
-
-            try:
-                # Get cache info before calculation
-                cache_info_before = self.calculate_data.cache_info()
-
-                # Calculate data (uses cache if available)
-                data, calc_time = self.calculate_data(country1, country2, time_span)
-
-                # Get cache info after calculation
-                cache_info_after = self.calculate_data.cache_info()
-                was_cached = cache_info_before.hits < cache_info_after.hits
-
-                # Create figure
-                fig = go.Figure()
-
-                # Add traces
-                fig.add_trace(
-                    go.Scatter(
-                        x=data["date"],
-                        y=data["sma"],
-                        mode="lines",
-                        name=f"{time_span}-Day SMA",
-                        line=dict(color="#3498db", width=3),
-                    )
-                )
-
-                fig.add_trace(
-                    go.Scatter(
-                        x=data["date"],
-                        y=data["ema"],
-                        mode="lines",
-                        name=f"{time_span}-Day EMA",
-                        line=dict(color="#e67e22", width=3),
-                    )
-                )
-
-                fig.add_trace(
-                    go.Scatter(
-                        x=data["date"],
-                        y=data["cma"],
-                        mode="lines",
-                        name="Cumulative MA",
-                        line=dict(color="#27ae60", width=3),
-                    )
-                )
-
-                # Add missing values
-                missing_mask = pd.isna(data["agreement"])
-                if missing_mask.any():
-                    fig.add_trace(
-                        go.Scatter(
-                            x=data["date"][missing_mask],
-                            y=[0.5] * missing_mask.sum(),
-                            mode="markers",
-                            name="Missing Data",
-                            marker=dict(color="gray", symbol="x", size=8),
-                            opacity=0.7,
-                        )
-                    )
-
-                # Update layout
-                missing_count = missing_mask.sum()
-                total_count = len(data)
-                cache_status = "📋 Cached" if was_cached else "🔄 Calculated"
-
-                fig.update_layout(
-                    title=f"GA Voting Agreement: {country1} vs {country2}<br>"
-                    + f"<sub>{total_count:,} votes • {missing_count:,} missing ({missing_count/total_count*100:.1f}%) • {cache_status}</sub>",
-                    xaxis_title="Date",
-                    yaxis_title="Agreement Level",
-                    yaxis=dict(range=[-0.05, 1.05]),
-                    template="plotly_white",
-                    hovermode="x unified",
-                    legend=dict(
-                        orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
-                    ),
-                )
-
-                # Status message
-                status_msg = html.Div(
-                    [
-                        html.Div(
-                            [
-                                html.I(
-                                    className="fas fa-check-circle",
-                                    style={"color": "green", "marginRight": "5px"},
-                                ),
-                                html.Strong("Chart Updated Successfully! "),
-                                f"Processed {total_count:,} data points in {calc_time:.2f}s ",
-                                f"({'from cache' if was_cached else 'newly calculated'})",
-                            ]
-                        ),
-                        html.Div(
-                            [
-                                html.I(
-                                    className="fas fa-database",
-                                    style={"color": "blue", "marginRight": "5px"},
-                                ),
-                                f"Cache: {cache_info_after.currsize}/{cache_info_after.maxsize} pairs stored • ",
-                                f"Hits: {cache_info_after.hits} • Misses: {cache_info_after.misses} • ",
-                                f"Hit Rate: {cache_info_after.hits/(cache_info_after.hits + cache_info_after.misses)*100:.1f}%",
-                            ],
-                            style={
-                                "fontSize": "12px",
-                                "color": "#7f8c8d",
-                                "marginTop": "5px",
-                            },
-                        ),
-                    ]
-                )
-
-                return fig, status_msg
-
-            except Exception as e:
-                error_msg = html.Div(
-                    [
-                        html.I(
-                            className="fas fa-exclamation-circle",
-                            style={"color": "red", "marginRight": "5px"},
-                        ),
-                        html.Strong("Error: "),
-                        f"Failed to generate chart: {str(e)}",
-                    ],
-                    style={"color": "red"},
-                )
-
-                return (
-                    go.Figure().add_annotation(
-                        text=f"Error: {str(e)}",
-                        xref="paper",
-                        yref="paper",
-                        x=0.5,
-                        y=0.5,
-                        showarrow=False,
-                        font_size=16,
-                    ),
-                    error_msg,
-                )
-
     def run(self, debug: bool = True, port: int = 8050, host: str = "127.0.0.1"):
         """Run the Dash app."""
         print(f"🚀 Starting Dash app...")
         print(f"📊 Countries available: {len(self.available_countries)}")
         print(f"🌐 Open your browser to: http://{host}:{port}")
-        print(f"🔄 True lazy loading enabled with caching")
 
         self.app.run(debug=debug, port=port, host=host)
 
@@ -492,40 +318,7 @@ def create_dash_app(
 
 
 # Usage examples and setup instructions
-print("🎯 Dash Lazy Loading Solution Ready!")
-print("\n📋 Setup Instructions:")
-print("1. Install Dash: pip install dash")
-print("2. Load your data: df = pd.read_csv('your_data.csv')")
-print("3. Create app: app = create_dash_app(df)")
-print("4. Run app: app.run()")
-print("5. Open browser to http://127.0.0.1:8050")
-
-print("\n🚀 Quick Start Example:")
-print(
-    """
-import pandas as pd
-from your_module import create_dash_app
-
-# Load your data
-df = pd.read_csv('ga_voting_data.csv')
-
-# Create and run the app
-app = create_dash_app(df, time_span=365, cache_size=100)
-app.run(debug=True, port=8050)
-"""
-)
-
-print("\n✅ Features:")
-print("- True lazy loading (calculates only when requested)")
-print("- Intelligent caching (LRU eviction)")
-print("- Real-time status updates")
-print("- Professional web interface")
-print("- Easy deployment to production")
-print("- Handles hundreds of countries efficiently")
-print("- No Jupyter dependency issues")
-
 print("\n🌐 Production Deployment:")
-print("- Deploy to Heroku, AWS, or any cloud platform")
 print("- Set debug=False for production")
 print("- Configure proper host/port for your environment")
 
@@ -644,9 +437,7 @@ def fetch_UN_data(dir_path: str | None = None):
     return df_ga, df_ga_transformed, df_sc, df_sc_transformed
 
 
-df_ga, df_ga_transformed, df_sc, df_sc_transformed = fetch_UN_data(
-    dir_path="C:\\Users\\janic\\OneDrive\\Desktop\\ETH\\UN Projekt\\data"
-)
+df_ga, df_ga_transformed, df_sc, df_sc_transformed = fetch_UN_data(dir_path="../data")
 
 
 if df_ga_transformed is None:
@@ -654,4 +445,8 @@ if df_ga_transformed is None:
     exit(1)
 
 app = create_dash_app(df_ga_transformed, time_span=365, cache_size=100)
+
+
+agreement_graph.register_callbacks()
+
 app.run(debug=True, port=8050)
