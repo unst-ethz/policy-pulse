@@ -9,7 +9,6 @@ import pandas as pd
 import requests
 from rdflib import Graph, RDF, SKOS
 
-
 class UNResolutionAnalyzer:
     """
     Main interface for querying UN resolutions with hierarchical subject filtering.
