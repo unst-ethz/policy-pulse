@@ -132,7 +132,20 @@ class DashMovingAverageApp:
 
         except Exception as e:
             print(f"❌ Calculation error: {e}")
-            return str(e), None, None
+            return (
+                html.Div(
+                    style={
+                        "padding": "10px",
+                        "marginBottom": "20px",
+                        "backgroundColor": "#d5dbdb",
+                        "border": "1px solid #bdc3c7",
+                        "borderRadius": "5px",
+                    },
+                    children=str(e),
+                ),
+                None,
+                None,
+            )
 
     def setup_layout(self):
         """Set up the Dash app layout."""
@@ -248,18 +261,7 @@ class DashMovingAverageApp:
                 ),
                 # Status and cache info
                 html.Div(
-                    [
-                        html.Div(
-                            id="status-display",
-                            style={
-                                "padding": "10px",
-                                "backgroundColor": "#d5dbdb",
-                                "border": "1px solid #bdc3c7",
-                                "borderRadius": "5px",
-                            },
-                        )
-                    ],
-                    style={"padding": "0 20px", "marginBottom": "20px"},
+                    id="status-display",
                 ),
                 *agreement_choropleth.layout,
                 *agreement_graph.layout,
