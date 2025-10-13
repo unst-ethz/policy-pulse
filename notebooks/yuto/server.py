@@ -5,6 +5,7 @@ import pandas as pd
 from functools import lru_cache
 import time
 
+from .components import agreement_choropleth
 from .components import agreement_graph
 
 # Global variables (in production, you'd load this properly)
@@ -260,6 +261,7 @@ class DashMovingAverageApp:
                     ],
                     style={"padding": "0 20px", "marginBottom": "20px"},
                 ),
+                *agreement_choropleth.layout,
                 *agreement_graph.layout,
                 # Footer with instructions
                 html.Div(
@@ -447,6 +449,7 @@ if df_ga_transformed is None:
 app = create_dash_app(df_ga_transformed, time_span=365, cache_size=100)
 
 
+agreement_choropleth.register_callbacks()
 agreement_graph.register_callbacks()
 
 app.run(debug=True, port=8050)
