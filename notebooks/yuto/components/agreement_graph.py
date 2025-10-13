@@ -1,6 +1,7 @@
 from dash import dcc, Input, Output, callback, html
 import plotly.graph_objects as go
 import pandas as pd
+from io import StringIO
 
 
 def register_callbacks():
@@ -36,7 +37,7 @@ def register_callbacks():
                 ]
             )
 
-        data = pd.read_json(moving_average_data)
+        data = pd.read_json(StringIO(moving_average_data))
 
         # Add traces
         fig.add_trace(
