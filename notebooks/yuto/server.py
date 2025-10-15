@@ -4,6 +4,15 @@ from dash import callback, dcc, html, Input, Output
 import pandas as pd
 from functools import lru_cache
 import time
+import sys, os
+
+# Add Janic's datastream module to search path
+sys.path.append(
+    os.path.normpath(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "janic")
+    )
+)
+from unDataStream import DataRepository, ResolutionQueryEngine
 
 from .components import agreement_choropleth
 from .components import agreement_graph
@@ -330,9 +339,6 @@ print("\n🌐 Production Deployment:")
 print("- Set debug=False for production")
 print("- Configure proper host/port for your environment")
 
-import os
-import pandas as pd
-
 
 def fetch_UN_data(dir_path: str | None = None):
     """
@@ -454,8 +460,22 @@ if df_ga_transformed is None:
 
 app = create_dash_app(df_ga_transformed, time_span=365, cache_size=100)
 
+print("Initialising data repository...")
+repo = DataRepository(
+    config_path=os.path.normpath(
+        os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..",
+            "janic",
+            "config",
+            "data_sources.yaml",
+        )
+    )
+)
+query_engine = ResolutionQueryEngine(repo=repo)
+print("Data repository initialised!")
 
-agreement_choropleth.register_callbacks()
+agreement_choropleth.register_callbacks(query_engine)
 agreement_graph.register_callbacks()
 
 app.run(debug=True, port=8050)

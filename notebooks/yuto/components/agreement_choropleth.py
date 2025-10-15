@@ -1,19 +1,10 @@
 from dash import dcc, Input, Output, callback, html
 import plotly.graph_objects as go
 import pandas as pd
-import sys, os
 import plotly.express as px
 
-# Add Janic's datastream module to search path
-sys.path.append(
-    os.path.normpath(
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "janic")
-    )
-)
-from unDataStream import DataRepository, ResolutionQueryEngine
 
-
-def register_callbacks():
+def register_callbacks(query_engine):
 
     @callback(
         [
@@ -25,21 +16,6 @@ def register_callbacks():
         ],
     )
     def generate_chart(country1):
-
-        repo = DataRepository(
-            config_path=os.path.normpath(
-                os.path.join(
-                    os.path.dirname(os.path.abspath(__file__)),
-                    "..",
-                    "..",
-                    "janic",
-                    "config",
-                    "data_sources.yaml",
-                )
-            )
-        )
-        query_engine = ResolutionQueryEngine(repo=repo)
-
         data = query_engine.query_agreement_between_countries(country1, average=True)
 
         # Transpose and remove the first two rows which are for the selected
