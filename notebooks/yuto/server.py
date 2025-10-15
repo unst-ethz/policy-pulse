@@ -187,7 +187,7 @@ class DashMovingAverageApp:
                         html.Div(
                             [
                                 html.Label(
-                                    "Country 1:",
+                                    "Select a country:",
                                     style={"fontWeight": "bold", "marginBottom": "5px"},
                                 ),
                                 dcc.Dropdown(
@@ -207,10 +207,20 @@ class DashMovingAverageApp:
                                 "paddingRight": "20px",
                             },
                         ),
+                    ],
+                    style={"padding": "0 20px", "marginBottom": "20px"},
+                ),
+                # Status and cache info
+                html.Div(
+                    id="status-display",
+                ),
+                *agreement_choropleth.layout,
+                html.Div(
+                    [
                         html.Div(
                             [
                                 html.Label(
-                                    "Country 2:",
+                                    "Select a country to compare with:",
                                     style={"fontWeight": "bold", "marginBottom": "5px"},
                                 ),
                                 dcc.Dropdown(
@@ -256,14 +266,8 @@ class DashMovingAverageApp:
                             ],
                             style={"width": "30%", "display": "inline-block"},
                         ),
-                    ],
-                    style={"padding": "0 20px", "marginBottom": "20px"},
+                    ]
                 ),
-                # Status and cache info
-                html.Div(
-                    id="status-display",
-                ),
-                *agreement_choropleth.layout,
                 *agreement_graph.layout,
                 # Footer with instructions
                 html.Div(
