@@ -6,6 +6,8 @@ import datetime
 from resolution_analyzer import UNResolutionAnalyzer
 analyzer = UNResolutionAnalyzer(config_path='config/data_sources.yaml')
 
+
+
 PAGE_SIZE = 100
 
 if 'results' not in st.session_state:
@@ -47,7 +49,7 @@ vote_agreement_filter = "All resolutions"
 if len(selected_countries) == 2:
     vote_agreement_filter = st.radio(
         "Filter by vote agreement:",
-        ("All resolutions", "When countries agreed", "When countries disagreed"),
+        ("All resolutions", "Agreements", "Disagreements", "Strong disagreements"),
         horizontal=True,
     )
 
@@ -60,6 +62,7 @@ if len(selected_countries) == 1:
     )
 
 min_un_date = datetime.date(1945, 1, 1)
+
 
 col1, col2 = st.columns(2)
 with col1:
@@ -79,6 +82,7 @@ with col2:
     )
 
 find_button = st.button('Find Resolutions', type="primary")
+
 
 
 if find_button:
@@ -107,12 +111,16 @@ if not st.session_state.results.empty:
 
 
 
+
+
     if len(selected_countries) == 2:
         country1, country2 = selected_countries
-        if vote_agreement_filter == "When countries agreed":
+        if vote_agreement_filter == "Agreements":
             results_df = results_df[results_df[country1] == results_df[country2]]
-        elif vote_agreement_filter == "When countries disagreed":
+        elif vote_agreement_filter == "Disagreements":
             results_df = results_df[results_df[country1] != results_df[country2]]
+        elif vote_agreement_filter == "Strong disagreements":
+            results_df = results_df.query(f'({country1} == "Y" and {country2} == "N") or ({country1} == "N" and {country2} == "Y")')
         results_df.dropna(subset=[country1, country2], inplace=True)   
 
 
@@ -150,3 +158,9 @@ if not st.session_state.results.empty:
 else:
     if find_button:
         st.info("No resolutions found with the selected criteria.")
+
+
+
+
+
+
