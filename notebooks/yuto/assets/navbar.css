@@ -1,0 +1,47 @@
+.navbar {
+  /* Navbar should have three components, with the middle filling up all
+  available space. */
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+
+  /* 54px + 4px border bottom = 58px height */
+  height: 54px;
+  background-color: #1b3357;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  box-sizing: content-box;
+  border-bottom: 4px solid #3bc4ff;
+  margin-bottom: 1rem;
+
+  /* Slight subtle shadow for visual separation*/
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+
+  h1 {
+    /* Match line height with navbar height to center text vertically */
+    line-height: 54px;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    color: white;
+    font-weight: 400;
+    justify-self: start;
+  }
+
+  .navbar-dropdown {
+    min-width: 400px;
+
+    .Select-control {
+      border-color: transparent;
+      border-radius: 2px;
+      background-color: #4f668e;
+
+      .Select-value, .Select-placeholder,
+      .Select-value .Select-value-label {
+        /* !important is needed to override default React-Select dropdown styles */
+        color: white !important;
+        text-align: center;
+      }
+    }
+  }
+}
