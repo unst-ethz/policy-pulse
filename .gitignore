@@ -20,3 +20,6 @@ resolution_subject_table.csv
 subject_table.csv
 closure_table.csv
 *.log
+
+.vscode
+.python-version
