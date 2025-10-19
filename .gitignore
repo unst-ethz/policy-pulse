@@ -19,3 +19,4 @@ resolution_table.csv
 resolution_subject_table.csv
 subject_table.csv
 closure_table.csv
+*.log
