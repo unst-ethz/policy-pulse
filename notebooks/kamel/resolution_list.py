@@ -131,7 +131,8 @@ if not st.session_state.results.empty:
 
     df_to_display = results_df.head(st.session_state.num_shown)
     for index, row in df_to_display.iterrows():
-        display_text = f"**{row['resolution']} -- {row['date']}**: {row['title']}: {row['agenda_title']}"
+        s = "" + f'{row['date']}'
+        display_text = f"**[{row['resolution']}]({row['undl_link']}) -- {s.split()[0]}**: {row['title'].split(" :")[0]}: {row['agenda_title']}"
 
         if selected_countries:
             vote_parts = []
@@ -158,9 +159,4 @@ if not st.session_state.results.empty:
 else:
     if find_button:
         st.info("No resolutions found with the selected criteria.")
-
-
-
-
-
-
+        
