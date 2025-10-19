@@ -17,6 +17,7 @@ from unDataStream import DataRepository, ResolutionQueryEngine
 from .components import agreement_choropleth
 from .components import agreement_graph
 from .components import navbar
+from .components import breadcrumb
 
 
 class DashMovingAverageApp:
@@ -167,6 +168,7 @@ class DashMovingAverageApp:
                 html.Div(
                     className="container",
                     children=[
+                        *breadcrumb.layout,
                         # Status and cache info
                         html.Div(
                             id="status-display",
@@ -434,6 +436,7 @@ query_engine = ResolutionQueryEngine(repo=repo)
 print("Data repository initialised!")
 
 navbar.register_callbacks()
+breadcrumb.register_callbacks()
 agreement_choropleth.register_callbacks(query_engine)
 agreement_graph.register_callbacks()
 
