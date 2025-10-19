@@ -8,8 +8,8 @@ def register_callbacks():
 
     @callback(
         [
-            Output("agreement-chart", "figure"),
-            Output("agreement-chart-status", "children"),
+            Output("alignment-chart", "figure"),
+            Output("alignment-chart-status", "children"),
         ],
         [
             Input("country1-dropdown", "value"),
@@ -67,7 +67,7 @@ def register_callbacks():
         )
 
         # Add missing values
-        missing_mask = pd.isna(data["agreement"])
+        missing_mask = pd.isna(data["alignment"])
         if missing_mask.any():
             fig.add_trace(
                 go.Scatter(
@@ -85,10 +85,10 @@ def register_callbacks():
         total_count = len(data)
 
         fig.update_layout(
-            title=f"GA Voting Agreement: {country1} vs {country2}<br>"
+            title=f"GA Voting Alignment: {country1} vs {country2}<br>"
             + f"<sub>{total_count:,} votes • {missing_count:,} missing ({missing_count/total_count*100:.1f}%)</sub>",
             xaxis_title="Date",
-            yaxis_title="Agreement Level",
+            yaxis_title="Alignment Level",
             yaxis=dict(range=[-0.05, 1.05]),
             template="plotly_white",
             hovermode="x unified",
@@ -115,9 +115,9 @@ def register_callbacks():
 layout = (
     html.Div(
         [
-            html.Div(id="agreement-chart-status"),
+            html.Div(id="alignment-chart-status"),
             dcc.Loading(
-                children=[dcc.Graph(id="agreement-chart", style={"height": "600px"})],
+                children=[dcc.Graph(id="alignment-chart", style={"height": "600px"})],
                 type="cube",
                 color="#3498db",
             ),

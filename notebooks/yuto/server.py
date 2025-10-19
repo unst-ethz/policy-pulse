@@ -14,8 +14,8 @@ sys.path.append(
 )
 from unDataStream import DataRepository, ResolutionQueryEngine
 
-from .components import agreement_choropleth
-from .components import agreement_graph
+from .components import alignment_choropleth
+from .components import alignment_graph
 from .components import navbar
 from .components import breadcrumb
 
@@ -97,8 +97,8 @@ class DashMovingAverageApp:
         try:
             countries = [country1, country2]
 
-            # Calculate agreement
-            def calc_agreement(row: pd.Series):
+            # Calculate alignment
+            def calc_alignment(row: pd.Series):
                 vote_mapping = {"Y": 1, "A": 0, "N": -1}
                 if row[country1] in vote_mapping and row[country2] in vote_mapping:
                     diff = abs(
@@ -109,7 +109,7 @@ class DashMovingAverageApp:
 
             # Process data
             df_subset = self.df[["date", country1, country2]].copy()
-            df_subset["agreement"] = df_subset.apply(calc_agreement, axis=1)
+            df_subset["alignment"] = df_subset.apply(calc_alignment, axis=1)
             df_subset["date"] = pd.to_datetime(df_subset["date"])
             df_subset = df_subset.sort_values("date").reset_index(drop=True)
 
@@ -125,12 +125,12 @@ class DashMovingAverageApp:
 
             # Calculate moving averages with the specified time span
             df_subset["sma"] = (
-                df_subset["agreement"].rolling(window=time_span, min_periods=1).mean()
+                df_subset["alignment"].rolling(window=time_span, min_periods=1).mean()
             )
             df_subset["ema"] = (
-                df_subset["agreement"].ewm(span=time_span, adjust=False).mean()
+                df_subset["alignment"].ewm(span=time_span, adjust=False).mean()
             )
-            df_subset["cma"] = df_subset["agreement"].expanding(min_periods=1).mean()
+            df_subset["cma"] = df_subset["alignment"].expanding(min_periods=1).mean()
 
             calc_time = time.time() - start_time
             print(f"✅ Calculated in {calc_time:.2f}s ({len(df_subset):,} points)")
@@ -173,7 +173,7 @@ class DashMovingAverageApp:
                         html.Div(
                             id="status-display",
                         ),
-                        *agreement_choropleth.layout,
+                        *alignment_choropleth.layout,
                         html.Div(
                             [
                                 html.Div(
@@ -235,7 +235,7 @@ class DashMovingAverageApp:
                                 ),
                             ]
                         ),
-                        *agreement_graph.layout,
+                        *alignment_graph.layout,
                         # Footer with instructions
                         html.Div(
                             [
@@ -246,7 +246,7 @@ class DashMovingAverageApp:
                                         html.Strong("How it works:"),
                                         " Select countries and time span above. ",
                                         "Data is calculated on-demand and cached for fast re-access. ",
-                                        "Agreement ranges from 0 (complete disagreement) to 1 (perfect agreement).",
+                                        "Alignment ranges from 0 (complete disalignment) to 1 (perfect alignment).",
                                     ],
                                     style={
                                         "color": "#7f8c8d",
@@ -437,7 +437,7 @@ print("Data repository initialised!")
 
 navbar.register_callbacks()
 breadcrumb.register_callbacks()
-agreement_choropleth.register_callbacks(query_engine)
-agreement_graph.register_callbacks()
+alignment_choropleth.register_callbacks(query_engine)
+alignment_graph.register_callbacks()
 
 app.run(debug=True, port=8050)

@@ -8,8 +8,8 @@ def register_callbacks(query_engine):
 
     @callback(
         [
-            Output("agreement-choropleth", "figure"),
-            Output("agreement-choropleth-status", "children"),
+            Output("alignment-choropleth", "figure"),
+            Output("alignment-choropleth-status", "children"),
         ],
         [
             Input("country1-dropdown", "value"),
@@ -22,14 +22,14 @@ def register_callbacks(query_engine):
         # country etc
         data = data.T[2:]
         data = data.reset_index()
-        data.columns = ["three_letter_country", "agreement"]
-        # Make sure the agreement column is numeric, so we can apply the
+        data.columns = ["three_letter_country", "alignment"]
+        # Make sure the alignment column is numeric, so we can apply the
         # continuous color scale
-        data[["agreement"]] = data[["agreement"]].apply(pd.to_numeric)
+        data[["alignment"]] = data[["alignment"]].apply(pd.to_numeric)
 
         fig = px.choropleth(
             data,
-            color="agreement",
+            color="alignment",
             color_continuous_scale=px.colors.sequential.RdBu,
             range_color=[0, 1],
             locations="three_letter_country",
@@ -41,7 +41,7 @@ def register_callbacks(query_engine):
                 html.Div(
                     [
                         html.Strong("Chart Updated Successfully! "),
-                        f"Processed {len(data[["agreement"]])} data points.",
+                        f"Processed {len(data[["alignment"]])} data points.",
                     ]
                 ),
             ]
@@ -53,10 +53,10 @@ def register_callbacks(query_engine):
 layout = (
     html.Div(
         [
-            html.Div(id="agreement-choropleth-status"),
+            html.Div(id="alignment-choropleth-status"),
             dcc.Loading(
                 children=[
-                    dcc.Graph(id="agreement-choropleth", style={"height": "600px"})
+                    dcc.Graph(id="alignment-choropleth", style={"height": "600px"})
                 ],
                 type="cube",
                 color="#3498db",
