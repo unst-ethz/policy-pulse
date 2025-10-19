@@ -130,6 +130,5 @@ layout = (
                 color="#3498db",
             ),
         ],
-        style={"padding": "0 20px"},
     ),
 )

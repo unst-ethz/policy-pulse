@@ -201,7 +201,6 @@ class DashMovingAverageApp:
                                     style={
                                         "width": "30%",
                                         "display": "inline-block",
-                                        "paddingRight": "20px",
                                     },
                                 ),
                                 html.Div(
