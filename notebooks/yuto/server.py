@@ -164,85 +164,99 @@ class DashMovingAverageApp:
                 dcc.Store(id="chosen-country-1"),
                 # Nav bar
                 *navbar.layout(self.available_countries),
-                # Status and cache info
                 html.Div(
-                    id="status-display",
-                ),
-                *agreement_choropleth.layout,
-                html.Div(
-                    [
+                    className="container",
+                    children=[
+                        # Status and cache info
+                        html.Div(
+                            id="status-display",
+                        ),
+                        *agreement_choropleth.layout,
                         html.Div(
                             [
-                                html.Label(
-                                    "Select a country to compare with:",
-                                    style={"fontWeight": "bold", "marginBottom": "5px"},
-                                ),
-                                dcc.Dropdown(
-                                    id="country2-dropdown",
-                                    options=[
-                                        {"label": country, "value": country}
-                                        for country in self.available_countries
+                                html.Div(
+                                    [
+                                        html.Label(
+                                            "Select a country to compare with:",
+                                            style={
+                                                "fontWeight": "bold",
+                                                "marginBottom": "5px",
+                                            },
+                                        ),
+                                        dcc.Dropdown(
+                                            id="country2-dropdown",
+                                            options=[
+                                                {"label": country, "value": country}
+                                                for country in self.available_countries
+                                            ],
+                                            value=(
+                                                self.available_countries[1]
+                                                if len(self.available_countries) > 1
+                                                else self.available_countries[0]
+                                            ),
+                                            clearable=False,
+                                            style={"marginBottom": "15px"},
+                                        ),
                                     ],
-                                    value=(
-                                        self.available_countries[1]
-                                        if len(self.available_countries) > 1
-                                        else self.available_countries[0]
-                                    ),
-                                    clearable=False,
-                                    style={"marginBottom": "15px"},
+                                    style={
+                                        "width": "30%",
+                                        "display": "inline-block",
+                                        "paddingRight": "20px",
+                                    },
                                 ),
-                            ],
-                            style={
-                                "width": "30%",
-                                "display": "inline-block",
-                                "paddingRight": "20px",
-                            },
+                                html.Div(
+                                    [
+                                        html.Label(
+                                            "Time Span (days):",
+                                            style={
+                                                "fontWeight": "bold",
+                                                "marginBottom": "5px",
+                                            },
+                                        ),
+                                        dcc.Dropdown(
+                                            id="timespan-dropdown",
+                                            options=[
+                                                {"label": "30 days", "value": 30},
+                                                {"label": "90 days", "value": 90},
+                                                {"label": "180 days", "value": 180},
+                                                {"label": "365 days", "value": 365},
+                                                {
+                                                    "label": "730 days (2 years)",
+                                                    "value": 730,
+                                                },
+                                            ],
+                                            value=self.time_span,
+                                            clearable=False,
+                                            style={"marginBottom": "15px"},
+                                        ),
+                                    ],
+                                    style={"width": "30%", "display": "inline-block"},
+                                ),
+                            ]
                         ),
+                        *agreement_graph.layout,
+                        # Footer with instructions
                         html.Div(
                             [
-                                html.Label(
-                                    "Time Span (days):",
-                                    style={"fontWeight": "bold", "marginBottom": "5px"},
-                                ),
-                                dcc.Dropdown(
-                                    id="timespan-dropdown",
-                                    options=[
-                                        {"label": "30 days", "value": 30},
-                                        {"label": "90 days", "value": 90},
-                                        {"label": "180 days", "value": 180},
-                                        {"label": "365 days", "value": 365},
-                                        {"label": "730 days (2 years)", "value": 730},
+                                html.Hr(),
+                                html.P(
+                                    [
+                                        "💡 ",
+                                        html.Strong("How it works:"),
+                                        " Select countries and time span above. ",
+                                        "Data is calculated on-demand and cached for fast re-access. ",
+                                        "Agreement ranges from 0 (complete disagreement) to 1 (perfect agreement).",
                                     ],
-                                    value=self.time_span,
-                                    clearable=False,
-                                    style={"marginBottom": "15px"},
+                                    style={
+                                        "color": "#7f8c8d",
+                                        "textAlign": "center",
+                                        "fontSize": "14px",
+                                    },
                                 ),
                             ],
-                            style={"width": "30%", "display": "inline-block"},
-                        ),
-                    ]
-                ),
-                *agreement_graph.layout,
-                # Footer with instructions
-                html.Div(
-                    [
-                        html.Hr(),
-                        html.P(
-                            [
-                                "💡 ",
-                                html.Strong("How it works:"),
-                                " Select countries and time span above. ",
-                                "Data is calculated on-demand and cached for fast re-access. ",
-                                "Agreement ranges from 0 (complete disagreement) to 1 (perfect agreement).",
-                            ],
-                            style={
-                                "color": "#7f8c8d",
-                                "textAlign": "center",
-                                "fontSize": "14px",
-                            },
+                            style={"padding": "20px", "marginTop": "40px"},
                         ),
                     ],
-                    style={"padding": "20px", "marginTop": "40px"},
                 ),
             ]
         )
