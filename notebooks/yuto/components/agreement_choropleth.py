@@ -40,10 +40,6 @@ def register_callbacks(query_engine):
             [
                 html.Div(
                     [
-                        html.I(
-                            className="fas fa-check-circle",
-                            style={"color": "green", "marginRight": "5px"},
-                        ),
                         html.Strong("Chart Updated Successfully! "),
                         f"Processed {len(data[["agreement"]])} data points.",
                     ]

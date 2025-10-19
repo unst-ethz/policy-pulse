@@ -27,10 +27,6 @@ def register_callbacks():
                 [
                     html.Div(
                         [
-                            html.I(
-                                className="fas fa-check-circle",
-                                style={"color": "red", "marginRight": "5px"},
-                            ),
                             html.Strong("Chart could not be updated."),
                         ]
                     ),
@@ -106,10 +102,6 @@ def register_callbacks():
             [
                 html.Div(
                     [
-                        html.I(
-                            className="fas fa-check-circle",
-                            style={"color": "green", "marginRight": "5px"},
-                        ),
                         html.Strong("Chart Updated Successfully! "),
                         f"Processed {total_count:,} data points.",
                     ]
