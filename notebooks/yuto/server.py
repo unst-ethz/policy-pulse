@@ -16,10 +16,7 @@ from unDataStream import DataRepository, ResolutionQueryEngine
 
 from .components import agreement_choropleth
 from .components import agreement_graph
-
-# Global variables (in production, you'd load this properly)
-df_global = None  # Your dataframe goes here
-available_countries = []
+from .components import navbar
 
 
 class DashMovingAverageApp:
@@ -164,61 +161,9 @@ class DashMovingAverageApp:
                 # Graphs can read from this by using Input("moving-average-data", "data")
                 dcc.Store(id="moving-average-data"),
                 dcc.Store(id="moving-average-calc-time"),
-                # Header
-                html.Div(
-                    [
-                        html.H1(
-                            "🌍 GA Voting Agreement Analysis",
-                            style={
-                                "textAlign": "center",
-                                "color": "#2c3e50",
-                                "marginBottom": "10px",
-                            },
-                        ),
-                        html.P(
-                            f"Interactive analysis of {len(self.available_countries)} countries • True lazy loading with caching",
-                            style={
-                                "textAlign": "center",
-                                "color": "#7f8c8d",
-                                "fontSize": "16px",
-                            },
-                        ),
-                    ],
-                    style={
-                        "padding": "20px",
-                        "backgroundColor": "#ecf0f1",
-                        "marginBottom": "20px",
-                    },
-                ),
-                # Controls
-                html.Div(
-                    [
-                        html.Div(
-                            [
-                                html.Label(
-                                    "Select a country:",
-                                    style={"fontWeight": "bold", "marginBottom": "5px"},
-                                ),
-                                dcc.Dropdown(
-                                    id="country1-dropdown",
-                                    options=[
-                                        {"label": country, "value": country}
-                                        for country in self.available_countries
-                                    ],
-                                    value=self.available_countries[0],
-                                    clearable=False,
-                                    style={"marginBottom": "15px"},
-                                ),
-                            ],
-                            style={
-                                "width": "30%",
-                                "display": "inline-block",
-                                "paddingRight": "20px",
-                            },
-                        ),
-                    ],
-                    style={"padding": "0 20px", "marginBottom": "20px"},
-                ),
+                dcc.Store(id="chosen-country-1"),
+                # Nav bar
+                *navbar.layout(self.available_countries),
                 # Status and cache info
                 html.Div(
                     id="status-display",
@@ -475,6 +420,7 @@ repo = DataRepository(
 query_engine = ResolutionQueryEngine(repo=repo)
 print("Data repository initialised!")
 
+navbar.register_callbacks()
 agreement_choropleth.register_callbacks(query_engine)
 agreement_graph.register_callbacks()
 
