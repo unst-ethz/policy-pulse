@@ -14,11 +14,7 @@ sys.path.append(
 )
 from unDataStream import DataRepository, ResolutionQueryEngine
 
-from .components import alignment_choropleth
-from .components import alignment_graph
-from .components import navbar
-from .components import breadcrumb
-from .components import wordcloud_viz
+from .layouts import index
 
 
 class DashMovingAverageApp:
@@ -65,6 +61,21 @@ class DashMovingAverageApp:
             ]
         ]
 
+        print("Initialising data repository...")
+        repo = DataRepository(
+            config_path=os.path.normpath(
+                os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)),
+                    "..",
+                    "janic",
+                    "config",
+                    "data_sources.yaml",
+                )
+            )
+        )
+        query_engine = ResolutionQueryEngine(repo=repo)
+        print("Data repository initialised!")
+
         # Set up caching for expensive calculations
         callback(
             [
@@ -79,22 +90,19 @@ class DashMovingAverageApp:
             ],
         )(lru_cache(maxsize=cache_size)(self._calculate_data_uncached))
 
-        # Client-side callback from country1-dropdown (ISO alpha3) to ISO alpha2.
-        # This is useful to pipe into frontend JS code that can take ISO alpha2
-        # and convert to the full localised country name.
-        clientside_callback(
-            """
-            function convert_to_2(iso_three_digit) {
-                return new Intl.DisplayNames(["en"], { type: "region" }).of(window.getCountryISO2(iso_three_digit));
-            }
-            """,
-            Output("country1-localised-name", "data"),
-            Input("country1-dropdown", "value"),
-        )
-
-        # Initialize Dash app
+        # Initialize Dash app with index layout
         self.app = dash.Dash(__name__)
-        self.setup_layout()
+        self.app.layout = html.Div(
+            children=[
+                # Store intermediate results from callbacks.
+                # Graphs can read from this by using Input("moving-average-data", "data")
+                dcc.Store(id="moving-average-data"),
+                dcc.Store(id="moving-average-calc-time"),
+                # Layout file
+                index.layout(self.available_countries),
+            ]
+        )
+        index.register_callbacks(query_engine=query_engine)
 
     def _calculate_data_uncached(self, country1: str, country2: str, time_span: int):
         """Calculate moving average data for country pair (cached)."""
@@ -109,8 +117,6 @@ class DashMovingAverageApp:
         start_time = time.time()
 
         try:
-            countries = [country1, country2]
-
             # Calculate alignment
             def calc_alignment(row: pd.Series):
                 vote_mapping = {"Y": 1, "A": 0, "N": -1}
@@ -168,151 +174,11 @@ class DashMovingAverageApp:
                 None,
             )
 
-    def setup_layout(self):
-        """Set up the Dash app layout."""
-        self.app.layout = html.Div(
-            [
-                # Store intermediate results from callbacks.
-                # Graphs can read from this by using Input("moving-average-data", "data")
-                dcc.Store(id="moving-average-data"),
-                dcc.Store(id="moving-average-calc-time"),
-                dcc.Store(id="country1-localised-name"),
-                # Nav bar
-                *navbar.layout(self.available_countries),
-                html.Div(
-                    className="container",
-                    children=[
-                        *breadcrumb.layout,
-                        # Status and cache info
-                        html.Div(
-                            id="status-display",
-                        ),
-                        *alignment_choropleth.layout,
-                        html.Div(
-                            [
-                                html.Div(
-                                    [
-                                        html.Label(
-                                            "Select a country to compare with:",
-                                            style={
-                                                "fontWeight": "bold",
-                                                "marginBottom": "5px",
-                                            },
-                                        ),
-                                        dcc.Dropdown(
-                                            id="country2-dropdown",
-                                            options=[
-                                                {"label": country, "value": country}
-                                                for country in self.available_countries
-                                            ],
-                                            value=(
-                                                self.available_countries[1]
-                                                if len(self.available_countries) > 1
-                                                else self.available_countries[0]
-                                            ),
-                                            clearable=False,
-                                            style={"marginBottom": "15px"},
-                                        ),
-                                    ],
-                                    style={
-                                        "width": "30%",
-                                        "display": "inline-block",
-                                    },
-                                ),
-                                html.Div(
-                                    [
-                                        html.Label(
-                                            "Time Span (days):",
-                                            style={
-                                                "fontWeight": "bold",
-                                                "marginBottom": "5px",
-                                            },
-                                        ),
-                                        dcc.Dropdown(
-                                            id="timespan-dropdown",
-                                            options=[
-                                                {"label": "30 days", "value": 30},
-                                                {"label": "90 days", "value": 90},
-                                                {"label": "180 days", "value": 180},
-                                                {"label": "365 days", "value": 365},
-                                                {
-                                                    "label": "730 days (2 years)",
-                                                    "value": 730,
-                                                },
-                                            ],
-                                            value=self.time_span,
-                                            clearable=False,
-                                            style={"marginBottom": "15px"},
-                                        ),
-                                    ],
-                                    style={"width": "30%", "display": "inline-block"},
-                                ),
-                            ]
-                        ),
-                        *alignment_graph.layout,
-                        *wordcloud_viz.layout,
-                        # Footer with instructions
-                        html.Div(
-                            [
-                                html.Hr(),
-                                html.P(
-                                    [
-                                        "💡 ",
-                                        html.Strong("How it works:"),
-                                        " Select countries and time span above. ",
-                                        "Data is calculated on-demand and cached for fast re-access. ",
-                                        "Alignment ranges from 0 (complete disalignment) to 1 (perfect alignment).",
-                                    ],
-                                    style={
-                                        "color": "#7f8c8d",
-                                        "textAlign": "center",
-                                        "fontSize": "14px",
-                                    },
-                                ),
-                            ],
-                            style={"padding": "20px", "marginTop": "40px"},
-                        ),
-                    ],
-                ),
-            ]
-        )
-
     def run(self, debug: bool = True, port: int = 8050, host: str = "127.0.0.1"):
         """Run the Dash app."""
-        print(f"🚀 Starting Dash app...")
-        print(f"📊 Countries available: {len(self.available_countries)}")
-        print(f"🌐 Open your browser to: http://{host}:{port}")
+        print(f"     http://{host}:{port}")
 
         self.app.run(debug=debug, port=port, host=host)
-
-
-# Easy setup function
-def create_dash_app(
-    df: pd.DataFrame,
-    time_span: int = 365,
-    start_date: str | None = None,
-    end_date: str | None = None,
-    cache_size: int = 100,
-):
-    """
-    Create a Dash app for interactive moving average visualization.
-
-    Parameters:
-    - df: Your DataFrame with voting data
-    - time_span: Default moving average window
-    - start_date, end_date: Date range filters
-    - cache_size: Number of country pairs to cache
-
-    Returns:
-    - DashMovingAverageApp instance
-    """
-    return DashMovingAverageApp(df, time_span, start_date, end_date, cache_size)
-
-
-# Usage examples and setup instructions
-print("\n🌐 Production Deployment:")
-print("- Set debug=False for production")
-print("- Configure proper host/port for your environment")
 
 
 def fetch_UN_data(dir_path: str | None = None):
@@ -433,27 +299,5 @@ if df_ga_transformed is None:
     print("Failed to retrieve UN data")
     exit(1)
 
-app = create_dash_app(df_ga_transformed, time_span=365, cache_size=100)
-
-print("Initialising data repository...")
-repo = DataRepository(
-    config_path=os.path.normpath(
-        os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "..",
-            "janic",
-            "config",
-            "data_sources.yaml",
-        )
-    )
-)
-query_engine = ResolutionQueryEngine(repo=repo)
-print("Data repository initialised!")
-
-navbar.register_callbacks()
-breadcrumb.register_callbacks()
-alignment_choropleth.register_callbacks(query_engine)
-alignment_graph.register_callbacks()
-wordcloud_viz.register_callbacks()
-
+app = DashMovingAverageApp(df_ga_transformed, 365, None, None, 100)
 app.run(debug=True, port=8050)
