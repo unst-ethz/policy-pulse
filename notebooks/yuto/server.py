@@ -18,6 +18,7 @@ from .components import alignment_choropleth
 from .components import alignment_graph
 from .components import navbar
 from .components import breadcrumb
+from .components import wordcloud_viz
 
 
 class DashMovingAverageApp:
@@ -236,6 +237,7 @@ class DashMovingAverageApp:
                             ]
                         ),
                         *alignment_graph.layout,
+                        *wordcloud_viz.layout,
                         # Footer with instructions
                         html.Div(
                             [
@@ -439,5 +441,6 @@ navbar.register_callbacks()
 breadcrumb.register_callbacks()
 alignment_choropleth.register_callbacks(query_engine)
 alignment_graph.register_callbacks()
+wordcloud_viz.register_callbacks()
 
 app.run(debug=True, port=8050)
