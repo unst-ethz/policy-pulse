@@ -333,12 +333,12 @@ def fetch_UN_data(dir_path: str | None = None):
 
     if dir_path:
         try:
-            df_ga = pd.read_csv(f"{dir_path}/2025_7_23_ga_voting.csv")
+            df_ga = pd.read_csv(f"{dir_path}/2025_9_19_ga_voting.csv")
             df_sc = pd.read_csv(f"{dir_path}/2025_7_21_sc_voting.csv")
         except FileNotFoundError:
             print("Not all data found locally. Fetching from UN Digital Library...")
     if df_ga is None or df_sc is None:
-        ga_url = "https://digitallibrary.un.org/record/4060887/files/2025_7_23_ga_voting.csv?ln=en"
+        ga_url = "https://digitallibrary.un.org/record/4060887/files/2025_9_19_ga_voting.csv?ln=en"
         sc_url = "https://digitallibrary.un.org/record/4055387/files/2025_7_21_sc_voting.csv?ln=en"
 
         try:
@@ -352,7 +352,7 @@ def fetch_UN_data(dir_path: str | None = None):
                     os.makedirs(dir_path)
                     print(f"Created directory: {dir_path}")
 
-                df_ga.to_csv(f"{dir_path}/2025_7_23_ga_voting.csv", index=False)
+                df_ga.to_csv(f"{dir_path}/2025_9_19_ga_voting.csv", index=False)
                 df_sc.to_csv(f"{dir_path}/2025_7_21_sc_voting.csv", index=False)
         except Exception as e:
             print(
