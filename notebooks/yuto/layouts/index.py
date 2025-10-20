@@ -22,6 +22,16 @@ def register_callbacks(query_engine):
         Input("country1-dropdown", "value"),
     )
 
+    clientside_callback(
+        """
+        function store_to_heading(localised_name) {
+            return localised_name;
+        }
+        """,
+        Output("heading-country1-name", "children"),
+        Input("country1-localised-name", "data"),
+    )
+
     navbar.register_callbacks()
     breadcrumb.register_callbacks()
     alignment_choropleth.register_callbacks(query_engine)
@@ -39,6 +49,14 @@ def layout(available_countries: list[str]):
                 className="container",
                 children=[
                     *breadcrumb.layout,
+                    html.H1(
+                        [
+                            html.Span(
+                                id="heading-country1-name", style={"fontWeight": "bold"}
+                            ),
+                            "'s Policy Pulse",
+                        ]
+                    ),
                     # Status and cache info
                     html.Div(
                         id="status-display",
