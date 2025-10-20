@@ -61,7 +61,9 @@ def layout(available_countries: list[str]):
                     html.Div(
                         id="status-display",
                     ),
+                    html.H2("Global Alignment Map"),
                     *alignment_choropleth.layout,
+                    html.H2("Bi-country Alignment Comparison Graph"),
                     html.Div(
                         [
                             html.Div(
@@ -124,6 +126,9 @@ def layout(available_countries: list[str]):
                         ]
                     ),
                     *alignment_graph.layout,
+                    html.H2(
+                        "Keyword Wordcloud for GA Resolution Subjects (Not Country Specific)"
+                    ),
                     *wordcloud_viz.layout,
                     # Footer with instructions
                     html.Div(
