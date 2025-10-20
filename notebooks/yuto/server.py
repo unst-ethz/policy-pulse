@@ -1,6 +1,6 @@
 import json
 import dash
-from dash import callback, dcc, html, Input, Output
+from dash import callback, clientside_callback, dcc, html, Input, Output
 import pandas as pd
 from functools import lru_cache
 import time
@@ -78,6 +78,19 @@ class DashMovingAverageApp:
                 Input("timespan-dropdown", "value"),
             ],
         )(lru_cache(maxsize=cache_size)(self._calculate_data_uncached))
+
+        # Client-side callback from country1-dropdown (ISO alpha3) to ISO alpha2.
+        # This is useful to pipe into frontend JS code that can take ISO alpha2
+        # and convert to the full localised country name.
+        clientside_callback(
+            """
+            function convert_to_2(iso_three_digit) {
+                return new Intl.DisplayNames(["en"], { type: "region" }).of(window.getCountryISO2(iso_three_digit));
+            }
+            """,
+            Output("country1-localised-name", "data"),
+            Input("country1-dropdown", "value"),
+        )
 
         # Initialize Dash app
         self.app = dash.Dash(__name__)
@@ -163,7 +176,7 @@ class DashMovingAverageApp:
                 # Graphs can read from this by using Input("moving-average-data", "data")
                 dcc.Store(id="moving-average-data"),
                 dcc.Store(id="moving-average-calc-time"),
-                dcc.Store(id="chosen-country-1"),
+                dcc.Store(id="country1-localised-name"),
                 # Nav bar
                 *navbar.layout(self.available_countries),
                 html.Div(
