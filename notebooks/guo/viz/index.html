@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UN Policy Pulse: Word Cloud Examples</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --fg: #111827;
+        --muted: #6b7280;
+        --accent: #2563eb;
+        --accent-weak: #dbeafe;
+        --border: #e5e7eb;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0b0f17;
+          --fg: #e5e7eb;
+          --muted: #9ca3af;
+          --accent: #60a5fa;
+          --accent-weak: #1e293b;
+          --border: #1f2937;
+        }
+      }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
+          Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        height: 100%;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 16px;
+      }
+
+      h1 {
+        font-size: 20px;
+        margin: 0 0 12px 0;
+        font-weight: 600;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 6px;
+        border-bottom: 1px solid var(--border);
+        flex-wrap: wrap;
+      }
+
+      .tab {
+        appearance: none;
+        border: none;
+        background: transparent;
+        padding: 10px 12px;
+        cursor: pointer;
+        border-radius: 8px 8px 0 0;
+        color: var(--muted);
+        font-weight: 500;
+        transition: background 150ms ease, color 150ms ease;
+      }
+
+      .tab[aria-selected="true"] {
+        color: var(--accent);
+        background: var(--accent-weak);
+      }
+
+      .panels {
+        border: 1px solid var(--border);
+        border-top: none;
+        border-radius: 0 10px 10px 10px;
+        padding: 12px;
+        background: transparent;
+      }
+
+      .panel {
+        display: none;
+      }
+
+      .panel[aria-hidden="false"] {
+        display: block;
+      }
+
+      .img-wrap {
+        width: 100%;
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .img-wrap img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: 0 auto;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Word Cloud Examples</h1>
+
+      <div
+        class="tabs"
+        role="tablist"
+        aria-label="UN Policy Pulse visualizations"
+      >
+      <button class="tab" role="tab" aria-selected="true" aria-controls="panel-16-25" id="tab-16-25" tabindex="0">
+        16–25
+      </button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="panel-06-15" id="tab-06-15">
+          06–15
+        </button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="panel-96-05" id="tab-96-05" tabindex="-1">
+            96–05
+          </button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="panel-86-95" id="tab-86-95" tabindex="-1">
+          86–95
+        </button>
+        
+        <button class="tab" role="tab" aria-selected="false" aria-controls="panel-all" id="tab-all" tabindex="-1">
+          All
+        </button>
+      </div>
+
+      <div class="panels">
+        
+        <section class="panel" role="tabpanel" id="panel-16-25" aria-labelledby="tab-16-25" aria-hidden="false">
+          <div class="img-wrap">
+            <img src="./16-25.png" alt="Visualization for years 2016–2025" />
+          </div>
+        </section>
+        <section class="panel" role="tabpanel" id="panel-06-15" aria-labelledby="tab-06-15" aria-hidden="true">
+            <div class="img-wrap">
+              <img src="./06-15.png" alt="Visualization for years 2006–2015" />
+            </div>
+          </section>
+          <section class="panel" role="tabpanel" id="panel-96-05" aria-labelledby="tab-96-05" aria-hidden="true">
+            <div class="img-wrap">
+              <img src="./96-05.png" alt="Visualization for years 1996–2005" />
+            </div>
+          </section>
+        <section class="panel" role="tabpanel" id="panel-86-95" aria-labelledby="tab-86-95" aria-hidden="true">
+          <div class="img-wrap">
+            <img src="./86-95.png" alt="Visualization for years 1986–1995" />
+          </div>
+        </section>
+        
+        <section class="panel" role="tabpanel" id="panel-all" aria-labelledby="tab-all" aria-hidden="true">
+          <div class="img-wrap">
+            <img src="./all.png" alt="Visualization for all years" />
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      const tabs = Array.from(document.querySelectorAll('.tab'));
+      const panels = Array.from(document.querySelectorAll('.panel'));
+
+      function activateTab(newTab) {
+        tabs.forEach(tab => {
+          const isActive = tab === newTab;
+          tab.setAttribute('aria-selected', String(isActive));
+          tab.tabIndex = isActive ? 0 : -1;
+        });
+
+        panels.forEach(panel => {
+          const isTarget = panel.id === newTab.getAttribute('aria-controls');
+          panel.setAttribute('aria-hidden', String(!isTarget));
+        });
+
+        newTab.focus();
+      }
+
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => activateTab(tab));
+
+        tab.addEventListener('keydown', (e) => {
+          const idx = tabs.indexOf(tab);
+          if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            const next = tabs[(idx + 1) % tabs.length];
+            activateTab(next);
+          } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            const prev = tabs[(idx - 1 + tabs.length) % tabs.length];
+            activateTab(prev);
+          } else if (e.key === 'Home') {
+            e.preventDefault();
+            activateTab(tabs[0]);
+          } else if (e.key === 'End') {
+            e.preventDefault();
+            activateTab(tabs[tabs.length - 1]);
+          }
+        });
+      });
+    </script>
+  </body>
+  </html>
+
+
