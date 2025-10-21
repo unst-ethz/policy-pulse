@@ -37,12 +37,38 @@
       background-color: #4f668e;
       box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.1);
 
-      .Select-value, .Select-placeholder,
+
+      .Select-input input {
+        color: white !important;
+      }
+
+      .Select-value,
+      .Select-placeholder,
       .Select-value .Select-value-label {
         /* !important is needed to override default React-Select dropdown styles */
         color: white !important;
         text-align: center;
       }
+    }
+
+    a {
+      /* Disable blue highlighting that comes from using links in dropdowns */
+      color: inherit;
+      text-decoration: none;
+    }
+
+
+    .Select-menu-outer .VirtualizedSelectSelectedOption > a {
+      /* Disable clicking on currently selected link to prevent unnecessary page refresh */
+      pointer-events: none;
+    }
+
+    .Select-menu-outer .VirtualizedSelectOption > a {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: left;
     }
   }
 }
