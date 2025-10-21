@@ -205,7 +205,11 @@ def _calculate_data_uncached(country1: str, country2: str, time_span: int):
         calc_time = time.time() - start_time
         print(f"✅ Calculated in {calc_time:.2f}s ({len(df_subset):,} points)")
 
-        return None, df_subset.to_json(), calc_time
+        return (
+            None,
+            df_subset.to_json(date_format="iso"),
+            calc_time,
+        )
 
     except Exception as e:
         print(f"❌ Calculation error: {e}")
