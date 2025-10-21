@@ -1,31 +1,35 @@
-from dash import Input, Output, callback, html, dcc
+from dash import Input, Output, clientside_callback, html, dcc
+
+from .. import data
 
 
 def register_callbacks():
     pass
 
 
-def layout(available_countries: list[str]):
-    return (
-        html.Header(
-            [
-                html.H1(
-                    "UN-ETH Policy Pulse",
+layout = (
+    html.Header(
+        [
+            html.H1(
+                "UN-ETH Policy Pulse",
+            ),
+            html.Div(
+                dcc.Dropdown(
+                    options=[
+                        {
+                            "label": dcc.Link([country], href="/country/" + country),
+                            "value": country,
+                        }
+                        for country in data.available_countries
+                    ],
+                    # value=data.available_countries[0],
+                    clearable=False,
+                    className="navbar-dropdown",
+                    placeholder="Search for a country...",
                 ),
-                html.Div(
-                    dcc.Dropdown(
-                        id="country1-dropdown",
-                        options=[
-                            {"label": country, "value": country}
-                            for country in available_countries
-                        ],
-                        value=available_countries[0],
-                        clearable=False,
-                        className="navbar-dropdown",
-                    ),
-                ),
-                html.Div(),
-            ],
-            className="navbar",
-        ),
-    )
+            ),
+            html.Div(),
+        ],
+        className="navbar",
+    ),
+)

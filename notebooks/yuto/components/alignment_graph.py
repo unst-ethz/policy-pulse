@@ -12,7 +12,7 @@ def register_callbacks():
             Output("alignment-chart-status", "children"),
         ],
         [
-            Input("country1-dropdown", "value"),
+            Input("country1-iso-alpha3", "data"),
             Input("country2-dropdown", "value"),
             Input("timespan-dropdown", "value"),
             Input("moving-average-data", "data"),
