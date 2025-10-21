@@ -22,113 +22,101 @@ def layout(country_code_alpha3: str | None = None):
         [
             dcc.Store(id="country1-iso-alpha3", data=country_code_alpha3),
             dcc.Store(id="country1-localised-name"),
+            html.H1(
+                [
+                    html.Span(id="heading-country1-name", style={"fontWeight": "bold"}),
+                    "'s Policy Pulse",
+                ]
+            ),
+            # Status and cache info
             html.Div(
-                className="container",
-                children=[
-                    *breadcrumb.layout,
-                    html.H1(
-                        [
-                            html.Span(
-                                id="heading-country1-name", style={"fontWeight": "bold"}
-                            ),
-                            "'s Policy Pulse",
-                        ]
-                    ),
-                    # Status and cache info
-                    html.Div(
-                        id="status-display",
-                    ),
-                    html.H2("Global Alignment Map"),
-                    *alignment_choropleth.layout,
-                    html.H2("Bi-country Alignment Comparison Graph"),
+                id="status-display",
+            ),
+            html.H2("Global Alignment Map"),
+            *alignment_choropleth.layout,
+            html.H2("Bi-country Alignment Comparison Graph"),
+            html.Div(
+                [
                     html.Div(
                         [
-                            html.Div(
-                                [
-                                    html.Label(
-                                        "Select a country to compare with:",
-                                        style={
-                                            "fontWeight": "bold",
-                                            "marginBottom": "5px",
-                                        },
-                                    ),
-                                    dcc.Dropdown(
-                                        id="country2-dropdown",
-                                        options=[
-                                            {"label": country, "value": country}
-                                            for country in data.available_countries
-                                        ],
-                                        value=(
-                                            data.available_countries[1]
-                                            if len(data.available_countries) > 1
-                                            else data.available_countries[0]
-                                        ),
-                                        clearable=False,
-                                        style={"marginBottom": "15px"},
-                                    ),
-                                ],
+                            html.Label(
+                                "Select a country to compare with:",
                                 style={
-                                    "width": "30%",
-                                    "display": "inline-block",
+                                    "fontWeight": "bold",
+                                    "marginBottom": "5px",
                                 },
                             ),
-                            html.Div(
-                                [
-                                    html.Label(
-                                        "Time Span (days):",
-                                        style={
-                                            "fontWeight": "bold",
-                                            "marginBottom": "5px",
-                                        },
-                                    ),
-                                    dcc.Dropdown(
-                                        id="timespan-dropdown",
-                                        options=[
-                                            {"label": "30 days", "value": 30},
-                                            {"label": "90 days", "value": 90},
-                                            {"label": "180 days", "value": 180},
-                                            {"label": "365 days", "value": 365},
-                                            {
-                                                "label": "730 days (2 years)",
-                                                "value": 730,
-                                            },
-                                        ],
-                                        value=365,
-                                        clearable=False,
-                                        style={"marginBottom": "15px"},
-                                    ),
+                            dcc.Dropdown(
+                                id="country2-dropdown",
+                                options=[
+                                    {"label": country, "value": country}
+                                    for country in data.available_countries
                                 ],
-                                style={"width": "30%", "display": "inline-block"},
-                            ),
-                        ]
-                    ),
-                    *alignment_graph.layout,
-                    html.H2(
-                        "Keyword Wordcloud for GA Resolution Subjects (Not Country Specific)"
-                    ),
-                    *wordcloud_viz.layout,
-                    # Footer with instructions
-                    html.Div(
-                        [
-                            html.Hr(),
-                            html.P(
-                                [
-                                    "💡 ",
-                                    html.Strong("How it works:"),
-                                    " Select countries and time span above. ",
-                                    "Data is calculated on-demand and cached for fast re-access. ",
-                                    "Alignment ranges from 0 (complete disalignment) to 1 (perfect alignment).",
-                                ],
-                                style={
-                                    "color": "#7f8c8d",
-                                    "textAlign": "center",
-                                    "fontSize": "14px",
-                                },
+                                value=(
+                                    data.available_countries[1]
+                                    if len(data.available_countries) > 1
+                                    else data.available_countries[0]
+                                ),
+                                clearable=False,
+                                style={"marginBottom": "15px"},
                             ),
                         ],
-                        style={"padding": "20px", "marginTop": "40px"},
+                        style={
+                            "width": "30%",
+                            "display": "inline-block",
+                        },
+                    ),
+                    html.Div(
+                        [
+                            html.Label(
+                                "Time Span (days):",
+                                style={
+                                    "fontWeight": "bold",
+                                    "marginBottom": "5px",
+                                },
+                            ),
+                            dcc.Dropdown(
+                                id="timespan-dropdown",
+                                options=[
+                                    {"label": "30 days", "value": 30},
+                                    {"label": "90 days", "value": 90},
+                                    {"label": "180 days", "value": 180},
+                                    {"label": "365 days", "value": 365},
+                                    {
+                                        "label": "730 days (2 years)",
+                                        "value": 730,
+                                    },
+                                ],
+                                value=365,
+                                clearable=False,
+                                style={"marginBottom": "15px"},
+                            ),
+                        ],
+                        style={"width": "30%", "display": "inline-block"},
+                    ),
+                ]
+            ),
+            *alignment_graph.layout,
+            # Footer with instructions
+            html.Div(
+                [
+                    html.Hr(),
+                    html.P(
+                        [
+                            "💡 ",
+                            html.Strong("How it works:"),
+                            " Select countries and time span above. ",
+                            "Data is calculated on-demand and cached for fast re-access. ",
+                            "Alignment ranges from 0 (complete disalignment) to 1 (perfect alignment).",
+                        ],
+                        style={
+                            "color": "#7f8c8d",
+                            "textAlign": "center",
+                            "fontSize": "14px",
+                        },
                     ),
                 ],
+                style={"padding": "20px", "marginTop": "40px"},
             ),
         ]
     )
@@ -155,10 +143,8 @@ clientside_callback(
     Input("country1-localised-name", "data"),
 )
 
-breadcrumb.register_callbacks()
 alignment_choropleth.register_callbacks(data.query_engine)
 alignment_graph.register_callbacks()
-wordcloud_viz.register_callbacks()
 
 
 @callback(

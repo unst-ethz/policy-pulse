@@ -10,9 +10,7 @@ def register_callbacks():
 layout = (
     html.Header(
         [
-            html.H1(
-                "UN-ETH Policy Pulse",
-            ),
+            html.H1(dcc.Link("UN-ETH Policy Pulse", href="/")),
             html.Div(
                 dcc.Dropdown(
                     options=[

@@ -23,9 +23,13 @@
     margin: 0;
     padding: 0;
     text-align: center;
-    color: white;
     font-weight: 400;
     justify-self: start;
+
+    a {
+      color: white;
+      text-decoration: none;
+    }
   }
 
   .navbar-dropdown {
