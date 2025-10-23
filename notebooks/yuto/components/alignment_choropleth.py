@@ -12,7 +12,7 @@ def register_callbacks(query_engine):
             Output("alignment-choropleth-status", "children"),
         ],
         [
-            Input("country1-dropdown", "value"),
+            Input("country1-iso-alpha3", "data"),
         ],
     )
     def generate_chart(country1):

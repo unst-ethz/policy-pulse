@@ -1,9 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&display=swap');
+
 body {
   margin: 0;
-  font-family: "Helvetica", sans-serif;
+  font-family: "IBM Plex Sans", sans-serif;
 }
 
 .container {
   max-width: 1200px;
   margin: 0 auto;
+}
+
+h1, h2 {
+  font-weight: 400;
 }
