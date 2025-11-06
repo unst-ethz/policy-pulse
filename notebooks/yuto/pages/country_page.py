@@ -128,12 +128,25 @@ def layout(country_code_alpha3: str | None = None):
 # Client-side callback from country1-iso-alpha3 (ISO alpha3) to localised name.
 clientside_callback(
     """
-    function localise_iso_country(iso_three_digit) {
-        return new Intl.DisplayNames(["en"], { type: "region" }).of(window.getCountryISO2(iso_three_digit));
+    function localise_iso_country(iso_three_digit, navbar_clicks) {
+        // Check if triggered by navbar click
+        const triggered = dash_clientside.callback_context.triggered;
+        if (triggered && triggered[0] && triggered[0].prop_id === 'navbar-home-click.n_clicks') {
+            return null;
+        }
+        
+        // Otherwise localize the country code
+        if (!iso_three_digit) return null;
+        const iso2 = window.getCountryISO2(iso_three_digit);
+        if (!iso2) return iso_three_digit;
+        return new Intl.DisplayNames(["en"], { type: "region" }).of(iso2);
     }
     """,
     Output("country1-localised-name", "data"),
-    Input("country1-iso-alpha3", "data"),
+    [
+        Input("country1-iso-alpha3", "data"),
+        Input("navbar-home-click", "n_clicks")
+    ],
 )
 
 clientside_callback(

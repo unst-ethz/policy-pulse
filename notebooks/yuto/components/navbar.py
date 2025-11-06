@@ -1,18 +1,26 @@
-from dash import Input, Output, clientside_callback, html, dcc
+from dash import Input, Output, callback, clientside_callback, html, dcc
 
 from .. import data
 
 
 def register_callbacks():
-    pass
+
+    @callback(
+        Output("navbar-country-dropdown", "value"),
+        Input("navbar-home-click", "n_clicks"),
+        prevent_initial_call=True
+    )
+    def reset_country_dropdown(n_clicks):
+        return None
 
 
 layout = (
     html.Header(
         [
-            html.H1(dcc.Link("UN-ETH Policy Pulse", href="/")),
+            html.H1(html.Div(id="navbar-home-click", children=dcc.Link("UN-ETH Policy Pulse", href="/"))),
             html.Div(
                 dcc.Dropdown(
+                    id="navbar-country-dropdown",
                     options=[
                         {
                             "label": dcc.Link([data.get_country_name(country)], href="/country/" + country),
