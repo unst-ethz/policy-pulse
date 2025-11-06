@@ -35,6 +35,18 @@ def register_callbacks(query_engine):
             locations="three_letter_country",
         )
 
+        fig.add_trace(
+            go.Choropleth(
+                locations=[country1],
+                z=[1],  # dummy value
+                colorscale=[[0, "green"], [1, "green"]],  # solid green color
+                showscale=False,
+                hovertemplate=f"<b>{country1}</b> (Selected)<extra></extra>",
+                marker_line_color="black",
+                marker_line_width=2,
+            )
+        )
+        
         fig.update_geos(
             projection_type="azimuthal equidistant",
             projection_rotation=dict(lon=0, lat=90, roll=0),
