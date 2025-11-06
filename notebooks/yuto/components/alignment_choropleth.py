@@ -35,13 +35,19 @@ def register_callbacks(query_engine):
             locations="three_letter_country",
         )
 
+        fig.update_geos(
+            projection_type="azimuthal equidistant",
+            projection_rotation=dict(lon=0, lat=90, roll=0),
+            projection_scale=0.8
+        )
+
         # Status message
         status_msg = html.Div(
             [
                 html.Div(
                     [
                         html.Strong("Chart Updated Successfully! "),
-                        f"Processed {len(data[["alignment"]])} data points.",
+                        f"Processed {len(data[['alignment']])} data points.",
                     ]
                 ),
             ]
