@@ -1,5 +1,7 @@
 import functools
 import time
+import numpy as np
+from typing import List
 from dash import Input, Output, callback, clientside_callback, html, dcc, register_page
 import pandas as pd
 
@@ -57,6 +59,7 @@ def layout(country_code_alpha3: str | None = None):
                                     if len(data.available_countries) > 1
                                     else data.available_countries[0]
                                 ),
+                                multi=True,
                                 clearable=False,
                                 style={"marginBottom": "15px"},
                             ),
@@ -159,62 +162,88 @@ alignment_graph.register_callbacks()
         Input("timespan-dropdown", "value"),
     ],
 )
+def _calculate_data_wrapper(country1: str, country2: List[str] | str, time_span: int):
+    """Wrapper that converts list to tuple for caching."""
+    # normalize country2 to tuple (hashable)
+    if country2 is None:
+        return ("No comparison country selected.", None, None)
+    selected_tuple = tuple(country2) if isinstance(country2, list) else (country2,)
+    
+    return _calculate_data_uncached(country1, selected_tuple, time_span)
+
 @functools.lru_cache(maxsize=100)
-def _calculate_data_uncached(country1: str, country2: str, time_span: int):
+def _calculate_data_uncached(country1: str, selected_tuple: tuple, time_span: int):
     """Calculate moving average data for country pair (cached)."""
-    if country1 == country2:
+    # Normalize country2 to a list
+    selected = list(selected_tuple)  # convert back to list for processing
+    
+    # remove country1 if accidentally selected
+    selected = [c for c in selected if c != country1]
+    if len(selected) == 0:
         return (
-            "Same country selected for both dropdowns. Please choose different countries.",
+            "No valid countries selected. Please choose valid countries (excluding the primary country).",
             None,
             None,
         )
 
-    print(f"🔄 Calculating {country1} vs {country2} (span: {time_span})")
+    print(f"🔄 Calculating {country1} vs {selected} (span: {time_span})")
     start_time = time.time()
 
     try:
-        # Calculate alignment
-        def calc_alignment(row: pd.Series):
-            vote_mapping = {"Y": 1, "A": 0, "N": -1}
-            if row[country1] in vote_mapping and row[country2] in vote_mapping:
-                diff = abs(vote_mapping[row[country1]] - vote_mapping[row[country2]])
-                return 1 - (diff / 2)
-            return float("nan")
+        vote_mapping = {"Y": 1, "A": 0, "N": -1}
 
-        # Process data
-        df_subset = data.query_engine.query_resolutions()[["date", country1, country2]].copy()
-        df_subset["alignment"] = df_subset.apply(calc_alignment, axis=1)
-        df_subset = df_subset.sort_values("date").reset_index(drop=True)
+        # Pull only required columns
+        cols = ["date", country1] + selected
+        df = data.query_engine.query_resolutions()[cols].copy()
 
-        # Set start date to first date where both countries have voted
-        mask = df_subset[[country1, country2]].notna().all(axis=1)
-        first_pos = mask.values.argmax()   # integer position of first True
-        df_subset = df_subset.iloc[first_pos:].copy()
-        df_subset.reset_index(drop=True, inplace=True)
+        # normalize and map votes to numeric (robust handling)
+        vote_cols = [country1] + selected
+        # convert to string, strip whitespace, uppercase
+        df[vote_cols] = df[vote_cols].astype(str).apply(lambda s: s.str.strip().str.upper())
+        # replace common null-like strings with actual NaN
+        df[vote_cols] = df[vote_cols].replace({"": pd.NA, "NAN": pd.NA, "NONE": pd.NA, "<NA>": pd.NA})
+        # map to numbers
+        df[vote_cols] = df[vote_cols].replace(vote_mapping)
+        # coerce any remaining non-numeric to NaN
+        df[vote_cols] = df[vote_cols].apply(pd.to_numeric, errors="coerce")
 
-        # Apply date filters
-        # if self.start_date:
-        #     df_subset = df_subset[df_subset["date"] >= pd.to_datetime(self.start_date)]
-        # if self.end_date:
-        #     df_subset = df_subset[df_subset["date"] <= pd.to_datetime(self.end_date)]
+        # ensure dates and sort
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df = df.sort_values("date").reset_index(drop=True)
 
-        # Calculate moving averages with the specified time span
-        df_subset["sma"] = (
-            df_subset["alignment"].rolling(window=time_span, min_periods=1).mean()
-        )
-        df_subset["ema"] = (
-            df_subset["alignment"].ewm(span=time_span, adjust=False).mean()
-        )
-        df_subset["cma"] = df_subset["alignment"].expanding(min_periods=1).mean()
+        # start after first row where country1 and at least one selected country voted
+        mask_any = (~df[country1].isna()) & df[selected].notna().any(axis=1)
+        if not mask_any.any():
+            return ("No overlapping votes between the selected countries.", None, None)
+        first_pos = mask_any.values.argmax()
+        df = df.iloc[first_pos:].reset_index(drop=True)
+
+        # compute per-country agreement (vectorized)
+        diffs = df[selected].subtract(df[country1], axis=0).abs()
+        agreement = 1.0 - (diffs / 2.0)
+
+        # set agreement to NaN where either side didn't vote
+        for col in selected:
+            both_voted = df[[country1, col]].notna().all(axis=1)
+            agreement[col] = agreement[col].where(both_voted, np.nan)
+
+        # build output dataframe with per-country alignment and moving averages
+        out = pd.DataFrame({"date": df["date"]})
+        for col in selected:
+            align_col = f"alignment_{col}"
+            sma_col = f"sma_{col}"
+            #ema_col = f"ema_{col}"
+            #cma_col = f"cma_{col}"
+
+            out[align_col] = agreement[col]
+            out[sma_col] = out[align_col].rolling(window=time_span, min_periods=time_span//4).mean()
+            #out[ema_col] = out[align_col].ewm(span=time_span, adjust=False).mean()
+            #out[cma_col] = out[align_col].expanding(min_periods=1).mean()
 
         calc_time = time.time() - start_time
-        print(f"✅ Calculated in {calc_time:.2f}s ({len(df_subset):,} points)")
+        print(f"✅ Calculated in {calc_time:.2f}s ({len(out):,} points)")
 
-        return (
-            None,
-            df_subset.to_json(date_format="iso"),
-            calc_time,
-        )
+        return (None, out.to_json(date_format="iso"), calc_time)
 
     except Exception as e:
         print(f"❌ Calculation error: {e}")
