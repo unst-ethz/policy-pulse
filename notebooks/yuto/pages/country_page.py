@@ -4,6 +4,7 @@ import numpy as np
 from typing import List
 from dash import Input, Output, callback, clientside_callback, html, dcc, register_page
 import pandas as pd
+import random
 
 from ..components import breadcrumb
 from ..components import alignment_choropleth
@@ -20,6 +21,9 @@ register_page(__name__, path_template="/country/<country_code_alpha3>")
 
 
 def layout(country_code_alpha3: str | None = None):
+    
+    available = [c for c in data.available_countries if c != country_code_alpha3]
+    default_countries = random.sample(available, k=4)
     return html.Div(
         [
             dcc.Store(id="country1-iso-alpha3", data=country_code_alpha3),
@@ -54,11 +58,7 @@ def layout(country_code_alpha3: str | None = None):
                                     {"label": data.get_country_name(country), "value": country}
                                     for country in data.available_countries
                                 ],
-                                value=(
-                                    data.available_countries[1]
-                                    if len(data.available_countries) > 1
-                                    else data.available_countries[0]
-                                ),
+                                value=default_countries,
                                 multi=True,
                                 clearable=False,
                                 style={"marginBottom": "15px"},
