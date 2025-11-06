@@ -51,7 +51,7 @@ def layout(country_code_alpha3: str | None = None):
                             dcc.Dropdown(
                                 id="country2-dropdown",
                                 options=[
-                                    {"label": country, "value": country}
+                                    {"label": data.get_country_name(country), "value": country}
                                     for country in data.available_countries
                                 ],
                                 value=(

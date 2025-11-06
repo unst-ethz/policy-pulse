@@ -15,7 +15,7 @@ layout = (
                 dcc.Dropdown(
                     options=[
                         {
-                            "label": dcc.Link([country], href="/country/" + country),
+                            "label": dcc.Link([data.get_country_name(country)], href="/country/" + country),
                             "value": country,
                         }
                         for country in data.available_countries

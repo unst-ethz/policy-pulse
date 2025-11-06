@@ -2,7 +2,7 @@ from dash import dcc, Input, Output, callback, html
 import plotly.graph_objects as go
 import pandas as pd
 from io import StringIO
-
+from ..data import get_country_name
 
 def register_callbacks():
 
@@ -40,7 +40,7 @@ def register_callbacks():
                         x=df["date"],
                         y=df[sma_col],
                         mode="lines",
-                        name=f"{c} ({country1}) SMA",
+                        name=f"{get_country_name(c)}", #f"{c} ({country1}) SMA",
                         line=dict(color=colors[i % len(colors)]),
                     )
                 )
@@ -56,7 +56,7 @@ def register_callbacks():
                 )
 
         fig.update_layout(
-            title=f"Alignment: {country1} vs {', '.join(selected)}",
+            title=f"Alignment: {get_country_name(country1)} vs {', '.join([get_country_name(c) for c in selected])}",
             xaxis_title="Date",
             yaxis_title="Agreement",
             yaxis=dict(range=[0, 1]),

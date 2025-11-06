@@ -205,3 +205,7 @@ class ResolutionQueryEngine:
             
             self.logger.info(f"Retrieved agreement scores for {len(scores_df)} resolutions")
             return scores_df
+        
+    def get_available_countries(self) -> List[str]:
+        """Get list of available country codes in the dataset."""
+        return self.country_columns
