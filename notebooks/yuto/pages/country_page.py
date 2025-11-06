@@ -182,10 +182,15 @@ def _calculate_data_uncached(country1: str, country2: str, time_span: int):
             return float("nan")
 
         # Process data
-        df_subset = data.df_ga_transformed[["date", country1, country2]].copy()
+        df_subset = data.query_engine.query_resolutions()[["date", country1, country2]].copy()
         df_subset["alignment"] = df_subset.apply(calc_alignment, axis=1)
-        df_subset["date"] = pd.to_datetime(df_subset["date"])
         df_subset = df_subset.sort_values("date").reset_index(drop=True)
+
+        # Set start date to first date where both countries have voted
+        mask = df_subset[[country1, country2]].notna().all(axis=1)
+        first_pos = mask.values.argmax()   # integer position of first True
+        df_subset = df_subset.iloc[first_pos:].copy()
+        df_subset.reset_index(drop=True, inplace=True)
 
         # Apply date filters
         # if self.start_date:

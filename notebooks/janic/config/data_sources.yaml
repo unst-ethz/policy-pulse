@@ -10,7 +10,7 @@ data_sources:
     ga_resolutions:
       description: "UN General Assembly Resolution voting data"
       source_type: "file"
-      url: "https://digitallibrary.un.org/record/4060887/files/2025_9_19_ga_voting.csv"
+      url: "https://digitallibrary.un.org/nanna/record/4060887/files/2025_9_19_ga_voting.csv?withWatermark=0&withMetadata=0&registerDownload=1&version=1"
       format: "csv"
       
     #sc_resolutions:
@@ -22,7 +22,7 @@ data_sources:
   thesaurus:
     description: "UNBIS Thesaurus hierarchy"
     source_type: "file"
-    url: "https://digitallibrary.un.org/record/4075456/files/unbist-20250708_2.ttl"
+    url: "https://digitallibrary.un.org/nanna/record/4075456/files/unbist-20250708_2.ttl?withWatermark=0&withMetadata=0&registerDownload=1&version=1"
     format: "ttl"
     
 paths:

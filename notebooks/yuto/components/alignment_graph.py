@@ -35,6 +35,11 @@ def register_callbacks():
 
         data = pd.read_json(StringIO(moving_average_data))
 
+        start_date = data["date"].min()
+        end_date = data["date"].max()
+        start_str = start_date.strftime("%Y-%m-%d") if pd.notna(start_date) else "N/A"
+        end_str = end_date.strftime("%Y-%m-%d") if pd.notna(end_date) else "N/A"
+
         # Add traces
         fig.add_trace(
             go.Scatter(
@@ -103,7 +108,7 @@ def register_callbacks():
                 html.Div(
                     [
                         html.Strong("Chart Updated Successfully! "),
-                        f"Processed {total_count:,} data points.",
+                        f"Processed {total_count:,} data points between {start_str} and {end_str}.",
                     ]
                 ),
             ]
