@@ -25,6 +25,7 @@ layout = (
                         {
                             "label": dcc.Link([data.get_country_name(country)], href="/country/" + country),
                             "value": country,
+                            "search": data.get_country_name(country),
                         }
                         for country in data.available_countries
                     ],
