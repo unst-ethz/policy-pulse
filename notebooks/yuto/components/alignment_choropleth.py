@@ -33,6 +33,7 @@ def register_callbacks(query_engine):
             color_continuous_scale=px.colors.sequential.RdBu,
             range_color=[0, 1],
             locations="three_letter_country",
+            projection="robinson",
         )
 
         fig.add_trace(
@@ -46,12 +47,11 @@ def register_callbacks(query_engine):
                 marker_line_width=2,
             )
         )
-        
-        fig.update_geos(
-            projection_type="azimuthal equidistant",
-            projection_rotation=dict(lon=0, lat=90, roll=0),
-            projection_scale=0.8
-        )
+
+        # fig.update_geos(
+        #     projection_type="azimuthal equidistant",
+        #    # projection_rotation=dict(lon=0, lat=90, roll=0),
+        # )
 
         # Status message
         status_msg = html.Div(
@@ -74,7 +74,7 @@ layout = (
             html.Div(id="alignment-choropleth-status"),
             dcc.Loading(
                 children=[
-                    dcc.Graph(id="alignment-choropleth", style={"height": "600px"})
+                    dcc.Graph(id="alignment-choropleth", style={"height": "600px", "width": "100%"}),
                 ],
                 type="cube",
                 color="#3498db",
