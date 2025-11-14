@@ -3,15 +3,7 @@ import sys
 import pandas as pd
 import pycountry
 
-# Add Janic's datastream module to search path
-sys.path.append(
-    os.path.normpath(
-        os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "..", "notebooks", "janic"
-        )
-    )
-)
-from unDataStream import DataRepository, ResolutionQueryEngine  # type: ignore
+from .un_data_stream import DataRepository, ResolutionQueryEngine
 
 
 # def fetch_UN_data(dir_path: str | None = None):
@@ -150,18 +142,7 @@ from unDataStream import DataRepository, ResolutionQueryEngine  # type: ignore
 #     ]
 # ]
 
-repo = DataRepository(
-    config_path=os.path.normpath(
-        os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "..",
-            "notebooks",
-            "janic",
-            "config",
-            "data_sources.yaml",
-        )
-    )
-)
+repo = DataRepository(config_path="config/data_sources.yaml")
 query_engine = ResolutionQueryEngine(repo=repo)
 
 available_countries = query_engine.get_available_countries()
