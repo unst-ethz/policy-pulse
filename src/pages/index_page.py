@@ -3,10 +3,10 @@ import time
 from dash import Input, Output, callback, clientside_callback, html, dcc, register_page
 import pandas as pd
 
-from ..components import breadcrumb
-from ..components import alignment_choropleth
-from ..components import alignment_graph
-from ..components import wordcloud_viz
+from ..features import breadcrumb
+from ..features import alignment_choropleth
+from ..features import alignment_graph
+from ..features import wordcloud_viz
 from .. import data
 
 

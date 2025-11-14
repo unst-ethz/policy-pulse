@@ -6,7 +6,9 @@ import pycountry
 # Add Janic's datastream module to search path
 sys.path.append(
     os.path.normpath(
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "janic")
+        os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", "notebooks", "janic"
+        )
     )
 )
 from unDataStream import DataRepository, ResolutionQueryEngine  # type: ignore
@@ -153,6 +155,7 @@ repo = DataRepository(
         os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
             "..",
+            "notebooks",
             "janic",
             "config",
             "data_sources.yaml",
@@ -163,7 +166,10 @@ query_engine = ResolutionQueryEngine(repo=repo)
 
 available_countries = query_engine.get_available_countries()
 
-def get_country_name(iso3_code: str | None) -> str: #we need to support multiple languages at some point
+
+def get_country_name(
+    iso3_code: str | None,
+) -> str:  # we need to support multiple languages at some point
     """Get English country name from ISO3 code."""
     if iso3_code is None:
         return "Unknown"

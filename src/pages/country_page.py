@@ -6,10 +6,10 @@ from dash import Input, Output, callback, clientside_callback, html, dcc, regist
 import pandas as pd
 import random
 
-from ..components import breadcrumb
-from ..components import alignment_choropleth
-from ..components import alignment_graph
-from ..components import wordcloud_viz
+from ..features import breadcrumb
+from ..features import alignment_choropleth
+from ..features import alignment_graph
+from ..features import wordcloud_viz
 from .. import data
 
 
@@ -21,7 +21,7 @@ register_page(__name__, path_template="/country/<country_code_alpha3>")
 
 
 def layout(country_code_alpha3: str | None = None):
-    
+
     available = [c for c in data.available_countries if c != country_code_alpha3]
     default_countries = random.sample(available, k=4)
     return html.Div(
@@ -55,7 +55,10 @@ def layout(country_code_alpha3: str | None = None):
                             dcc.Dropdown(
                                 id="country2-dropdown",
                                 options=[
-                                    {"label": data.get_country_name(country), "value": country}
+                                    {
+                                        "label": data.get_country_name(country),
+                                        "value": country,
+                                    }
                                     for country in data.available_countries
                                 ],
                                 value=default_countries,
@@ -143,10 +146,7 @@ clientside_callback(
     }
     """,
     Output("country1-localised-name", "data"),
-    [
-        Input("country1-iso-alpha3", "data"),
-        Input("navbar-home-click", "n_clicks")
-    ],
+    [Input("country1-iso-alpha3", "data"), Input("navbar-home-click", "n_clicks")],
 )
 
 clientside_callback(
@@ -181,15 +181,16 @@ def _calculate_data_wrapper(country1: str, country2: List[str] | str, time_span:
     if country2 is None:
         return ("No comparison country selected.", None, None)
     selected_tuple = tuple(country2) if isinstance(country2, list) else (country2,)
-    
+
     return _calculate_data_uncached(country1, selected_tuple, time_span)
+
 
 @functools.lru_cache(maxsize=100)
 def _calculate_data_uncached(country1: str, selected_tuple: tuple, time_span: int):
     """Calculate moving average data for country pair (cached)."""
     # Normalize country2 to a list
     selected = list(selected_tuple)  # convert back to list for processing
-    
+
     # remove country1 if accidentally selected
     selected = [c for c in selected if c != country1]
     if len(selected) == 0:
@@ -212,9 +213,13 @@ def _calculate_data_uncached(country1: str, selected_tuple: tuple, time_span: in
         # normalize and map votes to numeric (robust handling)
         vote_cols = [country1] + selected
         # convert to string, strip whitespace, uppercase
-        df[vote_cols] = df[vote_cols].astype(str).apply(lambda s: s.str.strip().str.upper())
+        df[vote_cols] = (
+            df[vote_cols].astype(str).apply(lambda s: s.str.strip().str.upper())
+        )
         # replace common null-like strings with actual NaN
-        df[vote_cols] = df[vote_cols].replace({"": pd.NA, "NAN": pd.NA, "NONE": pd.NA, "<NA>": pd.NA})
+        df[vote_cols] = df[vote_cols].replace(
+            {"": pd.NA, "NAN": pd.NA, "NONE": pd.NA, "<NA>": pd.NA}
+        )
         # map to numbers
         df[vote_cols] = df[vote_cols].replace(vote_mapping)
         # coerce any remaining non-numeric to NaN
@@ -245,13 +250,17 @@ def _calculate_data_uncached(country1: str, selected_tuple: tuple, time_span: in
         for col in selected:
             align_col = f"alignment_{col}"
             sma_col = f"sma_{col}"
-            #ema_col = f"ema_{col}"
-            #cma_col = f"cma_{col}"
+            # ema_col = f"ema_{col}"
+            # cma_col = f"cma_{col}"
 
             out[align_col] = agreement[col]
-            out[sma_col] = out[align_col].rolling(window=time_span, min_periods=time_span//4).mean()
-            #out[ema_col] = out[align_col].ewm(span=time_span, adjust=False).mean()
-            #out[cma_col] = out[align_col].expanding(min_periods=1).mean()
+            out[sma_col] = (
+                out[align_col]
+                .rolling(window=time_span, min_periods=time_span // 4)
+                .mean()
+            )
+            # out[ema_col] = out[align_col].ewm(span=time_span, adjust=False).mean()
+            # out[cma_col] = out[align_col].expanding(min_periods=1).mean()
 
         calc_time = time.time() - start_time
         print(f"✅ Calculated in {calc_time:.2f}s ({len(out):,} points)")

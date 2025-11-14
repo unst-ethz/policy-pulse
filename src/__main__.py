@@ -1,8 +1,8 @@
 import dash
 from dash import dcc, html
 
-from .components import navbar
-from .components import breadcrumb
+from .features import navbar
+from .features import breadcrumb
 
 app = dash.Dash(__package__, use_pages=True)
 app.layout = html.Div(
