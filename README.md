@@ -6,3 +6,5 @@ Policy Pulse is a project by the UN-ETH Student Team on creating a powerful inte
 
 - `notebooks/` is for data exploration
 - `src/` is for the website
+
+The website can be launched with: `python3 -m src` if you have installed all dependencies in `requirements.txt`
