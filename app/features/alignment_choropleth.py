@@ -3,6 +3,10 @@ import plotly.graph_objects as go
 import pandas as pd
 import plotly.express as px
 
+from .country_coordinates import get_country_longitude
+
+
+
 
 def register_callbacks(query_engine):
 
@@ -89,10 +93,13 @@ def register_callbacks(query_engine):
             )
         )
 
-        # fig.update_geos(
-        #     projection_type="azimuthal equidistant",
-        #    # projection_rotation=dict(lon=0, lat=90, roll=0),
-        # )
+        # Center the map on the selected country's longitude (x-axis)
+        # Keep y-axis at equator (latitude = 0)
+        country_longitude = get_country_longitude(country1)
+        fig.update_geos(
+            projection_rotation_lon=-country_longitude
+        )
+
 
         # Status message
         status_msg = html.Div(
