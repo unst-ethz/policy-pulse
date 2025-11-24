@@ -1,0 +1,42 @@
+/* Tab Navigation Styling */
+
+.tabs {
+  font-family: "IBM Plex Sans", sans-serif;
+}
+
+/* Tab container */
+.tab {
+  padding: 12px 24px;
+  border: 1px solid #d5dbdb;
+  border-bottom: none;
+  background-color: #ecf0f1;
+  color: #34495e;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 400;
+  transition: all 0.2s ease;
+}
+
+/* Tab hover state */
+.tab:hover {
+  background-color: #d5dbdb;
+}
+
+/* Active/selected tab */
+.tab--selected {
+  background-color: #ffffff;
+  border-bottom: 2px solid #3498db;
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+/* Tab content container */
+.tab-content {
+  padding: 20px 0;
+}
+
+/* Tab parent container */
+.tabs__container {
+  border-bottom: 1px solid #d5dbdb;
+  margin-bottom: 20px;
+}

@@ -38,71 +38,102 @@ def layout(country_code_alpha3: str | None = None):
             html.Div(
                 id="status-display",
             ),
-            html.H2("Global Alignment Map"),
-            *alignment_choropleth.layout,
-            html.H2("Bi-country Alignment Comparison Graph"),
-            html.Div(
-                [
-                    html.Div(
-                        [
-                            html.Label(
-                                "Select a country to compare with:",
-                                style={
-                                    "fontWeight": "bold",
-                                    "marginBottom": "5px",
-                                },
-                            ),
-                            dcc.Dropdown(
-                                id="country2-dropdown",
-                                options=[
-                                    {
-                                        "label": data.get_country_name(country),
-                                        "value": country,
-                                    }
-                                    for country in data.available_countries
+            # Tab Navigation
+            dcc.Tabs(
+                id="country-view-tabs",
+                value="map",
+                children=[
+                    # TAB 1: Agreement Map
+                    dcc.Tab(
+                        label="Agreement Map",
+                        value="map",
+                        children=[
+                            html.Div(
+                                [
+                                    html.H2("Global Alignment Map"),
+                                    *alignment_choropleth.layout,
                                 ],
-                                value=default_countries,
-                                multi=True,
-                                clearable=False,
-                                style={"marginBottom": "15px"},
-                            ),
+                                className="tab-content",
+                            )
                         ],
-                        style={
-                            "width": "30%",
-                            "display": "inline-block",
-                        },
                     ),
-                    html.Div(
-                        [
-                            html.Label(
-                                "Time Span (days):",
-                                style={
-                                    "fontWeight": "bold",
-                                    "marginBottom": "5px",
-                                },
-                            ),
-                            dcc.Dropdown(
-                                id="timespan-dropdown",
-                                options=[
-                                    {"label": "30 days", "value": 30},
-                                    {"label": "90 days", "value": 90},
-                                    {"label": "180 days", "value": 180},
-                                    {"label": "365 days", "value": 365},
-                                    {
-                                        "label": "730 days (2 years)",
-                                        "value": 730,
-                                    },
+                    # TAB 2: Agreement Timeline
+                    dcc.Tab(
+                        label="Agreement Timeline",
+                        value="timeline",
+                        children=[
+                            html.Div(
+                                [
+                                    html.H2("Bi-country Alignment Comparison Graph"),
+                                    html.Div(
+                                        [
+                                            html.Div(
+                                                [
+                                                    html.Label(
+                                                        "Select a country to compare with:",
+                                                        style={
+                                                            "fontWeight": "bold",
+                                                            "marginBottom": "5px",
+                                                        },
+                                                    ),
+                                                    dcc.Dropdown(
+                                                        id="country2-dropdown",
+                                                        options=[
+                                                            {
+                                                                "label": data.get_country_name(country),
+                                                                "value": country,
+                                                            }
+                                                            for country in data.available_countries
+                                                        ],
+                                                        value=default_countries,
+                                                        multi=True,
+                                                        clearable=False,
+                                                        style={"marginBottom": "15px"},
+                                                    ),
+                                                ],
+                                                style={
+                                                    "width": "30%",
+                                                    "display": "inline-block",
+                                                },
+                                            ),
+                                            html.Div(
+                                                [
+                                                    html.Label(
+                                                        "Time Span (days):",
+                                                        style={
+                                                            "fontWeight": "bold",
+                                                            "marginBottom": "5px",
+                                                        },
+                                                    ),
+                                                    dcc.Dropdown(
+                                                        id="timespan-dropdown",
+                                                        options=[
+                                                            {"label": "30 days", "value": 30},
+                                                            {"label": "90 days", "value": 90},
+                                                            {"label": "180 days", "value": 180},
+                                                            {"label": "365 days", "value": 365},
+                                                            {
+                                                                "label": "730 days (2 years)",
+                                                                "value": 730,
+                                                            },
+                                                        ],
+                                                        value=365,
+                                                        clearable=False,
+                                                        style={"marginBottom": "15px"},
+                                                    ),
+                                                ],
+                                                style={"width": "30%", "display": "inline-block"},
+                                            ),
+                                        ]
+                                    ),
+                                    *alignment_graph.layout,
                                 ],
-                                value=365,
-                                clearable=False,
-                                style={"marginBottom": "15px"},
-                            ),
+                                className="tab-content",
+                            )
                         ],
-                        style={"width": "30%", "display": "inline-block"},
                     ),
-                ]
+                ],
             ),
-            *alignment_graph.layout,
             # Footer with instructions
             html.Div(
                 [
@@ -111,7 +142,8 @@ def layout(country_code_alpha3: str | None = None):
                         [
                             "💡 ",
                             html.Strong("How it works:"),
-                            " Select countries and time span above. ",
+                            " Use the tabs above to switch between visualizations. ",
+                            "Select countries and time spans in the Timeline tab. ",
                             "Data is calculated on-demand and cached for fast re-access. ",
                             "Alignment ranges from 0 (complete disalignment) to 1 (perfect alignment).",
                         ],
