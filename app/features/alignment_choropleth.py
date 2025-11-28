@@ -6,8 +6,6 @@ import plotly.express as px
 from .country_coordinates import get_country_longitude
 
 
-
-
 def register_callbacks(query_engine):
 
     @callback(
@@ -19,14 +17,24 @@ def register_callbacks(query_engine):
             Output("alignment-choropleth-status", "children"),
         ],
         [
-            Input("country1-iso-alpha3", "data"),
+            Input("filter-component-data-store", "data"),
+            Input("filter-component-filter-store", "data"),
             Input("alignment-choropleth-timeline", "value"),
         ],
     )
-    def generate_chart(country1, year: tuple[int, int]):
-        # Find time range of all resolutions available: this should be precalculated
-        # honestly
-        all_resolutions = query_engine.query_resolutions()
+    def generate_chart(filtered_data, filter_store, year: tuple[int, int]):
+        all_resolutions = pd.read_json(filtered_data, orient="split")
+        if all_resolutions.empty:
+            # no resolutions matcing the filter
+            status_msg = html.Div(
+                [
+                    html.Div([html.Strong("No resolutions to plot")]),
+                ]
+            )
+
+            return None, None, year, None, status_msg
+
+        # Find time range available resolutions for this filtered data
         earliest_year = pd.to_datetime(
             all_resolutions["date"], errors="coerce"
         ).dt.year.min()
@@ -47,6 +55,17 @@ def register_callbacks(query_engine):
                 <= int(year[1])
             )
         ]
+        country1 = filter_store["country1_alpha3"]
+        if country1 is None:
+            # primary country is not yet selected
+            status_msg = html.Div(
+                [
+                    html.Div([html.Strong("Please select a primary country")]),
+                ]
+            )
+
+            return None, earliest_year, year, latest_year, status_msg
+
         data = query_engine.query_agreement_between_countries(
             country1,
             resolution_ids=(resolutions_in_year["undl_id"].tolist()),
@@ -96,10 +115,7 @@ def register_callbacks(query_engine):
         # Center the map on the selected country's longitude (x-axis)
         # Keep y-axis at equator (latitude = 0)
         country_longitude = get_country_longitude(country1)
-        fig.update_geos(
-            projection_rotation_lon=-country_longitude
-        )
-
+        fig.update_geos(projection_rotation_lon=-country_longitude)
 
         # Status message
         status_msg = html.Div(

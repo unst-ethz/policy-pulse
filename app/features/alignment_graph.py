@@ -4,6 +4,7 @@ import pandas as pd
 from io import StringIO
 from ..data import get_country_name
 
+
 def register_callbacks():
 
     @callback(
@@ -12,16 +13,18 @@ def register_callbacks():
             Output("alignment-chart-status", "children"),
         ],
         [
-            Input("country1-iso-alpha3", "data"),
-            Input("country2-dropdown", "value"),
+            Input("filter-component-filter-store", "data"),
             Input("timespan-dropdown", "value"),
             Input("moving-average-data", "data"),
         ],
     )
-    def generate_chart(country1, country2, time_span, moving_average_data):
+    def generate_chart(filter_store, time_span, moving_average_data):
         # moving_average_data is JSON produced by to_json; parse it
         if moving_average_data is None:
             return go.Figure(), html.Div("No data")
+
+        country1 = filter_store["country1_alpha3"]
+        country2 = filter_store["country2"]
 
         df = pd.read_json(StringIO(moving_average_data))
         df["date"] = pd.to_datetime(df["date"])
@@ -40,7 +43,7 @@ def register_callbacks():
                         x=df["date"],
                         y=df[sma_col],
                         mode="lines",
-                        name=f"{get_country_name(c)}", #f"{c} ({country1}) SMA",
+                        name=f"{get_country_name(c)}",  # f"{c} ({country1}) SMA",
                         line=dict(color=colors[i % len(colors)]),
                     )
                 )
@@ -64,9 +67,22 @@ def register_callbacks():
         )
         # status message
         total_points = len(df)
-        start_str = df["date"].min().strftime("%Y-%m-%d") if not df["date"].isna().all() else "N/A"
-        end_str = df["date"].max().strftime("%Y-%m-%d") if not df["date"].isna().all() else "N/A"
-        status_msg = html.Div([html.Strong("Chart Updated Successfully. "), f"{total_points:,} points from {start_str} to {end_str}"])
+        start_str = (
+            df["date"].min().strftime("%Y-%m-%d")
+            if not df["date"].isna().all()
+            else "N/A"
+        )
+        end_str = (
+            df["date"].max().strftime("%Y-%m-%d")
+            if not df["date"].isna().all()
+            else "N/A"
+        )
+        status_msg = html.Div(
+            [
+                html.Strong("Chart Updated Successfully. "),
+                f"{total_points:,} points from {start_str} to {end_str}",
+            ]
+        )
 
         return fig, status_msg
 
