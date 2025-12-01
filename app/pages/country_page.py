@@ -99,7 +99,7 @@ def layout(country_code_alpha3: str | None = None):
                                             html.Div(
                                                 [
                                                     html.Label(
-                                                        "Time Span (days):",
+                                                        "Window Size (resolutions):",
                                                         style={
                                                             "fontWeight": "bold",
                                                             "marginBottom": "5px",
@@ -108,16 +108,11 @@ def layout(country_code_alpha3: str | None = None):
                                                     dcc.Dropdown(
                                                         id="timespan-dropdown",
                                                         options=[
-                                                            {"label": "30 days", "value": 30},
-                                                            {"label": "90 days", "value": 90},
-                                                            {"label": "180 days", "value": 180},
-                                                            {"label": "365 days", "value": 365},
-                                                            {
-                                                                "label": "730 days (2 years)",
-                                                                "value": 730,
-                                                            },
+                                                            {"label": "200 resolutions", "value": 200},
+                                                            {"label": "350 resolutions", "value": 350},
+                                                            {"label": "500 resolutions", "value": 500},
                                                         ],
-                                                        value=365,
+                                                        value=350,
                                                         clearable=False,
                                                         style={"marginBottom": "15px"},
                                                     ),
