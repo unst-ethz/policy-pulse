@@ -131,7 +131,23 @@ layout = (
                 color="#3498db",
             ),
             dcc.RangeSlider(
-                min=0, max=1, step=1, value=[0, 0], id="alignment-choropleth-timeline"
+                min=0, 
+                max=1, 
+                step=1, 
+                value=[0, 0], 
+                id="alignment-choropleth-timeline",
+                marks={
+                    1946: '1946',
+                    1950: '1950',
+                    1960: '1960',
+                    1970: '1970',
+                    1980: '1980',
+                    1990: '1990',
+                    2000: '2000',
+                    2010: '2010',
+                    2020: '2020',
+                    2025: '2025',
+                }
             ),
         ],
     ),
