@@ -191,3 +191,9 @@ TOP_LEVEL_SUBJECTS = {
 # Map subject IDs to labels
 SUBJECT_ID_TO_LABEL_MAP = {row["subject_id"]: row["label_en"] for _, row in subject_table.iterrows()}
 
+# Resolution date range (cached to avoid recalculating)
+_all_resolutions = query_engine.query_resolutions()
+
+MIN_UN_DATE = pd.to_datetime(_all_resolutions["date"], errors="coerce").min()
+MAX_UN_DATE = pd.to_datetime(_all_resolutions["date"], errors="coerce").max()
+

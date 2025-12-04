@@ -11,12 +11,10 @@ import pandas as pd
 import numpy as np
 import datetime
 
-from ..data import get_country_name, TOP_LEVEL_SUBJECTS, SUBJECT_ID_TO_LABEL_MAP
+from ..data import get_country_name, TOP_LEVEL_SUBJECTS, SUBJECT_ID_TO_LABEL_MAP, MIN_UN_DATE, MAX_UN_DATE
 
 
 # --- Constants ---
-MIN_UN_DATE = datetime.date(1945, 1, 1)
-MAX_UN_DATE = datetime.date.today()
 MIN_VOTES_THRESHOLD = 30  # Minimum votes required for a subject to be included
 
 
