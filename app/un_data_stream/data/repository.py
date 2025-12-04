@@ -215,5 +215,20 @@ class DataRepository:
         # Calculate the agreement matrix
         self.agreement_matrices, self.country_columns = processor.calculate_agreement_matrix(self.resolution_table)
 
+        
+        expanded_subjects = set()
+        
+        for subject_id in self.resolution_subject_table["subject_id"].unique().tolist():
+            ancestors = self.closure_table[
+                self.closure_table['descendant_id'] == subject_id
+                ]['ancestor_id'].to_list()
+            for i in ancestors:
+                expanded_subjects.add(i)
+
+        expanded_subjects = list(expanded_subjects)
+        self.subject_table = self.subject_table[self.subject_table['subject_id'].isin(expanded_subjects)]
+        self.closure_table = self.closure_table[self.closure_table['ancestor_id'].isin(expanded_subjects)]
+
+
         # Save processed data
         self._save_cached_data()
