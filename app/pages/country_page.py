@@ -9,6 +9,7 @@ import random
 from ..features import breadcrumb
 from ..features import alignment_choropleth
 from ..features import alignment_graph
+from ..features import alignment_by_subject
 from ..features import wordcloud_viz
 from .. import data
 
@@ -127,6 +128,26 @@ def layout(country_code_alpha3: str | None = None):
                             )
                         ],
                     ),
+                    # TAB 3: Alignment by Subject
+                    dcc.Tab(
+                        label="Alignment by Subject",
+                        value="subject",
+                        children=[
+                            html.Div(
+                                [
+                                    html.H2("Alignment by UN Subject Area"),
+                                    html.P(
+                                        "Compare voting alignment between two countries across different UN subject areas. "
+                                        "The agreement score ranges from 0 (complete disagreement) to 1 (complete agreement). "
+                                        "Only subjects with at least 30 shared votes are shown.",
+                                        style={"color": "#7f8c8d", "marginBottom": "20px"}
+                                    ),
+                                    *alignment_by_subject.layout,
+                                ],
+                                className="tab-content",
+                            )
+                        ],
+                    ),
                 ],
             ),
             # Footer with instructions
@@ -188,6 +209,25 @@ clientside_callback(
 
 alignment_choropleth.register_callbacks(data.query_engine)
 alignment_graph.register_callbacks()
+alignment_by_subject.register_callbacks(data.query_engine)
+
+
+@callback(
+    Output("subject-country2-dropdown", "options"),
+    Output("subject-country2-dropdown", "value"),
+    Input("country1-iso-alpha3", "data"),
+)
+def populate_subject_country_dropdown(country1):
+    """Populate the subject tab country dropdown with all countries except the selected one."""
+    options = [
+        {"label": data.get_country_name(country), "value": country}
+        for country in data.available_countries
+        if country != country1
+    ]
+    # Select a random default country
+    available = [c for c in data.available_countries if c != country1]
+    default_country = random.choice(available) if available else None
+    return options, default_country
 
 
 @callback(

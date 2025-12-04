@@ -159,3 +159,35 @@ def get_country_name(
         return country.name if country else iso3_code
     except:
         return iso3_code
+
+
+# Subject data for alignment by subject feature
+_data = repo.get_data()
+subject_table = _data["subject"]
+
+# Top level subjects (level 0 in the hierarchy)
+TOP_LEVEL_SUBJECTS = {
+    'http://metadata.un.org/thesaurus/10', 
+    'http://metadata.un.org/thesaurus/09', 
+    'http://metadata.un.org/thesaurus/16', 
+    'http://metadata.un.org/thesaurus/00', 
+    'http://metadata.un.org/thesaurus/07', 
+    'http://metadata.un.org/thesaurus/04', 
+    'http://metadata.un.org/thesaurus/06', 
+    'http://metadata.un.org/thesaurus/15', 
+    'http://metadata.un.org/thesaurus/05', 
+    'http://metadata.un.org/thesaurus/03', 
+    'http://metadata.un.org/thesaurus/17', 
+    'http://metadata.un.org/thesaurus/11', 
+    'http://metadata.un.org/thesaurus/12', 
+    'http://metadata.un.org/thesaurus/13', 
+    'http://metadata.un.org/thesaurus/14', 
+    'http://metadata.un.org/thesaurus/18', 
+    'http://metadata.un.org/thesaurus/08', 
+    'http://metadata.un.org/thesaurus/01', 
+    'http://metadata.un.org/thesaurus/02'
+}
+
+# Map subject IDs to labels
+SUBJECT_ID_TO_LABEL_MAP = {row["subject_id"]: row["label_en"] for _, row in subject_table.iterrows()}
+
