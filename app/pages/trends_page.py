@@ -231,6 +231,9 @@ def _calculate_data_uncached(
         if not mask_any.any():
             return ("No overlapping votes between the selected countries.", None, None)
         first_pos = mask_any.values.argmax()
+
+        # Keep a reference to the original df for finding last vote dates
+        df_original = df.copy()
         df = df.iloc[first_pos:].reset_index(drop=True)
 
         # compute per-country agreement (vectorized)
@@ -251,11 +254,24 @@ def _calculate_data_uncached(
             # cma_col = f"cma_{col}"
 
             out[align_col] = agreement[col]
+
             out[sma_col] = (
                 out[align_col]
                 .rolling(window=time_span, min_periods=time_span // 4)
                 .mean()
             )
+
+            # Find the last date this country actually voted
+            # Use the original unfiltered df to find the last non-null vote for this country
+            last_vote_mask = df_original[col].notna()
+            if last_vote_mask.any():
+                last_vote_date = df_original.loc[last_vote_mask, "date"].max()
+                print(f"  📅 {col}: Last vote date = {last_vote_date}")
+                # Set both alignment AND moving average to NaN for dates after the last vote
+                rows_set_to_nan = (out["date"] > last_vote_date).sum()
+                out.loc[out["date"] > last_vote_date, align_col] = np.nan
+                out.loc[out["date"] > last_vote_date, sma_col] = np.nan
+                print(f"      Set {rows_set_to_nan} rows to NaN after {last_vote_date}")
             # out[ema_col] = out[align_col].ewm(span=time_span, adjust=False).mean()
             # out[cma_col] = out[align_col].expanding(min_periods=1).mean()
 
