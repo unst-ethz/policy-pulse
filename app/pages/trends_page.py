@@ -10,6 +10,7 @@ from ..features import resolution_list
 from ..features import alignment_choropleth
 from ..features import alignment_graph
 from ..features import filters
+from ..features import wordcloud_interactive
 from .. import data
 
 
@@ -87,6 +88,20 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                             )
                         ],
                     ),
+                    # TAB 3: Word Cloud
+                    dcc.Tab(
+                        label="Word Cloud",
+                        value="wordcloud",
+                        children=[
+                            html.Div(
+                                [
+                                    html.H2("Resolution Title Word Cloud"),
+                                    *wordcloud_interactive.layout,
+                                ],
+                                className="tab-content",
+                            )
+                        ],
+                    ),
                 ],
             ),
         ]
@@ -134,6 +149,7 @@ filters.register_callbacks()
 resolution_list.register_callbacks()
 alignment_choropleth.register_callbacks(data.query_engine)
 alignment_graph.register_callbacks()
+wordcloud_interactive.register_callbacks()
 
 
 @callback(

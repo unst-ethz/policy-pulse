@@ -4,7 +4,7 @@ from dash import dcc, html
 from .features import navbar
 from .features import breadcrumb
 
-app = dash.Dash(__package__, use_pages=True)
+app = dash.Dash(__package__, use_pages=True, suppress_callback_exceptions=True)
 app.layout = html.Div(
     [
         # Global client-side store shared across all pages.
