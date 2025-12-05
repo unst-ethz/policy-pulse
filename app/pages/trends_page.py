@@ -6,43 +6,60 @@ from dash import Input, Output, callback, clientside_callback, html, dcc, regist
 import pandas as pd
 import random
 
-from ..features import breadcrumb
+from ..features import resolution_list
 from ..features import alignment_choropleth
 from ..features import alignment_graph
-from ..features import wordcloud_viz
+from ..features import filters
+from ..features import wordcloud_interactive
 from .. import data
 
 
-def title(country_code_alpha3=None):
-    return f"Country-specific Policy Pulse: {country_code_alpha3}"
+def title(countr1_alpha3=None):
+    return (
+        "Policy Pulse Analysis" + f" (Country 1: {countr1_alpha3})"
+        if countr1_alpha3
+        else ""
+    )
 
 
-register_page(__name__, path_template="/country/<country_code_alpha3>")
+register_page(__name__, path_template="/trends")
 
 
-def layout(country_code_alpha3: str | None = None):
+def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
 
-    available = [c for c in data.available_countries if c != country_code_alpha3]
-    default_countries = random.sample(available, k=4)
+    available = [c for c in data.available_countries if c != countr1_alpha3]
     return html.Div(
         [
-            dcc.Store(id="country1-iso-alpha3", data=country_code_alpha3),
+            dcc.Store(id="country1-iso-alpha3", data=countr1_alpha3),
             dcc.Store(id="country1-localised-name"),
             html.H1(
                 [
-                    html.Span(id="heading-country1-name", style={"fontWeight": "bold"}),
-                    "'s Policy Pulse",
+                    "Analysis",
                 ]
             ),
             # Status and cache info
             html.Div(
                 id="status-display",
             ),
+            *filters.layout,
             # Tab Navigation
             dcc.Tabs(
                 id="country-view-tabs",
-                value="map",
+                value="resolution_list",
                 children=[
+                    dcc.Tab(
+                        label="Resolutions",
+                        value="resolution_list",
+                        children=[
+                            html.Div(
+                                [
+                                    html.H2("Preview of resolutions"),
+                                    *resolution_list.layout,
+                                ],
+                                className="tab-content",
+                            )
+                        ],
+                    ),
                     # TAB 1: Agreement Map
                     dcc.Tab(
                         label="Agreement Map",
@@ -65,63 +82,21 @@ def layout(country_code_alpha3: str | None = None):
                             html.Div(
                                 [
                                     html.H2("Bi-country Alignment Comparison Graph"),
-                                    html.Div(
-                                        [
-                                            html.Div(
-                                                [
-                                                    html.Label(
-                                                        "Select a country to compare with:",
-                                                        style={
-                                                            "fontWeight": "bold",
-                                                            "marginBottom": "5px",
-                                                        },
-                                                    ),
-                                                    dcc.Dropdown(
-                                                        id="country2-dropdown",
-                                                        options=[
-                                                            {
-                                                                "label": data.get_country_name(country),
-                                                                "value": country,
-                                                            }
-                                                            for country in data.available_countries
-                                                        ],
-                                                        value=default_countries,
-                                                        multi=True,
-                                                        clearable=False,
-                                                        style={"marginBottom": "15px"},
-                                                    ),
-                                                ],
-                                                style={
-                                                    "width": "30%",
-                                                    "display": "inline-block",
-                                                },
-                                            ),
-                                            html.Div(
-                                                [
-                                                    html.Label(
-                                                        "Window Size (resolutions):",
-                                                        style={
-                                                            "fontWeight": "bold",
-                                                            "marginBottom": "5px",
-                                                        },
-                                                    ),
-                                                    dcc.Dropdown(
-                                                        id="timespan-dropdown",
-                                                        options=[
-                                                            {"label": "200 resolutions", "value": 200},
-                                                            {"label": "350 resolutions", "value": 350},
-                                                            {"label": "500 resolutions", "value": 500},
-                                                        ],
-                                                        value=350,
-                                                        clearable=False,
-                                                        style={"marginBottom": "15px"},
-                                                    ),
-                                                ],
-                                                style={"width": "30%", "display": "inline-block"},
-                                            ),
-                                        ]
-                                    ),
                                     *alignment_graph.layout,
+                                ],
+                                className="tab-content",
+                            )
+                        ],
+                    ),
+                    # TAB 3: Word Cloud
+                    dcc.Tab(
+                        label="Word Cloud",
+                        value="wordcloud",
+                        children=[
+                            html.Div(
+                                [
+                                    html.H2("Resolution Title Word Cloud"),
+                                    *wordcloud_interactive.layout,
                                 ],
                                 className="tab-content",
                             )
@@ -129,42 +104,23 @@ def layout(country_code_alpha3: str | None = None):
                     ),
                 ],
             ),
-            # Footer with instructions
-            html.Div(
-                [
-                    html.Hr(),
-                    html.P(
-                        [
-                            "💡 ",
-                            html.Strong("How it works:"),
-                            " Use the tabs above to switch between visualizations. ",
-                            "Select countries and time spans in the Timeline tab. ",
-                            "Data is calculated on-demand and cached for fast re-access. ",
-                            "Alignment ranges from 0 (complete disalignment) to 1 (perfect alignment).",
-                        ],
-                        style={
-                            "color": "#7f8c8d",
-                            "textAlign": "center",
-                            "fontSize": "14px",
-                        },
-                    ),
-                ],
-                style={"padding": "20px", "marginTop": "40px"},
-            ),
         ]
     )
 
 
-# Client-side callback from country1-iso-alpha3 (ISO alpha3) to localised name.
+# Client-side callback from filter component's country 1 (ISO alpha3) to
+# localised name.
 clientside_callback(
     """
-    function localise_iso_country(iso_three_digit, navbar_clicks) {
+    function localise_iso_country(filter_store, navbar_clicks) {
         // Check if triggered by navbar click
         const triggered = dash_clientside.callback_context.triggered;
         if (triggered && triggered[0] && triggered[0].prop_id === 'navbar-home-click.n_clicks') {
             return null;
         }
-        
+
+        const iso_three_digit = filter_store.country1_alpha3;
+
         // Otherwise localize the country code
         if (!iso_three_digit) return null;
         const iso2 = window.getCountryISO2(iso_three_digit);
@@ -173,21 +129,27 @@ clientside_callback(
     }
     """,
     Output("country1-localised-name", "data"),
-    [Input("country1-iso-alpha3", "data"), Input("navbar-home-click", "n_clicks")],
+    [
+        Input("filter-component-filter-store", "data"),
+        Input("navbar-home-click", "n_clicks"),
+    ],
 )
 
-clientside_callback(
-    """
-    function store_to_heading(localised_name) {
-        return localised_name;
-    }
-    """,
-    Output("heading-country1-name", "children"),
-    Input("country1-localised-name", "data"),
-)
+# clientside_callback(
+#     """
+#     function store_to_heading(localised_name) {
+#         return localised_name;
+#     }
+#     """,
+#     Output("heading-country1-name", "children"),
+#     Input("country1-localised-name", "data"),
+# )
 
+filters.register_callbacks()
+resolution_list.register_callbacks()
 alignment_choropleth.register_callbacks(data.query_engine)
 alignment_graph.register_callbacks()
+wordcloud_interactive.register_callbacks()
 
 
 @callback(
@@ -197,13 +159,15 @@ alignment_graph.register_callbacks()
         Output("moving-average-calc-time", "data"),
     ],
     [
-        Input("country1-iso-alpha3", "data"),
-        Input("country2-dropdown", "value"),
+        Input("filter-component-filter-store", "data"),
         Input("timespan-dropdown", "value"),
     ],
 )
-def _calculate_data_wrapper(country1: str, country2: List[str] | str, time_span: int):
+def _calculate_data_wrapper(filter_store, time_span: int):
     """Wrapper that converts list to tuple for caching."""
+    country1 = filter_store["country1_alpha3"]
+    country2: List[str] | str = filter_store["country2"]
+
     # normalize country2 to tuple (hashable)
     if country2 is None:
         return ("No comparison country selected.", None, None)
@@ -213,8 +177,14 @@ def _calculate_data_wrapper(country1: str, country2: List[str] | str, time_span:
 
 
 @functools.lru_cache(maxsize=100)
-def _calculate_data_uncached(country1: str, selected_tuple: tuple, time_span: int):
+def _calculate_data_uncached(
+    country1: str | None, selected_tuple: tuple, time_span: int
+):
     """Calculate moving average data for country pair (cached)."""
+    if country1 is None:
+        # Don't calculate yet if no primary country is selected
+        return (None, None, None)
+
     # Normalize country2 to a list
     selected = list(selected_tuple)  # convert back to list for processing
 
@@ -222,7 +192,7 @@ def _calculate_data_uncached(country1: str, selected_tuple: tuple, time_span: in
     selected = [c for c in selected if c != country1]
     if len(selected) == 0:
         return (
-            "No valid countries selected. Please choose valid countries (excluding the primary country).",
+            "No valid countries selected to compare against. Please choose valid countries (excluding the primary country).",
             None,
             None,
         )
@@ -261,7 +231,7 @@ def _calculate_data_uncached(country1: str, selected_tuple: tuple, time_span: in
         if not mask_any.any():
             return ("No overlapping votes between the selected countries.", None, None)
         first_pos = mask_any.values.argmax()
-        
+
         # Keep a reference to the original df for finding last vote dates
         df_original = df.copy()
         df = df.iloc[first_pos:].reset_index(drop=True)
@@ -284,23 +254,23 @@ def _calculate_data_uncached(country1: str, selected_tuple: tuple, time_span: in
             # cma_col = f"cma_{col}"
 
             out[align_col] = agreement[col]
-            
+
             out[sma_col] = (
                 out[align_col]
                 .rolling(window=time_span, min_periods=time_span // 4)
                 .mean()
             )
-            
+
             # Find the last date this country actually voted
             # Use the original unfiltered df to find the last non-null vote for this country
             last_vote_mask = df_original[col].notna()
             if last_vote_mask.any():
-                last_vote_date = df_original.loc[last_vote_mask, 'date'].max()
+                last_vote_date = df_original.loc[last_vote_mask, "date"].max()
                 print(f"  📅 {col}: Last vote date = {last_vote_date}")
                 # Set both alignment AND moving average to NaN for dates after the last vote
-                rows_set_to_nan = (out['date'] > last_vote_date).sum()
-                out.loc[out['date'] > last_vote_date, align_col] = np.nan
-                out.loc[out['date'] > last_vote_date, sma_col] = np.nan
+                rows_set_to_nan = (out["date"] > last_vote_date).sum()
+                out.loc[out["date"] > last_vote_date, align_col] = np.nan
+                out.loc[out["date"] > last_vote_date, sma_col] = np.nan
                 print(f"      Set {rows_set_to_nan} rows to NaN after {last_vote_date}")
             # out[ema_col] = out[align_col].ewm(span=time_span, adjust=False).mean()
             # out[cma_col] = out[align_col].expanding(min_periods=1).mean()

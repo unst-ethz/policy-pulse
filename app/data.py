@@ -1,5 +1,6 @@
 import os
 import sys
+from typing import Any
 import pandas as pd
 import pycountry
 
@@ -159,3 +160,55 @@ def get_country_name(
         return country.name if country else iso3_code
     except:
         return iso3_code
+
+
+def available_subjects() -> list[dict[str, Any]]:
+    data = repo.get_data()
+
+    # data["subject"]: pd.DataFrame, totally 7341 subjects
+    subject_options_list = data["subject"].to_dict("records")
+
+    # If only want to show level zero subjects
+    # level_zero_subjects = {
+    #     'http://metadata.un.org/thesaurus/10',
+    #     'http://metadata.un.org/thesaurus/09',
+    #     'http://metadata.un.org/thesaurus/16',
+    #     'http://metadata.un.org/thesaurus/07',
+    #     'http://metadata.un.org/thesaurus/04',
+    #     'http://metadata.un.org/thesaurus/06',
+    #     'http://metadata.un.org/thesaurus/15',
+    #     'http://metadata.un.org/thesaurus/05',
+    #     'http://metadata.un.org/thesaurus/03',
+    #     'http://metadata.un.org/thesaurus/17',
+    #     'http://metadata.un.org/thesaurus/11',
+    #     'http://metadata.un.org/thesaurus/12',
+    #     'http://metadata.un.org/thesaurus/13',
+    #     'http://metadata.un.org/thesaurus/14',
+    #     'http://metadata.un.org/thesaurus/18',
+    #     'http://metadata.un.org/thesaurus/08',
+    #     'http://metadata.un.org/thesaurus/01',
+    #     'http://metadata.un.org/thesaurus/02'
+    # }
+    # subject_options_list = data["subject"][data["subject"]["subject_id"].isin(level_zero_subjects)].to_dict('records')
+
+    subject_options = [
+        {"label": r["label_en"], "value": r["subject_id"]} for r in subject_options_list
+    ]
+    # ! not sure about sequence of subjects
+    subject_options = subject_options[::-1]
+
+    return subject_options
+
+
+def get_earliest_data_date():
+    # 1946-01-26
+    data = repo.get_data()
+
+    return data["resolution"]["date"].min()
+
+
+def get_latest_data_date():
+    # 2025-09-05
+    data = repo.get_data()
+
+    return data["resolution"]["date"].max()

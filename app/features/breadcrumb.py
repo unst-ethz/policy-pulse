@@ -11,7 +11,7 @@ def register_callbacks():
         if country_full_name is not None:
             crumbs = [html.Span("Home")]
             crumbs.append(html.Span(">"))
-            crumbs.append(html.Span("Country (" + country_full_name + ")"))
+            crumbs.append(html.Span("Analysis (Country 1: " + country_full_name + ")"))
             return html.Div(children=crumbs)
         return None
 
