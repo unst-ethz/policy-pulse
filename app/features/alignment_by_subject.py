@@ -37,11 +37,9 @@ def calculate_agreement(query_engine, c1, c2, start_date, end_date, subject_list
     if all_resolutions.empty:
         return pd.DataFrame()
     
-    # 2. Query agreement between the two countries for ALL resolutions (not averaged)
-    # This returns a DataFrame with columns: undl_id, c2 (and other countries we don't need)
     agreement_df = query_engine.query_agreement_between_countries(
         country_code=c1,
-        #resolution_ids=all_resolutions['undl_id'].tolist(),
+        resolution_ids=all_resolutions['undl_id'].tolist(),
         average=False
     )
     
