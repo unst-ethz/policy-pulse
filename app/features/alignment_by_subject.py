@@ -125,17 +125,30 @@ def register_callbacks(query_engine):
             Output("alignment-by-subject-status", "children"),
         ],
         [
-            Input("country1-iso-alpha3", "data"),
-            Input("subject-country2-dropdown", "value"),
-            Input("subject-date-picker-range", "start_date"),
-            Input("subject-date-picker-range", "end_date"),
+            Input("filter-component-filter-store", "data"),
         ],
         prevent_initial_call=False
     )
-    def update_subject_alignment(c1, c2, start_date, end_date):
-        """Update the alignment by subject visualization."""
+    def update_subject_alignment(filter_params):
+        """Update the alignment by subject visualization using global filters."""
+        if not filter_params:
+             return {}, {'display': 'none'}, None, ""
+
+        c1 = filter_params.get("country1_alpha3")
+        c2_input = filter_params.get("country2")
+        start_date = filter_params.get("start_date")
+        end_date = filter_params.get("end_date")
+
+        # Handle Country 2 (take first if list)
+        c2 = None
+        if isinstance(c2_input, list) and len(c2_input) > 0:
+            c2 = c2_input[0]
+        elif isinstance(c2_input, str) and c2_input:
+            c2 = c2_input
+        
         if not c1 or not c2:
-            return {}, {'display': 'none'}, None, "Please select two countries."
+            msg = "Please select a comparison country in the sidebar settings." if c1 else "Please select a primary country."
+            return {}, {'display': 'none'}, None, msg
         
         if c1 == c2:
             return {}, {'display': 'none'}, None, "Please select two different countries."
@@ -158,7 +171,7 @@ def register_callbacks(query_engine):
             x='agreement_score', 
             y='subject_label', 
             orientation='h',
-            title=f"Voting Alignment: {get_country_name(c1)} vs {get_country_name(c2)} by Subject",
+            title=f"Voting Alignment: {get_country_name(c1)} vs {get_country_name(c2)}",
             labels={'agreement_score': 'Agreement Score', 'subject_label': 'Subject'},
             hover_data=['total_votes'],
             color='agreement_score',
@@ -218,7 +231,7 @@ def register_callbacks(query_engine):
         
         status_msg = html.Div([
             html.Strong("Chart Updated Successfully! "),
-            f"Analyzed {len(df)} subjects with sufficient voting data."
+            f"Analyzed {len(df)} subjects based on resolutions from {start_date} to {end_date}."
         ])
         
         return fig, {'display': 'block'}, table, status_msg
@@ -226,48 +239,7 @@ def register_callbacks(query_engine):
 
 # Layout for the alignment by subject feature
 layout = [
-    html.Div(
-        [
-            html.Div(
-                [
-                    html.Label(
-                        "Select a country to compare with:",
-                        style={"fontWeight": "bold", "marginBottom": "5px"},
-                    ),
-                    dcc.Dropdown(
-                        id="subject-country2-dropdown",
-                        options=[],  # Will be populated dynamically
-                        value=None,
-                        clearable=False,
-                        placeholder="Select a country...",
-                        style={"marginBottom": "15px"},
-                    ),
-                ],
-                style={"width": "30%", "display": "inline-block", "marginRight": "20px"},
-            ),
-            html.Div(
-                [
-                    html.Label(
-                        "Date Range:",
-                        style={"fontWeight": "bold", "marginBottom": "5px"},
-                    ),
-                    dcc.DatePickerRange(
-                        id="subject-date-picker-range",
-                        min_date_allowed=get_earliest_data_date(),
-                        max_date_allowed=get_latest_data_date(),
-                        start_date=get_earliest_data_date(),
-                        end_date=get_latest_data_date(),
-                        display_format='YYYY-MM-DD',
-                        style={"marginBottom": "15px"},
-                    ),
-                ],
-                style={"width": "40%", "display": "inline-block"},
-            ),
-        ],
-        style={"marginBottom": "20px"}
-    ),
-    html.Hr(),
-    html.Div(id="alignment-by-subject-status", style={"marginBottom": "10px"}),
+    html.Div(id="alignment-by-subject-status", style={"marginBottom": "10px", "marginTop": "10px", "color": "#666"}),
     dcc.Loading(
         id="alignment-by-subject-loading",
         type="circle",

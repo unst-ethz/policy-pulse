@@ -176,22 +176,6 @@ alignment_by_subject.register_callbacks(data.query_engine)
 
 
 
-@callback(
-    Output("subject-country2-dropdown", "options"),
-    Output("subject-country2-dropdown", "value"),
-    Input("country1-iso-alpha3", "data"),
-)
-def populate_subject_country_dropdown(country1):
-    """Populate the subject tab country dropdown with all countries except the selected one."""
-    options = [
-        {"label": data.get_country_name(country), "value": country}
-        for country in data.available_countries
-        if country != country1
-    ]
-    # Select a random default country
-    available = [c for c in data.available_countries if c != country1]
-    default_country = random.choice(available) if available else None
-    return options, default_country
 wordcloud_interactive.register_callbacks()
 
 
