@@ -9,8 +9,9 @@ import random
 from ..features import resolution_list
 from ..features import alignment_choropleth
 from ..features import alignment_graph
-from ..features import filters
+from ..features import alignment_by_subject
 from ..features import wordcloud_interactive
+from ..features import filters
 from .. import data
 
 
@@ -47,6 +48,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                 id="country-view-tabs",
                 value="resolution_list",
                 children=[
+                    # TAB 1: Resolution List
                     dcc.Tab(
                         label="Resolutions",
                         value="resolution_list",
@@ -60,7 +62,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                             )
                         ],
                     ),
-                    # TAB 1: Agreement Map
+                    # TAB 2: Agreement Map
                     dcc.Tab(
                         label="Agreement Map",
                         value="map",
@@ -74,7 +76,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                             )
                         ],
                     ),
-                    # TAB 2: Agreement Timeline
+                    # TAB 3: Agreement Timeline
                     dcc.Tab(
                         label="Agreement Timeline",
                         value="timeline",
@@ -88,7 +90,27 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                             )
                         ],
                     ),
-                    # TAB 3: Word Cloud
+                    # TAB 4: Alignment by Subject
+                    dcc.Tab(
+                        label="Alignment by Subject",
+                        value="subject",
+                        children=[
+                            html.Div(
+                                [
+                                    html.H2("Alignment by UN Subject Area"),
+                                    html.P(
+                                        "Compare voting alignment between two countries across different UN subject areas. "
+                                        "The agreement score ranges from 0 (complete disagreement) to 1 (complete agreement). "
+                                        "Only subjects with at least 30 shared votes are shown.",
+                                        style={"color": "#7f8c8d", "marginBottom": "20px"}
+                                    ),
+                                    *alignment_by_subject.layout,
+                                ],
+                                className="tab-content",
+                            )
+                        ],
+                    ),
+                    # TAB 5: Word Cloud
                     dcc.Tab(
                         label="Word Cloud",
                         value="wordcloud",
@@ -149,6 +171,11 @@ filters.register_callbacks()
 resolution_list.register_callbacks()
 alignment_choropleth.register_callbacks(data.query_engine)
 alignment_graph.register_callbacks()
+alignment_by_subject.register_callbacks(data.query_engine)
+
+
+
+
 wordcloud_interactive.register_callbacks()
 
 
@@ -250,8 +277,6 @@ def _calculate_data_uncached(
         for col in selected:
             align_col = f"alignment_{col}"
             sma_col = f"sma_{col}"
-            # ema_col = f"ema_{col}"
-            # cma_col = f"cma_{col}"
 
             out[align_col] = agreement[col]
 
@@ -272,8 +297,6 @@ def _calculate_data_uncached(
                 out.loc[out["date"] > last_vote_date, align_col] = np.nan
                 out.loc[out["date"] > last_vote_date, sma_col] = np.nan
                 print(f"      Set {rows_set_to_nan} rows to NaN after {last_vote_date}")
-            # out[ema_col] = out[align_col].ewm(span=time_span, adjust=False).mean()
-            # out[cma_col] = out[align_col].expanding(min_periods=1).mean()
 
         calc_time = time.time() - start_time
         print(f"✅ Calculated in {calc_time:.2f}s ({len(out):,} points)")

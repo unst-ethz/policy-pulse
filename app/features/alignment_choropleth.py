@@ -4,6 +4,9 @@ import pandas as pd
 import plotly.express as px
 
 from .country_coordinates import get_country_longitude
+from ..data import get_earliest_data_date, get_latest_data_date
+
+
 
 
 def register_callbacks(query_engine):
@@ -35,12 +38,8 @@ def register_callbacks(query_engine):
             return None, None, year, None, status_msg
 
         # Find time range available resolutions for this filtered data
-        earliest_year = pd.to_datetime(
-            all_resolutions["date"], errors="coerce"
-        ).dt.year.min()
-        latest_year = pd.to_datetime(
-            all_resolutions["date"], errors="coerce"
-        ).dt.year.max()
+        earliest_year = get_earliest_data_date().year
+        latest_year = get_latest_data_date().year
 
         if year[0] == 0 and year[1] == 0:
             year = (earliest_year, latest_year)
@@ -66,7 +65,7 @@ def register_callbacks(query_engine):
 
             return None, earliest_year, year, latest_year, status_msg
 
-        data = query_engine.query_agreement_between_countries(
+        alignment_data = query_engine.query_agreement_between_countries(
             country1,
             resolution_ids=(resolutions_in_year["undl_id"].tolist()),
             average=True,
@@ -74,25 +73,25 @@ def register_callbacks(query_engine):
 
         # Transpose and remove the first two rows which are for the selected
         # country etc
-        data = data.T[2:]
-        data = data.reset_index()
+        alignment_data = alignment_data.T[2:]
+        alignment_data = alignment_data.reset_index()
 
-        if data.empty:
+        if alignment_data.empty:
             # Simulate neutral 0.5 value for all countries
-            data = pd.DataFrame(
+            alignment_data = pd.DataFrame(
                 {
                     "three_letter_country": ["NAN"],
                     "alignment": [0.5],
                 }
             )
 
-        data.columns = ["three_letter_country", "alignment"]
+        alignment_data.columns = ["three_letter_country", "alignment"]
         # Make sure the alignment column is numeric, so we can apply the
         # continuous color scale
-        data[["alignment"]] = data[["alignment"]].apply(pd.to_numeric)
+        alignment_data[["alignment"]] = alignment_data[["alignment"]].apply(pd.to_numeric)
 
         fig = px.choropleth(
-            data,
+            alignment_data,
             color="alignment",
             color_continuous_scale=px.colors.sequential.RdBu,
             range_color=[0, 1],
@@ -123,7 +122,7 @@ def register_callbacks(query_engine):
                 html.Div(
                     [
                         html.Strong("Chart Updated Successfully! "),
-                        f"Processed {len(data[['alignment']])} data points.",
+                        f"Processed {len(alignment_data[['alignment']])} data points.",
                     ]
                 ),
             ]
