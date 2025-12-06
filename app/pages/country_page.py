@@ -11,6 +11,7 @@ from ..features import alignment_choropleth
 from ..features import alignment_graph
 from ..features import alignment_by_subject
 from ..features import wordcloud_viz
+from ..features import resolution_finder
 from .. import data
 
 
@@ -148,6 +149,24 @@ def layout(country_code_alpha3: str | None = None):
                             )
                         ],
                     ),
+                    # TAB 4: Resolution Finder
+                    dcc.Tab(
+                        label="Resolution Finder",
+                        value="resolution_finder",
+                        children=[
+                            html.Div(
+                                [
+                                    html.H2("Find Resolutions"),
+                                    html.P(
+                                        "Search and filter UN resolutions to see how this country voted.",
+                                        style={"color": "#7f8c8d", "marginBottom": "20px"}
+                                    ),
+                                    resolution_finder.layout,
+                                ],
+                                className="tab-content",
+                            )
+                        ],
+                    ),
                 ],
             ),
             # Footer with instructions
@@ -210,6 +229,7 @@ clientside_callback(
 alignment_choropleth.register_callbacks(data.query_engine)
 alignment_graph.register_callbacks()
 alignment_by_subject.register_callbacks(data.query_engine)
+resolution_finder.register_callbacks(data.query_engine)
 
 
 @callback(
@@ -320,8 +340,6 @@ def _calculate_data_uncached(country1: str, selected_tuple: tuple, time_span: in
         for col in selected:
             align_col = f"alignment_{col}"
             sma_col = f"sma_{col}"
-            # ema_col = f"ema_{col}"
-            # cma_col = f"cma_{col}"
 
             out[align_col] = agreement[col]
             
@@ -342,8 +360,6 @@ def _calculate_data_uncached(country1: str, selected_tuple: tuple, time_span: in
                 out.loc[out['date'] > last_vote_date, align_col] = np.nan
                 out.loc[out['date'] > last_vote_date, sma_col] = np.nan
                 print(f"      Set {rows_set_to_nan} rows to NaN after {last_vote_date}")
-            # out[ema_col] = out[align_col].ewm(span=time_span, adjust=False).mean()
-            # out[cma_col] = out[align_col].expanding(min_periods=1).mean()
 
         calc_time = time.time() - start_time
         print(f"✅ Calculated in {calc_time:.2f}s ({len(out):,} points)")
