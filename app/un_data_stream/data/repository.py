@@ -5,6 +5,7 @@ This module handles storage, retrieval, and caching of processed UN data,
 orchestrating the entire data processing pipeline.
 """
 
+import json
 import logging
 import pickle
 import sys
@@ -46,10 +47,14 @@ class DataRepository:
         
         # Check if data is already processed and available
         if self._has_cached_data():
-            # Cached data found -> load
-            self._load_cached_data() 
-            self.logger.info("Initialization Complete with Cached Data.")
-            return
+            # Version Check
+            if self._check_data_version():
+                # Cached data found and version matches -> load
+                self._load_cached_data() 
+                self.logger.info("Initialization Complete with Cached Data.")
+                return
+            else:
+                self.logger.info("Data version mismatch or missing. Rebuilding data...")
         
         self._build_data()
         self.logger.info("Initialization complete with fetched Data.")
@@ -147,6 +152,37 @@ class DataRepository:
         else:
             self.logger.info("Cached Data files not found.")
         return all_exist
+
+    def _check_data_version(self) -> bool:
+        """
+        Check if the cached data version matches the config version.
+        
+        Returns:
+             bool: True if versions match, False otherwise.
+        """
+        data_path = Path(self.config['paths']['data'])
+        metadata_file = data_path / 'metadata.json'
+        
+        if not metadata_file.exists():
+            self.logger.warning("No metadata file found for cached data.")
+            return False
+            
+        try:
+            with open(metadata_file, 'r') as f:
+                metadata = json.load(f)
+                
+            cached_version = metadata.get('version')
+            config_version = str(self.config.get('version'))
+            
+            if str(cached_version) == config_version:
+                self.logger.info(f"Data version match: {cached_version}")
+                return True
+            else:
+                self.logger.warning(f"Data version mismatch. Cached: {cached_version}, Config: {config_version}")
+                return False
+        except Exception as e:
+             self.logger.error(f"Error checking data version: {e}")
+             return False
     
     def _load_cached_data(self):
         """Load cached data files into DataFrames."""
@@ -184,6 +220,15 @@ class DataRepository:
                 'country_columns': self.country_columns
             }
             pickle.dump(agreement_data, f)
+            
+        # Save Metadata (Version)
+        metadata = {
+            'version': self.config.get('version', 'unknown'),
+            'last_updated': self.config.get('last_updated', 'unknown')
+        }
+        with open(data_path / 'metadata.json', 'w') as f:
+            json.dump(metadata, f, indent=4)
+        self.logger.info(f"Saved data metadata (version {metadata['version']})")
 
     def _build_data(self):
         """Build processed data tables from raw sources."""
