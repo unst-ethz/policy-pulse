@@ -192,14 +192,6 @@ TOP_LEVEL_SUBJECTS = {
 # Map subject IDs to labels
 SUBJECT_ID_TO_LABEL_MAP = {row["subject_id"]: row["label_en"] for _, row in subject_table.iterrows()}
 
-# Resolution date range (cached to avoid recalculating)
-_all_resolutions = query_engine.query_resolutions()
-
-MIN_UN_DATE = pd.to_datetime(_all_resolutions["date"], errors="coerce").min()
-MAX_UN_DATE = pd.to_datetime(_all_resolutions["date"], errors="coerce").max()
-
-
-
 def available_subjects() -> list[dict[str, Any]]:
     data = repo.get_data()
 
@@ -242,11 +234,11 @@ def get_earliest_data_date():
     # 1946-01-26
     data = repo.get_data()
 
-    return data["resolution"]["date"].min()
+    return pd.to_datetime(data["resolution"]["date"].min())
 
 
 def get_latest_data_date():
     # 2025-09-05
     data = repo.get_data()
 
-    return data["resolution"]["date"].max()
+    return pd.to_datetime(data["resolution"]["date"].max())

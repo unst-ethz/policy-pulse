@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 import datetime
 
-from ..data import get_country_name, TOP_LEVEL_SUBJECTS, SUBJECT_ID_TO_LABEL_MAP, MIN_UN_DATE, MAX_UN_DATE
+from ..data import get_country_name, TOP_LEVEL_SUBJECTS, SUBJECT_ID_TO_LABEL_MAP, get_earliest_data_date, get_latest_data_date
 
 
 # --- Constants ---
@@ -253,10 +253,10 @@ layout = [
                     ),
                     dcc.DatePickerRange(
                         id="subject-date-picker-range",
-                        min_date_allowed=MIN_UN_DATE,
-                        max_date_allowed=MAX_UN_DATE,
-                        start_date=MIN_UN_DATE,
-                        end_date=MAX_UN_DATE,
+                        min_date_allowed=get_earliest_data_date(),
+                        max_date_allowed=get_latest_data_date(),
+                        start_date=get_earliest_data_date(),
+                        end_date=get_latest_data_date(),
                         display_format='YYYY-MM-DD',
                         style={"marginBottom": "15px"},
                     ),

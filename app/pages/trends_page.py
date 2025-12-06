@@ -11,7 +11,6 @@ from ..features import alignment_choropleth
 from ..features import alignment_graph
 from ..features import alignment_by_subject
 from ..features import wordcloud_interactive
-from ..features import resolution_finder
 from ..features import filters
 from .. import data
 
@@ -49,6 +48,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                 id="country-view-tabs",
                 value="resolution_list",
                 children=[
+                    # TAB 1: Resolution List
                     dcc.Tab(
                         label="Resolutions",
                         value="resolution_list",
@@ -62,7 +62,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                             )
                         ],
                     ),
-                    # TAB 1: Agreement Map
+                    # TAB 2: Agreement Map
                     dcc.Tab(
                         label="Agreement Map",
                         value="map",
@@ -76,7 +76,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                             )
                         ],
                     ),
-                    # TAB 2: Agreement Timeline
+                    # TAB 3: Agreement Timeline
                     dcc.Tab(
                         label="Agreement Timeline",
                         value="timeline",
@@ -90,7 +90,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                             )
                         ],
                     ),
-                    # TAB 3: Alignment by Subject
+                    # TAB 4: Alignment by Subject
                     dcc.Tab(
                         label="Alignment by Subject",
                         value="subject",
@@ -110,25 +110,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                             )
                         ],
                     ),
-                    # TAB 4: Resolution Finder
-                    dcc.Tab(
-                        label="Resolution Finder",
-                        value="resolution_finder",
-                        children=[
-                            html.Div(
-                                [
-                                    html.H2("Find Resolutions"),
-                                    html.P(
-                                        "Search and filter UN resolutions to see how this country voted.",
-                                        style={"color": "#7f8c8d", "marginBottom": "20px"}
-                                    ),
-                                    resolution_finder.layout,
-                                ],
-                                className="tab-content",
-                            )
-                        ],
-                    ),
-                    # TAB 3: Word Cloud
+                    # TAB 5: Word Cloud
                     dcc.Tab(
                         label="Word Cloud",
                         value="wordcloud",
@@ -190,7 +172,8 @@ resolution_list.register_callbacks()
 alignment_choropleth.register_callbacks(data.query_engine)
 alignment_graph.register_callbacks()
 alignment_by_subject.register_callbacks(data.query_engine)
-resolution_finder.register_callbacks(data.query_engine)
+
+
 
 
 @callback(

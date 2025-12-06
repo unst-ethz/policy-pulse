@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 
 from .country_coordinates import get_country_longitude
-from ..data import MIN_UN_DATE, MAX_UN_DATE
+from ..data import get_earliest_data_date, get_latest_data_date
 
 
 
@@ -38,12 +38,8 @@ def register_callbacks(query_engine):
             return None, None, year, None, status_msg
 
         # Find time range available resolutions for this filtered data
-        earliest_year = pd.to_datetime(
-            all_resolutions["date"], errors="coerce"
-        ).dt.year.min()
-        latest_year = pd.to_datetime(
-            all_resolutions["date"], errors="coerce"
-        ).dt.year.max()
+        earliest_year = get_earliest_data_date().year
+        latest_year = get_latest_data_date().year
 
         if year[0] == 0 and year[1] == 0:
             year = (earliest_year, latest_year)
@@ -69,7 +65,7 @@ def register_callbacks(query_engine):
 
             return None, earliest_year, year, latest_year, status_msg
 
-        data = query_engine.query_agreement_between_countries(
+        alignment_data = query_engine.query_agreement_between_countries(
             country1,
             resolution_ids=(resolutions_in_year["undl_id"].tolist()),
             average=True,
@@ -132,7 +128,7 @@ def register_callbacks(query_engine):
             ]
         )
 
-        return fig, MIN_UN_DATE.year, year, MAX_UN_DATE.year, status_msg
+        return fig, earliest_year, year, latest_year, status_msg
 
 
 layout = (
