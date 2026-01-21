@@ -16,4 +16,4 @@ USER appuser
 
 EXPOSE 8050
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8050", "--workers", "4", "app:server"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8050", "--workers", "4", "app.__main__:server"]
