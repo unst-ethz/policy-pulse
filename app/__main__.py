@@ -5,6 +5,9 @@ from .features import navbar
 from .features import breadcrumb
 
 app = dash.Dash(__package__, use_pages=True, suppress_callback_exceptions=True)
+
+server = app.server
+
 app.layout = html.Div(
     [
         # Global client-side store shared across all pages.
