@@ -1,0 +1,52 @@
+/* Override Dash DatePickerRange styles for better spacing and smaller text */
+
+.custom-datepicker .DateRangePickerInput {
+    background-color: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 6px 12px; /* Comfortable padding */
+    display: flex;
+    align-items: center;
+}
+
+.custom-datepicker .DateInput {
+    width: 100px;
+    background: transparent;
+}
+
+.custom-datepicker .DateInput_input {
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 2px 4px;
+    text-align: center;
+    border-bottom: none;
+    color: #495057;
+    font-weight: 500;
+}
+
+.custom-datepicker .DateInput_input__focused {
+    border-bottom: 2px solid #1b3357;
+}
+
+.custom-datepicker .DateRangePickerInput_arrow {
+    padding: 0 10px;
+    color: #6c757d;
+}
+
+.custom-datepicker .DateRangePickerInput_clearDates {
+    padding: 0;
+    margin: 0;
+    display: flex;
+    align-items: center;
+}
+
+/* 
+   We are NOT overriding general CalendarDay/Month styles globally anymore
+   to avoid breaking navigation functionality.
+   If needed, we can target specific classes more carefully.
+*/
+
+/* Ensure the calendar itself has a clean background / z-index if needed */
+.DateRangePicker_picker {
+    z-index: 1000;
+}

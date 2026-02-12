@@ -1,4 +1,4 @@
-from dash import Input, Output, callback, clientside_callback, html, dcc
+from dash import Input, Output, State, callback, clientside_callback, html, dcc
 import pandas as pd
 import urllib.parse
 
@@ -10,13 +10,69 @@ ids = {
     "subject_dropdown": f"{prefix}-subject-dropdown",
     "country": f"{prefix}-country-dropdown",
     "country2": f"{prefix}-country2-dropdown",
+    "preset": f"{prefix}-preset-dropdown",
+    "reset_btn": f"{prefix}-reset-btn",
     "filter_store": f"{prefix}-filter-store",
-    "data_store": f"{prefix}-data-store",  # Store for queried data
+    "data_store": f"{prefix}-data-store",
     "location": f"{prefix}-location",
+}
+
+# Country group presets for quick comparison selection
+PRESETS = {
+    "p5": {
+        "label": "P5 (Security Council)",
+        "countries": ["USA", "GBR", "FRA", "RUS", "CHN"],
+    },
+    "g7": {
+        "label": "G7",
+        "countries": ["USA", "GBR", "FRA", "DEU", "ITA", "JPN", "CAN"],
+    },
+    "brics": {
+        "label": "BRICS",
+        "countries": ["BRA", "RUS", "IND", "CHN", "ZAF"],
+    },
+    "eu_major": {
+        "label": "EU (Major)",
+        "countries": ["DEU", "FRA", "ITA", "ESP", "NLD", "POL", "SWE"],
+    },
+    "nordic": {
+        "label": "Nordic",
+        "countries": ["SWE", "NOR", "FIN", "DNK", "ISL"],
+    },
 }
 
 
 def register_callbacks():
+
+    # Callback: Apply preset to comparison countries
+    @callback(
+        Output(ids["country2"], "value"),
+        Input(ids["preset"], "value"),
+        prevent_initial_call=True,
+    )
+    def apply_preset(preset_key):
+        if not preset_key or preset_key not in PRESETS:
+            return []
+        return PRESETS[preset_key]["countries"]
+
+    # Callback: Reset all filters except main country
+    @callback(
+        Output(ids["date_picker"], "start_date"),
+        Output(ids["date_picker"], "end_date"),
+        Output(ids["subject_dropdown"], "value"),
+        Output(ids["country2"], "value", allow_duplicate=True),
+        Output(ids["preset"], "value", allow_duplicate=True),
+        Input(ids["reset_btn"], "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def reset_filters(n_clicks):
+        return (
+            data.get_earliest_data_date(),
+            data.get_latest_data_date(),
+            None,
+            [],
+            None,
+        )
 
     # Callback: Update filter store and print current selections when any filter changes
     @callback(
@@ -117,31 +173,57 @@ layout = (
             "boxShadow": "0 2px 8px rgba(0,0,0,0.08)",
         },
         children=[
-            # 存储组件
+            # Hidden stores
             dcc.Store(id=ids["filter_store"]),
-            dcc.Store(id=ids["data_store"]),  # Store for queried data
+            dcc.Store(id=ids["data_store"]),
             dcc.Location(id=ids["location"], refresh=False),
-            html.H2(
-                "Filter the Data",
-                style={"color": "#212529", "marginBottom": "10px"},
-            ),
-            # Filters container with better layout
+            # Header row: title + reset button
             html.Div(
                 [
-                    # Date Range Filter - Full width
+                    html.H2(
+                        "Filter the Data",
+                        style={"color": "#212529", "margin": "0"},
+                    ),
+                    html.Button(
+                        "↺ Reset Filters",
+                        id=ids["reset_btn"],
+                        n_clicks=0,
+                        style={
+                            "backgroundColor": "transparent",
+                            "border": "1px solid #adb5bd",
+                            "borderRadius": "4px",
+                            "color": "#495057",
+                            "padding": "6px 14px",
+                            "fontSize": "13px",
+                            "cursor": "pointer",
+                            "fontFamily": "inherit",
+                        },
+                    ),
+                ],
+                style={
+                    "display": "flex",
+                    "justifyContent": "space-between",
+                    "alignItems": "center",
+                    "marginBottom": "10px",
+                },
+            ),
+            # Filters container
+            html.Div(
+                [
+                    # ROW 1: Main Country
                     html.Div(
                         [
                             html.Div(
                                 [
                                     html.Span(
-                                        "📅",
+                                        "🌍",
                                         style={
                                             "fontSize": "18px",
                                             "marginRight": "8px",
                                         },
                                     ),
                                     html.Label(
-                                        "Date Range",
+                                        "Main Country",
                                         style={
                                             "fontWeight": "600",
                                             "color": "#495057",
@@ -152,28 +234,179 @@ layout = (
                                     ),
                                 ]
                             ),
-                            dcc.DatePickerRange(
-                                id=ids["date_picker"],
-                                min_date_allowed=data.get_earliest_data_date(),
-                                max_date_allowed=data.get_latest_data_date(),
-                                start_date=data.get_earliest_data_date(),
-                                end_date=data.get_latest_data_date(),
-                                display_format="YYYY-MM-DD",
-                                style={"width": "100%", "fontSize": "14px"},
-                                calendar_orientation="vertical",
+                            dcc.Dropdown(
+                                id=ids["country"],
+                                options=[
+                                    {
+                                        "label": data.get_country_name(country),
+                                        "value": country,
+                                        "search": data.get_country_name(country),
+                                    }
+                                    for country in data.available_countries
+                                ],
+                                placeholder="Select a country...",
+                                clearable=True,
+                                style={
+                                    "width": "100%",
+                                    "fontSize": "14px",
+                                },
+                                searchable=True,
                             ),
                         ],
                         style={
-                            "marginBottom": "25px",
+                            "marginBottom": "20px",
                             "padding": "15px",
                             "backgroundColor": "#f8f9fa",
                             "borderRadius": "8px",
                             "border": "1px solid #e9ecef",
                         },
                     ),
-                    # Subjects and Country in a row
+                    # ROW 2: Comparison Countries + Preset
                     html.Div(
                         [
+                            html.Div(
+                                [
+                                    html.Div(
+                                        [
+                                            html.Span(
+                                                "🔄",
+                                                style={
+                                                    "fontSize": "18px",
+                                                    "marginRight": "8px",
+                                                },
+                                            ),
+                                            html.Label(
+                                                "Compare with",
+                                                style={
+                                                    "fontWeight": "600",
+                                                    "color": "#495057",
+                                                    "fontSize": "15px",
+                                                    "marginBottom": "8px",
+                                                    "display": "block",
+                                                },
+                                            ),
+                                        ]
+                                    ),
+                                    dcc.Dropdown(
+                                        id=ids["country2"],
+                                        options=[
+                                            {
+                                                "label": data.get_country_name(country),
+                                                "value": country,
+                                            }
+                                            for country in data.available_countries
+                                        ],
+                                        value=[],
+                                        multi=True,
+                                        clearable=False,
+                                        placeholder="Select countries to compare...",
+                                        style={
+                                            "width": "100%",
+                                            "fontSize": "14px",
+                                        },
+                                        searchable=True,
+                                    ),
+                                ],
+                                style={"flex": "1"},
+                            ),
+                            # Preset dropdown
+                            html.Div(
+                                [
+                                    html.Div(
+                                        [
+                                            html.Span(
+                                                "⚡",
+                                                style={
+                                                    "fontSize": "18px",
+                                                    "marginRight": "8px",
+                                                },
+                                            ),
+                                            html.Label(
+                                                "Quick Select",
+                                                style={
+                                                    "fontWeight": "600",
+                                                    "color": "#495057",
+                                                    "fontSize": "15px",
+                                                    "marginBottom": "8px",
+                                                    "display": "block",
+                                                },
+                                            ),
+                                        ]
+                                    ),
+                                    dcc.Dropdown(
+                                        id=ids["preset"],
+                                        options=[
+                                            {"label": p["label"], "value": k}
+                                            for k, p in PRESETS.items()
+                                        ],
+                                        placeholder="Choose a group...",
+                                        clearable=True,
+                                        style={
+                                            "width": "100%",
+                                            "fontSize": "14px",
+                                        },
+                                    ),
+                                ],
+                                style={"flex": "0 0 220px"},
+                            ),
+                        ],
+                        style={
+                            "display": "flex",
+                            "flexDirection": "row",
+                            "gap": "20px",
+                            "marginBottom": "20px",
+                            "padding": "15px",
+                            "backgroundColor": "#f8f9fa",
+                            "borderRadius": "8px",
+                            "border": "1px solid #e9ecef",
+                        },
+                    ),
+                    # ROW 3: Date Range and Subjects side by side
+                    html.Div(
+                        [
+                            # Date Range Filter
+                            html.Div(
+                                [
+                                    html.Div(
+                                        [
+                                            html.Span(
+                                                "📅",
+                                                style={
+                                                    "fontSize": "18px",
+                                                    "marginRight": "8px",
+                                                },
+                                            ),
+                                            html.Label(
+                                                "Date Range",
+                                                style={
+                                                    "fontWeight": "600",
+                                                    "color": "#495057",
+                                                    "fontSize": "15px",
+                                                    "marginBottom": "8px",
+                                                    "display": "block",
+                                                },
+                                            ),
+                                        ]
+                                    ),
+                                    dcc.DatePickerRange(
+                                        id=ids["date_picker"],
+                                        min_date_allowed=data.get_earliest_data_date().date(),
+                                        max_date_allowed=data.get_latest_data_date().date(),
+                                        start_date=data.get_earliest_data_date().date(),
+                                        end_date=data.get_latest_data_date().date(),
+                                        initial_visible_month=data.get_earliest_data_date().date(),
+                                        display_format="MMM D, YYYY",
+                                        className="custom-datepicker",
+                                    ),
+                                ],
+                                style={
+                                    "flex": "0 0 20%",
+                                    "padding": "15px",
+                                    "backgroundColor": "#f8f9fa",
+                                    "borderRadius": "8px",
+                                    "border": "1px solid #e9ecef",
+                                },
+                            ),
                             # Subjects Filter
                             html.Div(
                                 [
@@ -212,60 +445,6 @@ layout = (
                                 ],
                                 style={
                                     "flex": "1",
-                                    "marginRight": "20px",
-                                    "padding": "15px",
-                                    "backgroundColor": "#f8f9fa",
-                                    "borderRadius": "8px",
-                                    "border": "1px solid #e9ecef",
-                                },
-                            ),
-                            # Country Filter
-                            html.Div(
-                                [
-                                    html.Div(
-                                        [
-                                            html.Span(
-                                                "🌍",
-                                                style={
-                                                    "fontSize": "18px",
-                                                    "marginRight": "8px",
-                                                },
-                                            ),
-                                            html.Label(
-                                                "Country",
-                                                style={
-                                                    "fontWeight": "600",
-                                                    "color": "#495057",
-                                                    "fontSize": "15px",
-                                                    "marginBottom": "8px",
-                                                    "display": "block",
-                                                },
-                                            ),
-                                        ]
-                                    ),
-                                    dcc.Dropdown(
-                                        id=ids["country"],
-                                        options=[
-                                            {
-                                                "label": data.get_country_name(country),
-                                                "value": country,
-                                                "search": data.get_country_name(
-                                                    country
-                                                ),
-                                            }
-                                            for country in data.available_countries
-                                        ],
-                                        placeholder="Select a country...",
-                                        clearable=True,
-                                        style={
-                                            "width": "100%",
-                                            "fontSize": "14px",
-                                        },
-                                        searchable=True,
-                                    ),
-                                ],
-                                style={
-                                    "flex": "0 0 280px",
                                     "padding": "15px",
                                     "backgroundColor": "#f8f9fa",
                                     "borderRadius": "8px",
@@ -276,39 +455,9 @@ layout = (
                         style={
                             "display": "flex",
                             "flexDirection": "row",
-                            "gap": "0",
+                            "gap": "20px",
                         },
                     ),
-                    html.Div(
-                        [
-                            html.Label(
-                                "Select a country to compare with:",
-                                style={
-                                    "fontWeight": "bold",
-                                    "marginBottom": "5px",
-                                },
-                            ),
-                            dcc.Dropdown(
-                                id=ids["country2"],
-                                options=[
-                                    {
-                                        "label": data.get_country_name(country),
-                                        "value": country,
-                                    }
-                                    for country in data.available_countries
-                                ],
-                                value=[],
-                                multi=True,
-                                clearable=False,
-                                style={"marginBottom": "15px"},
-                            ),
-                        ],
-                        style={
-                            "width": "30%",
-                            "display": "inline-block",
-                        },
-                    ),
-
                 ]
             ),
         ],
