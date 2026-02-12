@@ -26,7 +26,6 @@ app.layout = html.Div(
         ),
     ]
 )
-navbar.register_callbacks()
 breadcrumb.register_callbacks()
 
 if __name__ == "__main__":

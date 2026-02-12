@@ -134,16 +134,10 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
 # localised name.
 clientside_callback(
     """
-    function localise_iso_country(filter_store, navbar_clicks) {
-        // Check if triggered by navbar click
-        const triggered = dash_clientside.callback_context.triggered;
-        if (triggered && triggered[0] && triggered[0].prop_id === 'navbar-home-click.n_clicks') {
-            return null;
-        }
-
+    function localise_iso_country(filter_store) {
         const iso_three_digit = filter_store.country1_alpha3;
 
-        // Otherwise localize the country code
+        // Localize the country code
         if (!iso_three_digit) return null;
         const iso2 = window.getCountryISO2(iso_three_digit);
         if (!iso2) return iso_three_digit;
@@ -153,7 +147,6 @@ clientside_callback(
     Output("country1-localised-name", "data"),
     [
         Input("filter-component-filter-store", "data"),
-        Input("navbar-home-click", "n_clicks"),
     ],
 )
 
