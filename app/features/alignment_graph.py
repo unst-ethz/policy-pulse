@@ -14,11 +14,10 @@ def register_callbacks():
         ],
         [
             Input("filter-component-filter-store", "data"),
-            Input("timespan-dropdown", "value"),
             Input("moving-average-data", "data"),
         ],
     )
-    def generate_chart(filter_store, time_span, moving_average_data):
+    def generate_chart(filter_store, moving_average_data):
         # moving_average_data is JSON produced by to_json; parse it
         if moving_average_data is None:
             return go.Figure(), html.Div("No data")

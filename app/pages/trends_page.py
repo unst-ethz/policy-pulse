@@ -178,12 +178,9 @@ wordcloud_interactive.register_callbacks()
         Output("moving-average-data", "data"),
         Output("moving-average-calc-time", "data"),
     ],
-    [
-        Input("filter-component-filter-store", "data"),
-        Input("timespan-dropdown", "value"),
-    ],
+    Input("filter-component-filter-store", "data"),
 )
-def _calculate_data_wrapper(filter_store, time_span: int):
+def _calculate_data_wrapper(filter_store):
     """Wrapper that converts list to tuple for caching."""
     country1 = filter_store["country1_alpha3"]
     country2: List[str] | str = filter_store["country2"]
@@ -193,7 +190,7 @@ def _calculate_data_wrapper(filter_store, time_span: int):
         return ("No comparison country selected.", None, None)
     selected_tuple = tuple(country2) if isinstance(country2, list) else (country2,)
 
-    return _calculate_data_uncached(country1, selected_tuple, time_span)
+    return _calculate_data_uncached(country1, selected_tuple, 350)
 
 
 @functools.lru_cache(maxsize=100)

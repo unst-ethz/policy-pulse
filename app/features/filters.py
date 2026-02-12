@@ -308,29 +308,7 @@ layout = (
                             "display": "inline-block",
                         },
                     ),
-                    html.Div(
-                        [
-                            html.Label(
-                                "Window Size (resolutions):",
-                                style={
-                                    "fontWeight": "bold",
-                                    "marginBottom": "5px",
-                                },
-                            ),
-                            dcc.Dropdown(
-                                id="timespan-dropdown",
-                                options=[
-                                    {"label": "200 resolutions", "value": 200},
-                                    {"label": "350 resolutions", "value": 350},
-                                    {"label": "500 resolutions", "value": 500},
-                                ],
-                                value=350,
-                                clearable=False,
-                                style={"marginBottom": "15px"},
-                            ),
-                        ],
-                        style={"width": "30%", "display": "inline-block"},
-                    ),
+
                 ]
             ),
         ],
