@@ -12,6 +12,7 @@ from matplotlib import colors as mpl_colors
 from wordcloud import WordCloud
 
 from .. import data
+from .resolution_list import create_vote_indicator
 
 # Initialize word cloud data on module load
 _resolution_wc_data = {}
@@ -231,8 +232,8 @@ def _build_wordcloud(filtered_data_json: str):
         
         # Sort and limit to top 30 words
         sorted_word_freq = sorted(word_freq.items(), key=lambda x: (-x[1], x[0]))
-        if len(sorted_word_freq) > 30:
-            word_freq = dict(sorted_word_freq[:30])
+        if len(sorted_word_freq) > 20:
+            word_freq = dict(sorted_word_freq[:20])
         else:
             word_freq = dict(sorted_word_freq)
         
@@ -307,18 +308,68 @@ def _build_wordcloud(filtered_data_json: str):
         
         hover_text = [f"<b>{w}</b><br>Appears in {f} resolutions" for w, f in zip(words, freqs)]
         
-        trace = go.Scatter(
+        # Calculate hover marker positions centered on words
+        # Since textposition="bottom right", the anchor is at bottom-right corner
+        # We need to shift left and up to center the hover area on the word
+        hover_x_positions = []
+        hover_y_positions = []
+        hover_sizes = []
+        
+        # WordCloud canvas dimensions for coordinate conversion
+        wc_width, wc_height = 1200, 800
+        coord_range_x = 2.2  # from -1.1 to 1.1
+        coord_range_y = 2.2
+        
+        for word, size, x_pos, y_pos in zip(words, sizes, x_positions, y_positions):
+            # Estimate word dimensions in pixels
+            # Character width factor ~0.6, line height factor ~1.2
+            word_width_px = size * len(word) * 0.6
+            word_height_px = size * 1
+            
+            # Convert pixel shifts to normalized coordinates
+            # Shift left by half width, up by half height
+            shift_x_normalized = (word_width_px / 2) / wc_width * coord_range_x
+            shift_y_normalized = (word_height_px / 2) / wc_height * coord_range_y
+            
+            # Center the hover marker on the word
+            hover_x_positions.append(x_pos + shift_x_normalized)
+            hover_y_positions.append(y_pos - shift_y_normalized)  # + because y increases upward
+            
+            # Size hover area to roughly match word size
+            hover_sizes.append(size * 1.5)
+        
+        # customdata: [hover_display_text, word] so resolution-table callback can read the word
+        hover_customdata = [[ht, w] for ht, w in zip(hover_text, words)]
+        
+        # Invisible marker trace with a larger hover area so that
+        # hovering near the *center* of a word still shows the tooltip,
+        # without changing the visual position of the words.
+        hover_trace = go.Scatter(
+            x=hover_x_positions,
+            y=hover_y_positions,
+            mode='markers',
+            marker=dict(
+                size=hover_sizes,
+                opacity=0,
+            ),
+            hovertemplate='%{customdata[0]}<extra></extra>',
+            customdata=hover_customdata,
+            showlegend=False,
+        )
+        
+        text_trace = go.Scatter(
             x=x_positions,
             y=y_positions,
             mode='text',
             text=words,
             textposition="bottom right",
             textfont=dict(size=sizes, color=colors),
-            hovertemplate='%{customdata}<extra></extra>',
-            customdata=hover_text,
+            hoverinfo="skip",  # disable hover on text itself
+            hovertemplate=None,
+            showlegend=False,
         )
         
-        fig = go.Figure(data=[trace])
+        fig = go.Figure(data=[hover_trace, text_trace])
         fig.update_layout(
             showlegend=False,
             xaxis=dict(visible=False, range=[-1.1, 1.1], scaleanchor="y", scaleratio=1.0),
@@ -381,10 +432,11 @@ def register_callbacks():
         Output("wordcloud-interactive-table", "children"),
         Input("wordcloud-interactive-chart", "hoverData"),
         Input("filter-component-data-store", "data"),
+        Input("filter-component-filter-store", "data"),
         prevent_initial_call=True,
     )
-    def update_resolution_table(hoverData, filtered_data):
-        """Update resolution table when hovering over a word."""
+    def update_resolution_table(hoverData, filtered_data, filter_params):
+        """Update resolution list (cards) when hovering over a word."""
         if hoverData is None or not hoverData or 'points' not in hoverData or not hoverData['points']:
             return html.Div("Hover over a word to see related resolutions.", style={'color': '#7f8c8d'})
         
@@ -392,7 +444,9 @@ def register_callbacks():
             return html.Div("No data available.", style={'color': '#7f8c8d'})
         
         try:
-            word = hoverData['points'][0].get('text')
+            pt = hoverData['points'][0]
+            custom = pt.get('customdata')
+            word = pt.get('text') or (custom[1] if isinstance(custom, (list, tuple)) and len(custom) > 1 else None)
             if not word:
                 return html.Div("No word selected.", style={'color': '#7f8c8d'})
             
@@ -404,45 +458,69 @@ def register_callbacks():
             if 'undl_id' not in df.columns:
                 return html.Div("No data available.", style={'color': '#7f8c8d'})
             
-            # Get resolution IDs that contain this word
             if word not in _wc_word_undlid_map:
                 return html.Div(f"No resolutions found for word '{word}'.", style={'color': '#7f8c8d'})
             
-            matching_ids = df[df['undl_id'].isin(_wc_word_undlid_map[word])]
-            
-            if matching_ids.empty:
+            matching = df[df['undl_id'].isin(_wc_word_undlid_map[word])].copy()
+            if matching.empty:
                 return html.Div(f"No resolutions found for word '{word}' in current filter.", style={'color': '#7f8c8d'})
             
-            # Sort by date then resolution
-            matching_ids = matching_ids[['resolution', 'date', 'title']].copy()
-            matching_ids['date'] = pd.to_datetime(matching_ids['date'], errors='coerce')
-            matching_ids = matching_ids.sort_values(by=['date', 'resolution'], ascending=[True, True])
-            
-            # Limit number of rows
+            matching['date'] = pd.to_datetime(matching['date'], errors='coerce')
+            matching = matching.sort_values(by=['date', 'resolution'], ascending=[True, True])
             max_rows = 10000
-            df_limited = matching_ids.head(max_rows)
+            display_df = matching.head(max_rows)
             
-            header = html.Tr([
-                html.Th("Resolution", style={'padding': '6px', 'textAlign': 'left', 'borderBottom': '2px solid #3498db'}),
-                html.Th("Date", style={'padding': '6px', 'textAlign': 'left', 'borderBottom': '2px solid #3498db'}),
-                html.Th("Title", style={'padding': '6px', 'textAlign': 'left', 'borderBottom': '2px solid #3498db'})
-            ])
+            # Country filters for vote indicators (same as resolution_list)
+            country1 = (filter_params or {}).get("country1_alpha3")
+            country2_raw = (filter_params or {}).get("country2")
+            comparison_countries = []
+            if isinstance(country2_raw, list):
+                comparison_countries = country2_raw
+            elif isinstance(country2_raw, str) and country2_raw:
+                comparison_countries = [country2_raw]
             
-            rows = [
-                html.Tr([
-                    html.Td(str(r['resolution']), style={'padding': '6px', 'verticalAlign': 'top'}),
-                    html.Td((r['date'].date().isoformat() if pd.notna(r['date']) else ''), style={'padding': '6px', 'verticalAlign': 'top'}),
-                    html.Td(str(r['title']), style={'padding': '6px'})
-                ]) for _, r in df_limited.iterrows()
-            ]
+            cards = []
+            for _, row in display_df.iterrows():
+                res_id = row.get('resolution', 'N/A')
+                link = row.get('undl_link', '#')
+                date_val = row.get('date')
+                date_str = date_val.strftime('%Y-%m-%d') if pd.notnull(date_val) else "Unknown"
+                title = row.get('title', 'Untitled')
+                indicators = []
+                if country1 and country1 in row:
+                    indicators.append(create_vote_indicator(data.get_country_name(country1), row.get(country1)))
+                for c2 in comparison_countries[:5]:
+                    if c2 in row:
+                        indicators.append(create_vote_indicator(data.get_country_name(c2), row.get(c2)))
+                card = html.Div([
+                    html.Div([
+                        html.A(
+                            html.H4([
+                                html.I(className="fas fa-file-pdf", style={'marginRight': '8px'}),
+                                f"{res_id}"
+                            ], style={'marginBottom': '5px', 'color': '#007bff', 'display': 'inline-block'}),
+                            href=link, target="_blank", style={'textDecoration': 'none'}
+                        ),
+                        html.Span(date_str, style={'float': 'right', 'color': '#666', 'fontSize': '0.9em'})
+                    ]),
+                    html.Div(title, style={'fontWeight': 'bold', 'marginBottom': '5px', 'fontSize': '1.05em'}),
+                    html.Div(indicators, style={'marginTop': '10px', 'paddingTop': '10px', 'borderTop': '1px solid #eee', 'display': 'flex', 'flexWrap': 'wrap', 'gap': '5px'}) if indicators else None
+                ], className='resolution-card', style={
+                    'backgroundColor': 'white',
+                    'border': '1px solid #e0e0e0',
+                    'borderRadius': '8px',
+                    'padding': '15px',
+                    'marginBottom': '15px',
+                    'boxShadow': '0 2px 4px rgba(0,0,0,0.05)'
+                })
+                cards.append(card)
             
             summary = html.Div(
-                f"{len(matching_ids)} resolutions for word '{word}'" + 
-                (f" (showing first {max_rows})" if len(matching_ids) > max_rows else ""),
+                f"{len(matching)} resolutions for word '{word}'" +
+                (f" (showing first {max_rows})" if len(matching) > max_rows else ""),
                 style={'fontWeight': 'bold', 'marginBottom': '8px'}
             )
-            table = html.Table([header] + rows, style={'width': '100%', 'borderCollapse': 'collapse'})
-            return html.Div([summary, table])
+            return html.Div([summary] + cards)
             
         except Exception as e:
             print(f"Error updating resolution table: {e}")

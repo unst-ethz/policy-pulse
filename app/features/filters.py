@@ -84,10 +84,30 @@ def register_callbacks():
                 # Only keep rows where the country has a vote (not NaN)
                 df = df.dropna(subset=[country])
 
+            # Build column list: base columns + undl_link + vote columns when countries selected
+            base_cols = ["undl_id", "resolution", "date", "title"]
+            if "undl_link" in df.columns:
+                base_cols.append("undl_link")
+            # country2_raw = filter_data.get("country2")
+            # comparison = []
+            # if isinstance(country2_raw, list):
+            #     comparison = country2_raw
+            # elif isinstance(country2_raw, str) and country2_raw:
+            #     comparison = [country2_raw]
+            # vote_cols = []
+            # if country and country in df.columns:
+            #     vote_cols.append(country)
+            # for c2 in comparison[:5]:
+            #     if c2 in df.columns:
+            #         vote_cols.append(c2)
+            # cols = [c for c in base_cols + vote_cols if c in df.columns]
+            
+            # if not cols:
+            cols = base_cols
+
             # Convert to JSON for storage
-            # Select key columns similar to app_mlkeyword.py
             result_df = (
-                df[["undl_id", "resolution", "date", "title"]].copy()
+                df[cols].copy()
                 if not df.empty
                 else pd.DataFrame()
             )
