@@ -66,12 +66,11 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                     dcc.Tab(
                         label="Agreement Map",
                         value="map",
+                        id="tab-agreement-map",
+                        disabled=False,
                         children=[
                             html.Div(
-                                [
-                                    html.H2("Global Alignment Map"),
-                                    *alignment_choropleth.layout,
-                                ],
+                                id="tab-map-content",
                                 className="tab-content",
                             )
                         ],
@@ -80,12 +79,11 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                     dcc.Tab(
                         label="Agreement Timeline",
                         value="timeline",
+                        id="tab-agreement-timeline",
+                        disabled=False,
                         children=[
                             html.Div(
-                                [
-                                    html.H2("Bi-country Alignment Comparison Graph"),
-                                    *alignment_graph.layout,
-                                ],
+                                id="tab-timeline-content",
                                 className="tab-content",
                             )
                         ],
@@ -94,18 +92,11 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                     dcc.Tab(
                         label="Alignment by Subject",
                         value="subject",
+                        id="tab-alignment-subject",
+                        disabled=False,
                         children=[
                             html.Div(
-                                [
-                                    html.H2("Alignment by UN Subject Area"),
-                                    html.P(
-                                        "Compare voting alignment between two countries across different UN subject areas. "
-                                        "The agreement score ranges from 0 (complete disagreement) to 1 (complete agreement). "
-                                        "Only subjects with at least 30 shared votes are shown.",
-                                        style={"color": "#7f8c8d", "marginBottom": "20px"}
-                                    ),
-                                    *alignment_by_subject.layout,
-                                ],
+                                id="tab-subject-content",
                                 className="tab-content",
                             )
                         ],
@@ -170,6 +161,143 @@ alignment_by_subject.register_callbacks(data.query_engine)
 
 
 wordcloud_interactive.register_callbacks()
+
+
+@callback(
+    [
+        Output("tab-agreement-map", "disabled"),
+        Output("tab-agreement-timeline", "disabled"),
+        Output("tab-alignment-subject", "disabled"),
+        Output("tab-map-content", "children"),
+        Output("tab-timeline-content", "children"),
+        Output("tab-subject-content", "children"),
+    ],
+    Input("filter-component-filter-store", "data"),
+    prevent_initial_call=False,
+)
+def update_tab_states(filter_store):
+    """Disable tabs based on country selection requirements."""
+    if not filter_store:
+        country1 = None
+        country2 = None
+    else:
+        country1 = filter_store.get("country1_alpha3")
+        country2_raw = filter_store.get("country2")
+        # Handle country2 as list or string
+        if isinstance(country2_raw, list):
+            country2 = country2_raw[0] if country2_raw else None
+        elif isinstance(country2_raw, str) and country2_raw:
+            country2 = country2_raw
+        else:
+            country2 = None
+    
+    # Agreement Map: requires only country1
+    map_disabled = country1 is None or country1 == ""
+    
+    # Agreement Timeline and Alignment by Subject: require both country1 and country2
+    comparison_disabled = (country1 is None or country1 == "") or (country2 is None or country2 == "")
+    
+    # Placeholder content for disabled tabs
+    placeholder_no_country1 = html.Div(
+        [
+            html.P(
+                "Please select a main country from the filters above to view this analysis.",
+                style={
+                    "color": "#7f8c8d",
+                    "fontSize": "16px",
+                    "textAlign": "center",
+                    "padding": "40px",
+                    "fontStyle": "italic",
+                }
+            )
+        ]
+    )
+    
+    placeholder_no_comparison = html.Div(
+        [
+            html.P(
+                "Please select a comparison country from the filters above to view this analysis.",
+                style={
+                    "color": "#7f8c8d",
+                    "fontSize": "16px",
+                    "textAlign": "center",
+                    "padding": "40px",
+                    "fontStyle": "italic",
+                }
+            )
+        ]
+    )
+    
+    # Content when enabled - wrap in a list to match Dash's expected format
+    if map_disabled:
+        map_content = [placeholder_no_country1]
+    else:
+        map_content = [
+            html.H2("Global Alignment Map"),
+            *alignment_choropleth.layout,
+        ]
+    
+    if comparison_disabled:
+        if country1 is None or country1 == "":
+            timeline_content = [placeholder_no_country1]
+            subject_content = [placeholder_no_country1]
+        else:
+            timeline_content = [placeholder_no_comparison]
+            subject_content = [placeholder_no_comparison]
+    else:
+        timeline_content = [
+            html.H2("Bi-country Alignment Comparison Graph"),
+            *alignment_graph.layout,
+        ]
+        subject_content = [
+            html.H2("Alignment by UN Subject Area"),
+            html.P(
+                "Compare voting alignment between two countries across different UN subject areas. "
+                "The agreement score ranges from 0 (complete disagreement) to 1 (complete agreement). "
+                "Only subjects with at least 30 shared votes are shown.",
+                style={"color": "#7f8c8d", "marginBottom": "20px"}
+            ),
+            *alignment_by_subject.layout,
+        ]
+    
+    return map_disabled, comparison_disabled, comparison_disabled, map_content, timeline_content, subject_content
+
+
+@callback(
+    Output("country-view-tabs", "value"),
+    Input("country-view-tabs", "value"),
+    Input("filter-component-filter-store", "data"),
+    prevent_initial_call=True,
+)
+def prevent_disabled_tab_switch(selected_tab, filter_store):
+    """Prevent switching to disabled tabs based on country selection requirements."""
+    if not filter_store:
+        country1 = None
+        country2 = None
+    else:
+        country1 = filter_store.get("country1_alpha3")
+        country2_raw = filter_store.get("country2")
+        # Handle country2 as list or string
+        if isinstance(country2_raw, list):
+            country2 = country2_raw[0] if country2_raw else None
+        elif isinstance(country2_raw, str) and country2_raw:
+            country2 = country2_raw
+        else:
+            country2 = None
+    
+    # Agreement Map: requires only country1
+    map_disabled = country1 is None or country1 == ""
+    
+    # Agreement Timeline and Alignment by Subject: require both country1 and country2
+    comparison_disabled = (country1 is None or country1 == "") or (country2 is None or country2 == "")
+    
+    # If trying to switch to a disabled tab, revert to resolution_list
+    if selected_tab == "map" and map_disabled:
+        return "resolution_list"
+    if selected_tab in ["timeline", "subject"] and comparison_disabled:
+        return "resolution_list"
+    
+    return selected_tab
 
 
 @callback(
