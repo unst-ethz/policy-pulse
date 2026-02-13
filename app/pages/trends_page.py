@@ -302,6 +302,57 @@ def prevent_disabled_tab_switch(selected_tab, filter_store):
 
 @callback(
     [
+        Output("filter-component-country-dropdown", "disabled"),
+        Output("filter-component-country2-dropdown", "disabled"),
+        Output("filter-component-preset-dropdown", "disabled"),
+        Output("filter-component-subject-dropdown", "disabled"),
+        Output("filter-component-country-dropdown", "style"),
+        Output("filter-component-country2-dropdown", "style"),
+        Output("filter-component-preset-dropdown", "style"),
+        Output("filter-component-subject-dropdown", "style"),
+    ],
+    Input("country-view-tabs", "value"),
+    prevent_initial_call=False,
+)
+def disable_filters_based_on_tab(selected_tab):
+    """Disable filters based on selected tab:
+    - Agreement Map: disable comparison dropdowns
+    - Word Cloud: disable all country dropdowns (main, compare, quick select)
+    """
+    is_map_tab = selected_tab == "map"
+    is_wordcloud_tab = selected_tab == "wordcloud"
+    is_timeline_or_subject_tab = selected_tab in ["timeline", "subject"]
+    
+    # Base styles
+    base_style = {
+        "width": "100%",
+        "fontSize": "14px",
+    }
+    
+    # Disabled styles (grayed out)
+    disabled_style = {
+        **base_style,
+        "opacity": "0.5",
+        "cursor": "not-allowed",
+        "backgroundColor": "#e9ecef",
+    }
+    
+    if is_wordcloud_tab:
+        # Word Cloud: disable all country dropdowns
+        return True, True, True, False, disabled_style, disabled_style, disabled_style, base_style
+    elif is_map_tab:
+        # Agreement Map: disable only comparison dropdowns
+        return False, True, True, False, base_style, disabled_style, disabled_style, base_style
+    elif is_timeline_or_subject_tab:
+        # Agreement Timeline / Alignment by Subject: disable subject dropdown
+        return False, False, False, True, base_style, base_style, base_style, disabled_style
+    else:
+        # Other tabs: enable all
+        return False, False, False, False, base_style, base_style, base_style, base_style
+
+
+@callback(
+    [
         Output("status-display", "children"),
         Output("moving-average-data", "data"),
         Output("moving-average-calc-time", "data"),
