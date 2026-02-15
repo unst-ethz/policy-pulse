@@ -76,3 +76,11 @@ def get_latest_data_date():
     data = repo.get_data()
 
     return pd.to_datetime(data["resolution"]["date"].max())
+
+
+def get_earliest_year():
+    return get_earliest_data_date().year
+
+
+def get_latest_year():
+    return get_latest_data_date().year
