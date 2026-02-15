@@ -166,9 +166,9 @@ wordcloud_interactive.register_callbacks()
 
 @callback(
     [
-        Output("tab-agreement-map", "disabled"),
-        Output("tab-agreement-timeline", "disabled"),
-        Output("tab-alignment-subject", "disabled"),
+        Output("tab-agreement-map", "style"),
+        Output("tab-agreement-timeline", "style"),
+        Output("tab-alignment-subject", "style"),
         Output("tab-map-content", "children"),
         Output("tab-timeline-content", "children"),
         Output("tab-subject-content", "children"),
@@ -177,7 +177,7 @@ wordcloud_interactive.register_callbacks()
     prevent_initial_call=False,
 )
 def update_tab_states(filter_store):
-    """Disable tabs based on country selection requirements."""
+    """Gray out tabs visually based on country selection requirements."""
     if not filter_store:
         country1 = None
         country2 = None
@@ -192,11 +192,19 @@ def update_tab_states(filter_store):
         else:
             country2 = None
     
-    # Agreement Map: requires only country1
-    map_disabled = country1 is None or country1 == ""
-    
-    # Agreement Timeline and Alignment by Subject: require both country1 and country2
-    comparison_disabled = (country1 is None or country1 == "") or (country2 is None or country2 == "")
+    no_main_country = country1 is None or country1 == ""
+    comparison_disabled = no_main_country or (country2 is None or country2 == "")
+    tab_normal_style = {}
+    tab_grayed_style = {
+        "opacity": 0.45,
+        "filter": "grayscale(100%)",
+        "transition": "opacity 120ms ease",
+    }
+    # Agreement Map requires main country only.
+    # Agreement Timeline / Alignment by Subject require both main + compare country.
+    map_tab_style = tab_grayed_style if no_main_country else tab_normal_style
+    timeline_tab_style = tab_grayed_style if comparison_disabled else tab_normal_style
+    subject_tab_style = tab_grayed_style if comparison_disabled else tab_normal_style
     
     # Placeholder content for disabled tabs
     placeholder_no_country1 = html.Div(
@@ -230,7 +238,7 @@ def update_tab_states(filter_store):
     )
     
     # Content when enabled - wrap in a list to match Dash's expected format
-    if map_disabled:
+    if no_main_country:
         map_content = [placeholder_no_country1]
     else:
         map_content = [
@@ -261,7 +269,14 @@ def update_tab_states(filter_store):
             *alignment_by_subject.layout,
         ]
     
-    return map_disabled, comparison_disabled, comparison_disabled, map_content, timeline_content, subject_content
+    return (
+        map_tab_style,
+        timeline_tab_style,
+        subject_tab_style,
+        map_content,
+        timeline_content,
+        subject_content,
+    )
 
 
 @callback(
@@ -271,33 +286,7 @@ def update_tab_states(filter_store):
     prevent_initial_call=True,
 )
 def prevent_disabled_tab_switch(selected_tab, filter_store):
-    """Prevent switching to disabled tabs based on country selection requirements."""
-    if not filter_store:
-        country1 = None
-        country2 = None
-    else:
-        country1 = filter_store.get("country1_alpha3")
-        country2_raw = filter_store.get("country2")
-        # Handle country2 as list or string
-        if isinstance(country2_raw, list):
-            country2 = country2_raw[0] if country2_raw else None
-        elif isinstance(country2_raw, str) and country2_raw:
-            country2 = country2_raw
-        else:
-            country2 = None
-    
-    # Agreement Map: requires only country1
-    map_disabled = country1 is None or country1 == ""
-    
-    # Agreement Timeline and Alignment by Subject: require both country1 and country2
-    comparison_disabled = (country1 is None or country1 == "") or (country2 is None or country2 == "")
-    
-    # If trying to switch to a disabled tab, revert to resolution_list
-    if selected_tab == "map" and map_disabled:
-        return "resolution_list"
-    if selected_tab in ["timeline", "subject"] and comparison_disabled:
-        return "resolution_list"
-    
+    """Keep tab switching enabled; tab availability is visual only."""
     return selected_tab
 
 
