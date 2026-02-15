@@ -6,7 +6,9 @@ from .. import data
 
 prefix = "filter-component"
 ids = {
-    "date_picker": f"{prefix}-date-picker-range",
+    "start_year": f"{prefix}-start-year",
+    "end_year": f"{prefix}-end-year",
+    "era_preset": f"{prefix}-era-preset",
     "subject_dropdown": f"{prefix}-subject-dropdown",
     "country": f"{prefix}-country-dropdown",
     "country2": f"{prefix}-country2-dropdown",
@@ -41,8 +43,46 @@ PRESETS = {
     },
 }
 
+# Era presets for quick year range selection
+ERA_PRESETS = {
+    "cold_war": {
+        "label": "Cold War (1947–1991)",
+        "start": 1947,
+        "end": 1991,
+    },
+    "post_cold_war": {
+        "label": "Post Cold War (1992–2001)",
+        "start": 1992,
+        "end": 2001,
+    },
+    "war_on_terror": {
+        "label": "War on Terror (2001–2014)",
+        "start": 2001,
+        "end": 2014,
+    },
+    "recent": {
+        "label": "Recent (2015–present)",
+        "start": 2015,
+        "end": None,  # will use latest year
+    },
+}
+
 
 def register_callbacks():
+
+    # Callback: Apply era preset to year dropdowns
+    @callback(
+        Output(ids["start_year"], "value", allow_duplicate=True),
+        Output(ids["end_year"], "value", allow_duplicate=True),
+        Input(ids["era_preset"], "value"),
+        prevent_initial_call=True,
+    )
+    def apply_era_preset(preset_key):
+        if not preset_key or preset_key not in ERA_PRESETS:
+            from dash import no_update
+            return no_update, no_update
+        era = ERA_PRESETS[preset_key]
+        return era["start"], era["end"] or data.get_latest_year()
 
     # Callback: Apply preset to comparison countries
     @callback(
@@ -57,8 +97,9 @@ def register_callbacks():
 
     # Callback: Reset all filters except main country
     @callback(
-        Output(ids["date_picker"], "start_date"),
-        Output(ids["date_picker"], "end_date"),
+        Output(ids["start_year"], "value"),
+        Output(ids["end_year"], "value"),
+        Output(ids["era_preset"], "value"),
         Output(ids["subject_dropdown"], "value"),
         Output(ids["country2"], "value", allow_duplicate=True),
         Output(ids["preset"], "value", allow_duplicate=True),
@@ -67,8 +108,9 @@ def register_callbacks():
     )
     def reset_filters(n_clicks):
         return (
-            data.get_earliest_data_date(),
-            data.get_latest_data_date(),
+            data.get_earliest_year(),
+            data.get_latest_year(),
+            None,
             None,
             [],
             None,
@@ -78,23 +120,29 @@ def register_callbacks():
     @callback(
         Output(ids["filter_store"], "data"),
         Output(ids["location"], "search"),
-        Input(ids["date_picker"], "start_date"),
-        Input(ids["date_picker"], "end_date"),
+        Input(ids["start_year"], "value"),
+        Input(ids["end_year"], "value"),
         Input(ids["subject_dropdown"], "value"),
         Input(ids["country"], "value"),
         Input(ids["country2"], "value"),
         prevent_initial_call=False,
     )
-    def update_filter_store(start_date, end_date, subject_ids, country_iso3, country2):
+    def update_filter_store(start_year, end_year, subject_ids, country_iso3, country2):
         """
         Register callbacks for the filter component.
         - Filter state management
         - Print current selections when filters change
         - Query data when filters change
         """
+        # Convert years to inclusive date range (Jan 1 of start year to Dec 31 of end year)
+        start_date = f"{start_year}-01-01" if start_year else None
+        end_date = f"{end_year}-12-31" if end_year else None
+
         filter_data = {
             "start_date": start_date,
             "end_date": end_date,
+            "start_year": start_year,
+            "end_year": end_year,
             "subject_ids": subject_ids if subject_ids else None,
             "country1_alpha3": country_iso3,
             "country2": country2,
@@ -103,7 +151,7 @@ def register_callbacks():
         # Print current selections
         print("\n" + "=" * 50)
         print("Current Filter Selections:")
-        print(f"  Date Range: {start_date} to {end_date}")
+        print(f"  Year Range: {start_year} to {end_year}")
         print(f"  Subjects: {subject_ids if subject_ids else 'None'}")
         print(f"  Country: {country_iso3 if country_iso3 else 'None'}")
         print("=" * 50 + "\n")
@@ -384,7 +432,7 @@ layout = (
                     # ROW 3: Date Range and Subjects side by side
                     html.Div(
                         [
-                            # Date Range Filter
+                            # Year Range Filter
                             html.Div(
                                 [
                                     html.Div(
@@ -397,7 +445,7 @@ layout = (
                                                 },
                                             ),
                                             html.Label(
-                                                "Date Range",
+                                                "Year Range",
                                                 style={
                                                     "fontWeight": "600",
                                                     "color": "#495057",
@@ -408,19 +456,70 @@ layout = (
                                             ),
                                         ]
                                     ),
-                                    dcc.DatePickerRange(
-                                        id=ids["date_picker"],
-                                        min_date_allowed=data.get_earliest_data_date().date(),
-                                        max_date_allowed=data.get_latest_data_date().date(),
-                                        start_date=data.get_earliest_data_date().date(),
-                                        end_date=data.get_latest_data_date().date(),
-                                        initial_visible_month=data.get_earliest_data_date().date(),
-                                        display_format="MMM D, YYYY",
-                                        className="custom-datepicker",
+                                    html.Div(
+                                        [
+                                            dcc.Dropdown(
+                                                id=ids["start_year"],
+                                                options=[
+                                                    {"label": str(y), "value": y}
+                                                    for y in range(
+                                                        data.get_earliest_year(),
+                                                        data.get_latest_year() + 1,
+                                                    )
+                                                ],
+                                                value=data.get_earliest_year(),
+                                                clearable=False,
+                                                searchable=True,
+                                                style={"flex": "1", "fontSize": "14px"},
+                                            ),
+                                            html.Span(
+                                                "–",
+                                                style={
+                                                    "padding": "0 8px",
+                                                    "color": "#6c757d",
+                                                    "fontWeight": "600",
+                                                    "alignSelf": "center",
+                                                },
+                                            ),
+                                            dcc.Dropdown(
+                                                id=ids["end_year"],
+                                                options=[
+                                                    {"label": str(y), "value": y}
+                                                    for y in range(
+                                                        data.get_earliest_year(),
+                                                        data.get_latest_year() + 1,
+                                                    )
+                                                ],
+                                                value=data.get_latest_year(),
+                                                clearable=False,
+                                                searchable=True,
+                                                style={"flex": "1", "fontSize": "14px"},
+                                            ),
+                                        ],
+                                        style={
+                                            "display": "flex",
+                                            "flexDirection": "row",
+                                            "alignItems": "center",
+                                            "gap": "4px",
+                                        },
+                                    ),
+                                    dcc.Dropdown(
+                                        id=ids["era_preset"],
+                                        options=[
+                                            {"label": e["label"], "value": k}
+                                            for k, e in ERA_PRESETS.items()
+                                        ],
+                                        placeholder="Quick select era...",
+                                        clearable=True,
+                                        style={
+                                            "width": "100%",
+                                            "fontSize": "13px",
+                                            "marginTop": "8px",
+                                        },
                                     ),
                                 ],
                                 style={
-                                    "flex": "0 0 20%",
+                                    "flex": "0 0 23%",
                                     "padding": "15px",
                                     "backgroundColor": "#f8f9fa",
                                     "borderRadius": "8px",
