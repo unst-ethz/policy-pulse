@@ -8,3 +8,5 @@ Policy Pulse is a project by the UN-ETH Student Team on creating a powerful inte
 - `app/` is for the website
 
 The website can be launched with: `python3 -m app` if you have installed all dependencies in `requirements.txt`
+
+Website: http://unst-dev.vsos.ethz.ch/

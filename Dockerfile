@@ -17,4 +17,4 @@ USER appuser
 EXPOSE 8050
 
 # Preload the application let's a masterprocess fetch and process our data before spawning workers for handling requests.
-CMD ["gunicorn", "--bind", "0.0.0.0:8050", "--workers", "2", "--timeout", "300", "--preload", "app.__main__:server"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8050", "--workers", "1", "--timeout", "300", "app.__main__:server"]
