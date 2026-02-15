@@ -8,6 +8,7 @@ prefix = "filter-component"
 ids = {
     "start_year": f"{prefix}-start-year",
     "end_year": f"{prefix}-end-year",
+    "era_preset": f"{prefix}-era-preset",
     "subject_dropdown": f"{prefix}-subject-dropdown",
     "country": f"{prefix}-country-dropdown",
     "country2": f"{prefix}-country2-dropdown",
@@ -42,8 +43,46 @@ PRESETS = {
     },
 }
 
+# Era presets for quick year range selection
+ERA_PRESETS = {
+    "cold_war": {
+        "label": "Cold War (1947–1991)",
+        "start": 1947,
+        "end": 1991,
+    },
+    "post_cold_war": {
+        "label": "Post Cold War (1992–2001)",
+        "start": 1992,
+        "end": 2001,
+    },
+    "war_on_terror": {
+        "label": "War on Terror (2001–2014)",
+        "start": 2001,
+        "end": 2014,
+    },
+    "recent": {
+        "label": "Recent (2015–present)",
+        "start": 2015,
+        "end": None,  # will use latest year
+    },
+}
+
 
 def register_callbacks():
+
+    # Callback: Apply era preset to year dropdowns
+    @callback(
+        Output(ids["start_year"], "value", allow_duplicate=True),
+        Output(ids["end_year"], "value", allow_duplicate=True),
+        Input(ids["era_preset"], "value"),
+        prevent_initial_call=True,
+    )
+    def apply_era_preset(preset_key):
+        if not preset_key or preset_key not in ERA_PRESETS:
+            from dash import no_update
+            return no_update, no_update
+        era = ERA_PRESETS[preset_key]
+        return era["start"], era["end"] or data.get_latest_year()
 
     # Callback: Apply preset to comparison countries
     @callback(
@@ -60,6 +99,7 @@ def register_callbacks():
     @callback(
         Output(ids["start_year"], "value"),
         Output(ids["end_year"], "value"),
+        Output(ids["era_preset"], "value"),
         Output(ids["subject_dropdown"], "value"),
         Output(ids["country2"], "value", allow_duplicate=True),
         Output(ids["preset"], "value", allow_duplicate=True),
@@ -70,6 +110,7 @@ def register_callbacks():
         return (
             data.get_earliest_year(),
             data.get_latest_year(),
+            None,
             None,
             [],
             None,
@@ -442,9 +483,23 @@ layout = (
                                             "gap": "4px",
                                         },
                                     ),
+                                    dcc.Dropdown(
+                                        id=ids["era_preset"],
+                                        options=[
+                                            {"label": e["label"], "value": k}
+                                            for k, e in ERA_PRESETS.items()
+                                        ],
+                                        placeholder="Quick select era...",
+                                        clearable=True,
+                                        style={
+                                            "width": "100%",
+                                            "fontSize": "13px",
+                                            "marginTop": "8px",
+                                        },
+                                    ),
                                 ],
                                 style={
-                                    "flex": "0 0 20%",
+                                    "flex": "0 0 23%",
                                     "padding": "15px",
                                     "backgroundColor": "#f8f9fa",
                                     "borderRadius": "8px",
