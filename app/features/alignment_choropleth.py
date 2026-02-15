@@ -26,6 +26,8 @@ def register_callbacks(query_engine):
         ],
     )
     def generate_chart(filtered_data, filter_store, year: tuple[int, int]):
+        if not filtered_data or not filter_store:
+            return go.Figure(), None, year, None, ""
         all_resolutions = pd.read_json(filtered_data, orient="split")
         if all_resolutions.empty:
             # no resolutions matcing the filter
@@ -54,7 +56,7 @@ def register_callbacks(query_engine):
                 <= int(year[1])
             )
         ]
-        country1 = filter_store["country1_alpha3"]
+        country1 = filter_store.get("country1_alpha3")
         if country1 is None:
             # primary country is not yet selected
             status_msg = html.Div(

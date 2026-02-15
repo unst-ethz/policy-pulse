@@ -405,7 +405,11 @@ def register_callbacks():
     def update_wordcloud_chart(filtered_data):
         """Update word cloud when filter data changes."""
         if not filtered_data:
-            raise PreventUpdate
+            return go.Figure().add_annotation(
+                text="Loading data...",
+                x=0.5, y=0.5, xref="paper", yref="paper",
+                showarrow=False, font=dict(size=16, color="#7f8c8d")
+            )
         return _build_wordcloud(filtered_data)
     
     @callback(

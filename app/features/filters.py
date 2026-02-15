@@ -166,14 +166,11 @@ def register_callbacks():
     )
     def query_data_on_filter_change(filter_data):
         """Query data based on current filter selections."""
-        if not filter_data:
-            return None
-
         try:
-            start_date = filter_data.get("start_date")
-            end_date = filter_data.get("end_date")
-            subject_ids = filter_data.get("subject_ids")
-            country = filter_data.get("country1_alpha3")
+            start_date = filter_data.get("start_date") if filter_data else None
+            end_date = filter_data.get("end_date") if filter_data else None
+            subject_ids = filter_data.get("subject_ids") if filter_data else None
+            country = filter_data.get("country1_alpha3") if filter_data else None
 
             # Query resolutions using the query engine
             df = data.query_engine.query_resolutions(

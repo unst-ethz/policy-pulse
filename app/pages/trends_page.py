@@ -126,6 +126,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
 clientside_callback(
     """
     function localise_iso_country(filter_store) {
+        if (!filter_store) return null;
         const iso_three_digit = filter_store.country1_alpha3;
 
         // Localize the country code
@@ -361,8 +362,10 @@ def disable_filters_based_on_tab(selected_tab):
 )
 def _calculate_data_wrapper(filter_store):
     """Wrapper that converts list to tuple for caching."""
-    country1 = filter_store["country1_alpha3"]
-    country2: List[str] | str = filter_store["country2"]
+    if not filter_store:
+        return ("No country selected.", None, None)
+    country1 = filter_store.get("country1_alpha3")
+    country2: List[str] | str = filter_store.get("country2")
 
     # normalize country2 to tuple (hashable)
     if country2 is None:

@@ -19,11 +19,11 @@ def register_callbacks():
     )
     def generate_chart(filter_store, moving_average_data):
         # moving_average_data is JSON produced by to_json; parse it
-        if moving_average_data is None:
+        if moving_average_data is None or not filter_store:
             return go.Figure(), html.Div("No data")
 
-        country1 = filter_store["country1_alpha3"]
-        country2 = filter_store["country2"]
+        country1 = filter_store.get("country1_alpha3")
+        country2 = filter_store.get("country2")
 
         df = pd.read_json(StringIO(moving_average_data))
         df["date"] = pd.to_datetime(df["date"])
