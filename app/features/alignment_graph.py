@@ -32,7 +32,7 @@ def register_callbacks():
         selected = country2 if isinstance(country2, (list, tuple)) else [country2]
 
         fig = go.Figure()
-        colors = ["blue", "orange", "green", "red", "purple", "brown"]
+        colors = ["blue", "orange", "green", "red", "purple", "brown", "pink", "gray", "olive", "cyan"]
         for i, c in enumerate(selected):
             sma_col = f"sma_{c}"
             align_col = f"alignment_{c}"
