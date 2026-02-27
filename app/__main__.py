@@ -4,7 +4,20 @@ from dash import dcc, html
 from .features import navbar
 from .features import breadcrumb
 
-app = dash.Dash(__package__, use_pages=True, suppress_callback_exceptions=True)
+external_scripts = [
+    {
+        "src": "https://unst-dev2.vsos.ethz.ch/api/script.js",
+        "data-site-id": "9e3feb116761",
+        "defer": True,
+    }
+]
+
+app = dash.Dash(
+    __package__,
+    use_pages=True,
+    suppress_callback_exceptions=True,
+    external_scripts=external_scripts,
+)
 
 server = app.server
 
