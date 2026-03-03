@@ -36,6 +36,12 @@ def _safe_count(value):
         return 0
 
 
+def _safe_pct(count, total):
+    if total <= 0:
+        return 0.0
+    return (count / total) * 100.0
+
+
 def _extract_category_tag(row):
     raw_category = row.get("category_tag")
     if pd.isna(raw_category) or raw_category is None or str(raw_category).strip() == "":
@@ -81,6 +87,12 @@ def _build_resolution_card(row):
     no_count = _safe_count(row.get("total_no", 0))
     abstain_count = _safe_count(row.get("total_abstentions", 0))
     not_voting_count = _safe_count(row.get("total_non_voting", 0))
+    total_ms = _safe_count(row.get("total_ms", 0))
+
+    y_pct = _safe_pct(yes_count, total_ms)
+    n_pct = _safe_pct(no_count, total_ms)
+    a_pct = _safe_pct(abstain_count, total_ms)
+    x_pct = _safe_pct(not_voting_count, total_ms)
 
     return html.Div(
         [
@@ -118,10 +130,10 @@ def _build_resolution_card(row):
             ),
             html.Div(
                 [
-                    html.Span(f"Y(Yes): {yes_count}", style={"color": "#1a7f37", "fontWeight": "500"}),
-                    html.Span(f"N(No): {no_count}", style={"color": "#cf222e", "fontWeight": "500"}),
-                    html.Span(f"A(Abstain): {abstain_count}", style={"color": "#9a6700", "fontWeight": "500"}),
-                    html.Span(f"X(Not Voting): {not_voting_count}", style={"color": "#0969da", "fontWeight": "500"}),
+                    html.Span(f"Y(Yes): {yes_count} ({y_pct:.1f}%)", style={"color": "#1a7f37", "fontWeight": "500"}),
+                    html.Span(f"N(No): {no_count} ({n_pct:.1f}%)", style={"color": "#cf222e", "fontWeight": "500"}),
+                    html.Span(f"A(Abstain): {abstain_count} ({a_pct:.1f}%)", style={"color": "#9a6700", "fontWeight": "500"}),
+                    html.Span(f"X(Not Voting): {not_voting_count} ({x_pct:.1f}%)", style={"color": "#0969da", "fontWeight": "500"}),
                 ],
                 style={
                     "display": "flex",
