@@ -1,6 +1,13 @@
 from dash import callback, Input, Output, State, html, dcc
 import pandas as pd
 from .. import data
+import pandas as pd
+from pathlib import Path
+
+cwd = Path(__file__).resolve().parent
+file_path = cwd.parent / "assets" / "joining_dates.csv"
+joining_dates = pd.read_csv(file_path)
+
 
 PAGE_SIZE = 10
 LOAD_MORE_SIZE = 50
@@ -95,7 +102,7 @@ def register_callbacks():
             comparison_countries = country2_raw
         elif isinstance(country2_raw, str) and country2_raw:
             comparison_countries = [country2_raw]
-            
+
         # UI State Logic: Agreement Filter Visibility
         show_agreement_filter = False
         agreement_container_style = {'display': 'none'}
@@ -113,8 +120,25 @@ def register_callbacks():
 
         # 1. Query Data
         try:
-           df = data.query_engine.query_resolutions(
-                start_date=start_date,
+            underlying_countries = []
+            for i in comparison_countries:
+                underlying_countries.append(i)
+            if country1:
+                underlying_countries.append(country1)
+            if len(underlying_countries) == 0:
+                 df = data.query_engine.query_resolutions(
+                    start_date=start_date,
+                    end_date=end_date,
+                    subject_ids=subject_ids,
+                    include_descendants=True
+                )
+            else:
+               min_starting_date = '2099-01-01'
+               for c in underlying_countries:
+                  if joining_dates[joining_dates['country'] == c]['min_date'].to_list()[0] < min_starting_date:
+                     min_starting_date = joining_dates[joining_dates['country'] == c]['min_date'].to_list()[0]
+               df = data.query_engine.query_resolutions(
+                start_date= start_date if min_starting_date < start_date else min_starting_date,
                 end_date=end_date,
                 subject_ids=subject_ids,
                 include_descendants=True
