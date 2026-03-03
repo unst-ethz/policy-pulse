@@ -1,0 +1,233 @@
+import json
+from io import StringIO
+
+from dash import Input, Output, callback, dcc, html
+import pandas as pd
+
+from .. import data
+
+INITIAL_VISIBLE = 10
+STEP_VISIBLE = 10
+
+_LIST_CONTAINER_STYLE = {
+    "backgroundColor": "white",
+    "border": "1px solid #e0e0e0",
+    "borderRadius": "8px",
+    "padding": "12px",
+    "overflowY": "auto",
+    "maxHeight": "430px",
+}
+
+_BTN_VISIBLE_STYLE = {
+    "marginTop": "10px",
+    "cursor": "pointer",
+    "marginBottom": "0",
+    "border": "none",
+}
+
+_BTN_HIDDEN_STYLE = {"display": "none"}
+
+
+def _safe_count(value):
+    if pd.isna(value):
+        return 0
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _extract_category_tag(row):
+    raw_category = row.get("category_tag")
+    if pd.isna(raw_category) or raw_category is None or str(raw_category).strip() == "":
+        return "No Category"
+    return str(raw_category).strip() or "No Category"
+
+
+def _build_category_tag_map():
+    resolution_subject_df = data.query_engine.resolution_subject_table
+    subject_df = data.query_engine.subject_table
+
+    if resolution_subject_df.empty or subject_df.empty:
+        return {}
+
+    label_col = "label_en" if "label_en" in subject_df.columns else None
+    if label_col is None:
+        return {}
+
+    subject_labels = subject_df[["subject_id", label_col]].dropna(subset=["subject_id", label_col]).copy()
+    merged = resolution_subject_df.merge(subject_labels, on="subject_id", how="left")
+    merged = merged.dropna(subset=[label_col])
+    if merged.empty:
+        return {}
+
+    merged["undl_id"] = merged["undl_id"].astype(str)
+    merged[label_col] = merged[label_col].astype(str).str.strip()
+    merged = merged[merged[label_col] != ""]
+    if merged.empty:
+        return {}
+
+    first_labels = merged.groupby("undl_id", as_index=False)[label_col].first()
+    return dict(zip(first_labels["undl_id"], first_labels[label_col]))
+
+
+def _build_resolution_card(row):
+    res_id = row.get("resolution", "N/A")
+    link = row.get("undl_link", "#")
+    date_val = row.get("date")
+    date_str = date_val.strftime("%Y-%m-%d") if pd.notnull(date_val) else "Unknown"
+    title = row.get("title", "Untitled")
+    category_tag = _extract_category_tag(row)
+    yes_count = _safe_count(row.get("total_yes", 0))
+    no_count = _safe_count(row.get("total_no", 0))
+    abstain_count = _safe_count(row.get("total_abstentions", 0))
+    not_voting_count = _safe_count(row.get("total_non_voting", 0))
+
+    return html.Div(
+        [
+            html.Div(
+                [
+                    html.A(
+                        html.Span(
+                            [
+                                html.I(className="fas fa-file-pdf", style={"marginRight": "8px"}),
+                                f"{res_id}",
+                            ],
+                            style={"color": "#007bff", "fontWeight": "600", "fontSize": "1.05em"},
+                        ),
+                        href=link,
+                        target="_blank",
+                        style={"textDecoration": "none"},
+                    ),
+                    html.Span(date_str, style={"color": "#666", "fontSize": "0.9em"}),
+                ],
+                style={"display": "flex", "justifyContent": "space-between", "alignItems": "center", "gap": "12px"},
+            ),
+            html.Div(title, style={"fontWeight": "bold", "marginTop": "6px", "marginBottom": "8px", "fontSize": "1.05em"}),
+            html.Span(
+                category_tag,
+                style={
+                    "display": "inline-block",
+                    "marginBottom": "8px",
+                    "padding": "2px 8px",
+                    "fontSize": "0.8em",
+                    "fontWeight": "600",
+                    "color": "#1b3357",
+                    "backgroundColor": "#eaf1ff",
+                    "borderRadius": "999px",
+                },
+            ),
+            html.Div(
+                [
+                    html.Span(f"Y(Yes): {yes_count}", style={"color": "#1a7f37", "fontWeight": "500"}),
+                    html.Span(f"N(No): {no_count}", style={"color": "#cf222e", "fontWeight": "500"}),
+                    html.Span(f"A(Abstain): {abstain_count}", style={"color": "#9a6700", "fontWeight": "500"}),
+                    html.Span(f"X(Not Voting): {not_voting_count}", style={"color": "#0969da", "fontWeight": "500"}),
+                ],
+                style={
+                    "display": "flex",
+                    "flexWrap": "wrap",
+                    "gap": "12px",
+                    "paddingTop": "8px",
+                    "borderTop": "1px solid #eee",
+                    "fontSize": "0.92em",
+                },
+            ),
+        ],
+        className="resolution-card",
+        style={
+            "backgroundColor": "white",
+            "border": "1px solid #e0e0e0",
+            "borderRadius": "8px",
+            "padding": "15px",
+            "marginBottom": "12px",
+            "boxShadow": "0 2px 4px rgba(0,0,0,0.05)",
+        },
+    )
+
+
+def _query_sorted_resolutions():
+    df = data.query_engine.query_resolutions()
+    if df.empty:
+        return df
+
+    category_map = _build_category_tag_map()
+    if "undl_id" in df.columns:
+        df["category_tag"] = df["undl_id"].astype(str).map(category_map).fillna("No Category")
+    else:
+        df["category_tag"] = "No Category"
+
+    if "date" in df.columns:
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df = df.sort_values(by=["date"], ascending=False, na_position="last")
+    return df
+
+
+layout = html.Div(
+    [
+        dcc.Store(id="index-recent-resolutions-data-store"),
+        html.Div(id="index-recent-resolutions-summary", style={"color": "#666", "marginBottom": "8px"}),
+        html.Div(id="index-recent-resolutions-list", style=_LIST_CONTAINER_STYLE),
+        html.Button(
+            f"Show {STEP_VISIBLE} more",
+            id="index-recent-resolutions-more-btn",
+            n_clicks=0,
+            className="cta-button",
+            style=_BTN_VISIBLE_STYLE,
+        ),
+    ],
+    style={"marginTop": "10px"},
+)
+
+
+def register_callbacks():
+    @callback(
+        Output("index-recent-resolutions-data-store", "data"),
+        Input("index-recent-resolutions-more-btn", "id"),
+    )
+    def load_recent_resolutions_data(_):
+        try:
+            df = _query_sorted_resolutions()
+            first_item = df.head(1).to_dict(orient="records")
+            if first_item:
+                print("=====================================================")
+                print(f"[recent_resolutions_panel] First item: {json.dumps(first_item[0], default=str)}")
+            return df.to_json(date_format="iso", orient="split")
+        except Exception as e:
+            return {"error": str(e)}
+
+    @callback(
+        Output("index-recent-resolutions-list", "children"),
+        Output("index-recent-resolutions-summary", "children"),
+        Output("index-recent-resolutions-more-btn", "style"),
+        Input("index-recent-resolutions-more-btn", "n_clicks"),
+        Input("index-recent-resolutions-data-store", "data"),
+    )
+    def update_recent_resolutions(n_clicks, data_json):
+        if not data_json:
+            return html.Div("Loading recent resolutions..."), "", _BTN_HIDDEN_STYLE
+
+        if isinstance(data_json, dict) and data_json.get("error"):
+            return (
+                html.Div(f"Error loading recent resolutions: {data_json['error']}", style={"color": "red"}),
+                "",
+                _BTN_HIDDEN_STYLE,
+            )
+
+        try:
+            df = pd.read_json(StringIO(data_json), orient="split")
+        except Exception as e:
+            return html.Div(f"Error parsing resolution data: {e}", style={"color": "red"}), "", _BTN_HIDDEN_STYLE
+
+        if df.empty:
+            return html.Div("No resolutions found.", style={"color": "#666"}), "0 resolutions", _BTN_HIDDEN_STYLE
+
+        visible_count = INITIAL_VISIBLE + ((n_clicks or 0) * STEP_VISIBLE)
+        display_df = df.head(visible_count)
+        cards = [_build_resolution_card(row) for _, row in display_df.iterrows()]
+
+        total = len(df)
+        shown = len(display_df)
+        summary = f"Showing {shown} of {total} resolutions (newest first)"
+        btn_style = _BTN_VISIBLE_STYLE if shown < total else _BTN_HIDDEN_STYLE
+        return cards, summary, btn_style
