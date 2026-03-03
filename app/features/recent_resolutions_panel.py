@@ -1,7 +1,6 @@
-import json
-from io import StringIO
+import functools
 
-from dash import Input, Output, callback, dcc, html
+from dash import Input, Output, callback, html
 import pandas as pd
 
 from .. import data
@@ -163,9 +162,12 @@ def _query_sorted_resolutions():
     return df
 
 
+@functools.lru_cache(maxsize=1)
+def _get_recent_resolutions_cached():
+    return _query_sorted_resolutions()
+
 layout = html.Div(
     [
-        dcc.Store(id="index-recent-resolutions-data-store"),
         html.Div(id="index-recent-resolutions-summary", style={"color": "#666", "marginBottom": "8px"}),
         html.Div(id="index-recent-resolutions-list", style=_LIST_CONTAINER_STYLE),
         html.Button(
@@ -182,42 +184,17 @@ layout = html.Div(
 
 def register_callbacks():
     @callback(
-        Output("index-recent-resolutions-data-store", "data"),
-        Input("index-recent-resolutions-more-btn", "id"),
-    )
-    def load_recent_resolutions_data(_):
-        try:
-            df = _query_sorted_resolutions()
-            first_item = df.head(1).to_dict(orient="records")
-            if first_item:
-                print("=====================================================")
-                print(f"[recent_resolutions_panel] First item: {json.dumps(first_item[0], default=str)}")
-            return df.to_json(date_format="iso", orient="split")
-        except Exception as e:
-            return {"error": str(e)}
-
-    @callback(
         Output("index-recent-resolutions-list", "children"),
         Output("index-recent-resolutions-summary", "children"),
         Output("index-recent-resolutions-more-btn", "style"),
         Input("index-recent-resolutions-more-btn", "n_clicks"),
-        Input("index-recent-resolutions-data-store", "data"),
     )
-    def update_recent_resolutions(n_clicks, data_json):
-        if not data_json:
-            return html.Div("Loading recent resolutions..."), "", _BTN_HIDDEN_STYLE
-
-        if isinstance(data_json, dict) and data_json.get("error"):
-            return (
-                html.Div(f"Error loading recent resolutions: {data_json['error']}", style={"color": "red"}),
-                "",
-                _BTN_HIDDEN_STYLE,
-            )
-
+    def update_recent_resolutions(n_clicks):
         try:
-            df = pd.read_json(StringIO(data_json), orient="split")
+            # Copy to avoid mutating cached dataframe downstream.
+            df = _get_recent_resolutions_cached().copy()
         except Exception as e:
-            return html.Div(f"Error parsing resolution data: {e}", style={"color": "red"}), "", _BTN_HIDDEN_STYLE
+            return html.Div(f"Error loading recent resolutions: {e}", style={"color": "red"}), "", _BTN_HIDDEN_STYLE
 
         if df.empty:
             return html.Div("No resolutions found.", style={"color": "#666"}), "0 resolutions", _BTN_HIDDEN_STYLE
