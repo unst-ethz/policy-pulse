@@ -2,7 +2,7 @@ import functools
 import time
 import numpy as np
 from typing import List
-from dash import Input, Output, callback, clientside_callback, html, dcc, register_page
+from dash import Input, Output, State, callback, clientside_callback, html, dcc, register_page
 import pandas as pd
 import random
 
@@ -288,6 +288,78 @@ def update_tab_states(filter_store):
 def prevent_disabled_tab_switch(selected_tab, filter_store):
     """Keep tab switching enabled; tab availability is visual only."""
     return selected_tab
+
+
+@callback(
+    Output("download-btn", "disabled"),
+    Output("download-btn", "style"),
+    Input("filter-component-filter-store", "data"),
+    prevent_initial_call=False,
+)
+def toggle_download_button(filter_store):
+    base_style = {
+        "border": "none",
+        "borderRadius": "4px",
+        "padding": "6px 14px",
+        "fontSize": "13px",
+        "fontFamily": "inherit",
+        "fontWeight": "600",
+    }
+    country1 = (filter_store or {}).get("country1_alpha3")
+    if not country1:
+        return True, {**base_style, "backgroundColor": "#adb5bd", "color": "white", "cursor": "not-allowed"}
+    return False, {**base_style, "backgroundColor": "#1a73e8", "color": "white", "cursor": "pointer"}
+
+
+@callback(
+    Output("download-resolutions-csv", "data"),
+    Input("download-btn", "n_clicks"),
+    State("filter-component-filter-store", "data"),
+    prevent_initial_call=True,
+)
+def download_resolutions_csv(n_clicks, filter_store):
+    """Build a CSV of all filtered resolutions + votes for selected countries."""
+    if not filter_store:
+        return None
+
+    start_date = filter_store.get("start_date")
+    end_date = filter_store.get("end_date")
+    subject_ids = filter_store.get("subject_ids")
+    country1 = filter_store.get("country1_alpha3")
+    country2_raw = filter_store.get("country2")
+
+    comparison: list[str] = []
+    if isinstance(country2_raw, list):
+        comparison = country2_raw
+    elif isinstance(country2_raw, str) and country2_raw:
+        comparison = [country2_raw]
+
+    df = data.query_engine.query_resolutions(
+        start_date=start_date,
+        end_date=end_date,
+        subject_ids=subject_ids,
+        include_descendants=True,
+    )
+
+    base_cols = ["undl_id", "resolution", "date", "session", "title", "agenda_title", "subjects", "draft"]
+    if "undl_link" in df.columns:
+        base_cols.append("undl_link")
+
+    vote_cols = []
+    if country1 and country1 in df.columns:
+        vote_cols.append(country1)
+    for c in comparison:
+        if c in df.columns and c not in vote_cols:
+            vote_cols.append(c)
+
+    cols = [c for c in base_cols + vote_cols if c in df.columns]
+    result = df[cols].copy() if not df.empty else pd.DataFrame(columns=cols)
+
+    # Rename vote columns to readable country names
+    rename_map = {c: data.get_country_name(c) for c in vote_cols}
+    result = result.rename(columns=rename_map)
+
+    return dcc.send_data_frame(result.to_csv, "resolutions.csv", index=False)
 
 
 @callback(

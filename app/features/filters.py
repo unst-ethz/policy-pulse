@@ -242,27 +242,49 @@ layout = (
             dcc.Store(id=ids["filter_store"]),
             dcc.Store(id=ids["data_store"]),
             dcc.Location(id=ids["location"], refresh=False),
-            # Header row: title + reset button
+            dcc.Download(id="download-resolutions-csv"),
+            # Header row: title + buttons
             html.Div(
                 [
                     html.H2(
                         "Filter the Data",
                         style={"color": "#212529", "margin": "0"},
                     ),
-                    html.Button(
-                        "↺ Reset Filters",
-                        id=ids["reset_btn"],
-                        n_clicks=0,
-                        style={
-                            "backgroundColor": "transparent",
-                            "border": "1px solid #adb5bd",
-                            "borderRadius": "4px",
-                            "color": "#495057",
-                            "padding": "6px 14px",
-                            "fontSize": "13px",
-                            "cursor": "pointer",
-                            "fontFamily": "inherit",
-                        },
+                    html.Div(
+                        [
+                            html.Button(
+                                "Download CSV",
+                                id="download-btn",
+                                n_clicks=0,
+                                style={
+                                    "backgroundColor": "#1a73e8",
+                                    "color": "white",
+                                    "border": "none",
+                                    "borderRadius": "4px",
+                                    "padding": "6px 14px",
+                                    "fontSize": "13px",
+                                    "cursor": "pointer",
+                                    "fontFamily": "inherit",
+                                    "fontWeight": "600",
+                                },
+                            ),
+                            html.Button(
+                                "↺ Reset Filters",
+                                id=ids["reset_btn"],
+                                n_clicks=0,
+                                style={
+                                    "backgroundColor": "transparent",
+                                    "border": "1px solid #adb5bd",
+                                    "borderRadius": "4px",
+                                    "color": "#495057",
+                                    "padding": "6px 14px",
+                                    "fontSize": "13px",
+                                    "cursor": "pointer",
+                                    "fontFamily": "inherit",
+                                },
+                            )
+                        ],
+                        style={"display": "flex", "gap": "8px"},
                     ),
                 ],
                 style={
