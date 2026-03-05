@@ -32,7 +32,7 @@ app.layout = html.Div(
         html.Div(
             className="container",
             children=[
-                *breadcrumb.layout,
+                # *breadcrumb.layout,
                 # Layout file
                 dash.page_container,
             ],
