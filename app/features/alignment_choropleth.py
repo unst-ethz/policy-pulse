@@ -4,7 +4,6 @@ import pandas as pd
 import plotly.express as px
 
 from .country_coordinates import get_country_longitude
-from ..data import get_earliest_data_date, get_latest_data_date
 
 
 
@@ -14,58 +13,36 @@ def register_callbacks(query_engine):
     @callback(
         [
             Output("alignment-choropleth", "figure"),
-            Output("alignment-choropleth-timeline", "min"),
-            Output("alignment-choropleth-timeline", "value"),
-            Output("alignment-choropleth-timeline", "max"),
             Output("alignment-choropleth-status", "children"),
         ],
         [
             Input("filter-component-data-store", "data"),
             Input("filter-component-filter-store", "data"),
-            Input("alignment-choropleth-timeline", "value"),
         ],
     )
-    def generate_chart(filtered_data, filter_store, year: tuple[int, int]):
+    def generate_chart(filtered_data, filter_store):
         if not filtered_data or not filter_store:
-            return go.Figure(), None, year, None, ""
+            return go.Figure(), ""
         all_resolutions = pd.read_json(filtered_data, orient="split")
         if all_resolutions.empty:
-            # no resolutions matcing the filter
-            status_msg = html.Div(
-                [
-                    html.Div([html.Strong("No resolutions to plot")]),
-                ]
-            )
+            status_msg = html.Div([html.Div([html.Strong("No resolutions to plot")])])
+            return go.Figure(), status_msg
 
-            return None, None, year, None, status_msg
-
-        # Find time range available resolutions for this filtered data
-        earliest_year = get_earliest_data_date().year
-        latest_year = get_latest_data_date().year
-
-        if year[0] == 0 and year[1] == 0:
-            year = (earliest_year, latest_year)
-
-        resolutions_in_year = all_resolutions[
-            (
-                pd.to_datetime(all_resolutions["date"], errors="coerce").dt.year
-                >= int(year[0])
-            )
-            & (
-                pd.to_datetime(all_resolutions["date"], errors="coerce").dt.year
-                <= int(year[1])
-            )
-        ]
         country1 = filter_store.get("country1_alpha3")
         if country1 is None:
-            # primary country is not yet selected
-            status_msg = html.Div(
-                [
-                    html.Div([html.Strong("Please select a primary country")]),
-                ]
-            )
+            status_msg = html.Div([html.Div([html.Strong("Please select a primary country")])])
+            return go.Figure(), status_msg
 
-            return None, earliest_year, year, latest_year, status_msg
+        start_year = filter_store.get("start_year")
+        end_year = filter_store.get("end_year")
+
+        resolutions_in_year = all_resolutions.copy()
+        if start_year or end_year:
+            dates = pd.to_datetime(resolutions_in_year["date"], errors="coerce").dt.year
+            if start_year:
+                resolutions_in_year = resolutions_in_year[dates >= int(start_year)]
+            if end_year:
+                resolutions_in_year = resolutions_in_year[dates <= int(end_year)]
 
         alignment_data = query_engine.query_agreement_between_countries(
             country1,
@@ -130,7 +107,7 @@ def register_callbacks(query_engine):
             ]
         )
 
-        return fig, earliest_year, year, latest_year, status_msg
+        return fig, status_msg
 
 
 layout = (
@@ -146,25 +123,6 @@ layout = (
                 ],
                 type="circle",
                 color="#3498db",
-            ),
-            dcc.RangeSlider(
-                min=0, 
-                max=1, 
-                step=1, 
-                value=[0, 0], 
-                id="alignment-choropleth-timeline",
-                marks={
-                    1946: '1946',
-                    1950: '1950',
-                    1960: '1960',
-                    1970: '1970',
-                    1980: '1980',
-                    1990: '1990',
-                    2000: '2000',
-                    2010: '2010',
-                    2020: '2020',
-                    2025: '2025',
-                }
             ),
         ],
     ),
