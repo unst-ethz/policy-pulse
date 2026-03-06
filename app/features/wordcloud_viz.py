@@ -20,7 +20,8 @@ def register_callbacks():
             return html.Img(src="/assets/86-95.png", width="100%")
 
 
-layout = (
+layout = html.Div(
+    [
     dcc.Tabs(
         id="wordcloud-viz-tabs",
         value="all",
@@ -33,4 +34,5 @@ layout = (
         ],
     ),
     html.Div(id="wordcloud-viz-image"),
+    ]
 )

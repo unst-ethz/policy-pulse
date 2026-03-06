@@ -74,52 +74,47 @@ def _build_stats_component():
 
     return html.Div(
         [
+            _stats_card("📄", "Resolutions", f"{total_resolutions:,}", "Total records"),
+            _stats_card(
+                "📅",
+                "Year Span",
+                f"{year_min}-{year_max}" if year_min and year_max else "N/A",
+                f"{year_span} years covered" if year_span else "No valid date range",
+            ),
+            _stats_card("🌍", "Countries", f"{num_countries:,}", "Voting columns available"),
+            _stats_card("🏷️", "Subjects", f"{unique_subjects:,}", f"{total_subject_links:,} resolution-subject links"),
+            _stats_card("🗳️", "Avg Participation", f"{avg_participation:.1f}", "Member states per resolution"),
+            html.Div("Vote Composition Across All Resolutions", style={"fontWeight": "600", "color": "#1f2937", "marginBottom": "8px"}),
             html.Div(
                 [
-                    _stats_card("📄", "Resolutions", f"{total_resolutions:,}", "Total records"),
-                    _stats_card(
-                        "📅",
-                        "Year Span",
-                        f"{year_min}-{year_max}" if year_min and year_max else "N/A",
-                        f"{year_span} years covered" if year_span else "No valid date range",
-                    ),
-                    _stats_card("🌍", "Countries", f"{num_countries:,}", "Voting columns available"),
-                    _stats_card("🏷️", "Subjects", f"{unique_subjects:,}", f"{total_subject_links:,} resolution-subject links"),
-                    _stats_card("🗳️", "Avg Participation", f"{avg_participation:.1f}", "Member states per resolution"),
+                    html.Div(style={"width": f"{y_pct:.2f}%", "backgroundColor": "#1a7f37", "height": "100%"}),
+                    html.Div(style={"width": f"{n_pct:.2f}%", "backgroundColor": "#cf222e", "height": "100%"}),
+                    html.Div(style={"width": f"{a_pct:.2f}%", "backgroundColor": "#9a6700", "height": "100%"}),
+                    html.Div(style={"width": f"{x_pct:.2f}%", "backgroundColor": "#0969da", "height": "100%"}),
                 ],
-                style={"display": "flex", "flexWrap": "wrap", "gap": "12px"},
+                style={"display": "flex", "height": "14px", "borderRadius": "999px", "overflow": "hidden", "backgroundColor": "#e5e7eb"},
             ),
             html.Div(
                 [
-                    html.Div("Vote Composition Across All Resolutions", style={"fontWeight": "600", "color": "#1f2937", "marginBottom": "8px"}),
-                    html.Div(
-                        [
-                            html.Div(style={"width": f"{y_pct:.2f}%", "backgroundColor": "#1a7f37", "height": "100%"}),
-                            html.Div(style={"width": f"{n_pct:.2f}%", "backgroundColor": "#cf222e", "height": "100%"}),
-                            html.Div(style={"width": f"{a_pct:.2f}%", "backgroundColor": "#9a6700", "height": "100%"}),
-                            html.Div(style={"width": f"{x_pct:.2f}%", "backgroundColor": "#0969da", "height": "100%"}),
-                        ],
-                        style={"display": "flex", "height": "14px", "borderRadius": "999px", "overflow": "hidden", "backgroundColor": "#e5e7eb"},
-                    ),
-                    html.Div(
-                        [
-                            html.Span(f"Y(Yes): {y_total:,} ({y_pct:.1f}%)", style={"color": "#1a7f37", "fontWeight": "600"}),
-                            html.Span(f"N(No): {n_total:,} ({n_pct:.1f}%)", style={"color": "#cf222e", "fontWeight": "600"}),
-                            html.Span(f"A(Abstain): {a_total:,} ({a_pct:.1f}%)", style={"color": "#9a6700", "fontWeight": "600"}),
-                            html.Span(f"X(Not Voting): {x_total:,} ({x_pct:.1f}%)", style={"color": "#0969da", "fontWeight": "600"}),
-                        ],
-                        style={"display": "flex", "flexWrap": "wrap", "gap": "12px", "marginTop": "8px", "fontSize": "0.9rem"},
-                    ),
+                    html.Span(f"Y(Yes): {y_total:,} ({y_pct:.1f}%)", style={"color": "#1a7f37", "fontWeight": "600"}),
+                    html.Span(f"N(No): {n_total:,} ({n_pct:.1f}%)", style={"color": "#cf222e", "fontWeight": "600"}),
+                    html.Span(f"A(Abstain): {a_total:,} ({a_pct:.1f}%)", style={"color": "#9a6700", "fontWeight": "600"}),
+                    html.Span(f"X(Not Voting): {x_total:,} ({x_pct:.1f}%)", style={"color": "#0969da", "fontWeight": "600"}),
                 ],
-                style={
-                    "marginTop": "14px",
-                    "backgroundColor": "#ffffff",
-                    "border": "1px solid #e5e7eb",
-                    "borderRadius": "12px",
-                    "padding": "12px",
-                },
+                style={"display": "flex", "flexWrap": "wrap", "gap": "12px", "marginTop": "8px", "fontSize": "0.9rem"},
             ),
-        ]
+        ],
+        style={
+            "display": "flex",
+            "flexDirection": "column",
+            "flexWrap": "wrap",
+            "gap": "12px",
+            "marginTop": "14px",
+            "backgroundColor": "#ffffff",
+            "border": "1px solid #e5e7eb",
+            "borderRadius": "12px",
+            "padding": "12px",
+        },
     )
 
 
