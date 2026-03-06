@@ -204,24 +204,17 @@ def register_callbacks():
             card = html.Div([
                 html.Div([
                     html.A(
-                        html.H4([html.I(className="fas fa-file-pdf", style={'marginRight': '8px'}), f"{res_id}"], 
-                               style={'marginBottom': '5px', 'color': '#007bff', 'display': 'inline-block'}),
+                        html.Span(f"{res_id}", 
+                               style={'color': '#007bff', 'fontWeight': 'bold'}),
                         href=link, target="_blank", style={'textDecoration': 'none'}
                     ),
                     html.Span(date_str, style={'float': 'right', 'color': '#666', 'fontSize': '0.9em'})
-                ]),
-                html.Div(title, style={'fontWeight': 'bold', 'marginBottom': '5px', 'fontSize': '1.05em'}),
+                ], style={'marginBottom': '0.5rem'}),
+                html.Div(title),
                 
                 html.Div(indicators, style={'marginTop': '10px', 'paddingTop': '10px', 'borderTop': '1px solid #eee', 'display': 'flex', 'flexWrap': 'wrap', 'gap': '5px'}) if indicators else None
                 
-            ], className='resolution-card', style={
-                'backgroundColor': 'white',
-                'border': '1px solid #e0e0e0',
-                'borderRadius': '8px',
-                'padding': '15px',
-                'marginBottom': '15px',
-                'boxShadow': '0 2px 4px rgba(0,0,0,0.05)'
-            })
+            ], className='resolution-card')
             cards.append(card)
             
         return cards, summary, btn_style, agreement_container_style, multi_msg, multi_msg_style

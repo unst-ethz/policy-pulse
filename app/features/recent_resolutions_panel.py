@@ -167,14 +167,6 @@ def _build_resolution_card(row):
             ),
         ],
         className="resolution-card",
-        style={
-            "backgroundColor": "white",
-            "border": "1px solid #e0e0e0",
-            "borderRadius": "8px",
-            "padding": "15px",
-            "marginBottom": "12px",
-            "boxShadow": "0 2px 4px rgba(0,0,0,0.05)",
-        },
     )
 
 
