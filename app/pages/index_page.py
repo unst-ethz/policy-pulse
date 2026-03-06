@@ -41,12 +41,15 @@ layout = html.Div(
             ],
             className="main-header",
         ),
-        html.H2("Keyword Wordcloud for GA Resolution Subjects (Not Country Specific)"),
+        html.H2(html.Span("At a quick glance"), className="section-title"),
+        recent_resolutions_panel.layout,
+        html.Span(
+            "Here are the top keywords present in resolutions that countries vote on at the United Nations General Assembly.",
+            className="section-subtitle",
+        ),
         *wordcloud_viz.layout,
         html.H2("Dataset Snapshot"),
         general_stats_panel.layout,
-        html.H2("Recent Resolutions"),
-        recent_resolutions_panel.layout,
     ],
 )
 

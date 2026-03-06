@@ -43,3 +43,26 @@
   -webkit-mask-image: linear-gradient(to right, #00000022 50%, black 100%);
   mask-image: linear-gradient(to right, #00000022 50%, black 100%);
 }
+
+.section-title {
+  font-size: 2rem;
+  margin-top: 3rem;
+  position: relative;
+
+  span {
+    background-color: white;
+    padding-right: 1rem;
+  }
+
+  &:after {
+    content: "";
+    display: block;
+    width: 100%;
+    height: 2px;
+    background-color: #1b3357;
+    position: absolute;
+    top: 50%;
+    left: 0;
+    z-index: -1;
+  }
+}

@@ -5,23 +5,15 @@ import pandas as pd
 
 from .. import data
 
-INITIAL_VISIBLE = 10
-STEP_VISIBLE = 10
+INITIAL_VISIBLE = 3
+STEP_VISIBLE = 5
 
 _LIST_CONTAINER_STYLE = {
     "backgroundColor": "white",
-    "border": "1px solid #e0e0e0",
-    "borderRadius": "8px",
-    "padding": "12px",
-    "overflowY": "auto",
-    "maxHeight": "430px",
 }
 
 _BTN_VISIBLE_STYLE = {
-    "marginTop": "10px",
-    "cursor": "pointer",
-    "marginBottom": "0",
-    "border": "none",
+    "marginTop": "1rem",
 }
 
 _BTN_HIDDEN_STYLE = {"display": "none"}
@@ -60,7 +52,11 @@ def _build_category_tag_map():
     if label_col is None:
         return {}
 
-    subject_labels = subject_df[["subject_id", label_col]].dropna(subset=["subject_id", label_col]).copy()
+    subject_labels = (
+        subject_df[["subject_id", label_col]]
+        .dropna(subset=["subject_id", label_col])
+        .copy()
+    )
     merged = resolution_subject_df.merge(subject_labels, on="subject_id", how="left")
     merged = merged.dropna(subset=[label_col])
     if merged.empty:
@@ -98,23 +94,36 @@ def _build_resolution_card(row):
         [
             html.Div(
                 [
+                    html.Span(date_str, style={"color": "#666", "fontSize": "0.9em"}),
                     html.A(
                         html.Span(
-                            [
-                                html.I(className="fas fa-file-pdf", style={"marginRight": "8px"}),
-                                f"{res_id}",
-                            ],
-                            style={"color": "#007bff", "fontWeight": "600", "fontSize": "1.05em"},
+                            f"{res_id}",
+                            style={
+                                "color": "#007bff",
+                                "fontWeight": "600",
+                                "fontSize": "1.05em",
+                            },
                         ),
                         href=link,
                         target="_blank",
                         style={"textDecoration": "none"},
                     ),
-                    html.Span(date_str, style={"color": "#666", "fontSize": "0.9em"}),
                 ],
-                style={"display": "flex", "justifyContent": "space-between", "alignItems": "center", "gap": "12px"},
+                style={
+                    "display": "flex",
+                    "justifyContent": "space-between",
+                    "alignItems": "center",
+                    "gap": "12px",
+                },
             ),
-            html.Div(title, style={"fontWeight": "bold", "marginTop": "6px", "marginBottom": "8px", "fontSize": "1.05em"}),
+            html.Div(
+                title,
+                style={
+                    "marginTop": "6px",
+                    "marginBottom": "8px",
+                    "fontSize": "1.05em",
+                },
+            ),
             html.Span(
                 category_tag,
                 style={
@@ -130,10 +139,22 @@ def _build_resolution_card(row):
             ),
             html.Div(
                 [
-                    html.Span(f"Y(Yes): {yes_count} ({y_pct:.1f}%)", style={"color": "#1a7f37", "fontWeight": "500"}),
-                    html.Span(f"N(No): {no_count} ({n_pct:.1f}%)", style={"color": "#cf222e", "fontWeight": "500"}),
-                    html.Span(f"A(Abstain): {abstain_count} ({a_pct:.1f}%)", style={"color": "#9a6700", "fontWeight": "500"}),
-                    html.Span(f"X(Not Voting): {not_voting_count} ({x_pct:.1f}%)", style={"color": "#0969da", "fontWeight": "500"}),
+                    html.Span(
+                        f"Yes: {yes_count} ({y_pct:.1f}%)",
+                        style={"color": "#1a7f37", "fontWeight": "500"},
+                    ),
+                    html.Span(
+                        f"No: {no_count} ({n_pct:.1f}%)",
+                        style={"color": "#cf222e", "fontWeight": "500"},
+                    ),
+                    html.Span(
+                        f"Abstain: {abstain_count} ({a_pct:.1f}%)",
+                        style={"color": "#9a6700", "fontWeight": "500"},
+                    ),
+                    html.Span(
+                        f"Not Voting: {not_voting_count} ({x_pct:.1f}%)",
+                        style={"color": "#0969da", "fontWeight": "500"},
+                    ),
                 ],
                 style={
                     "display": "flex",
@@ -164,7 +185,9 @@ def _query_sorted_resolutions():
 
     category_map = _build_category_tag_map()
     if "undl_id" in df.columns:
-        df["category_tag"] = df["undl_id"].astype(str).map(category_map).fillna("No Category")
+        df["category_tag"] = (
+            df["undl_id"].astype(str).map(category_map).fillna("No Category")
+        )
     else:
         df["category_tag"] = "No Category"
 
@@ -178,9 +201,13 @@ def _query_sorted_resolutions():
 def _get_recent_resolutions_cached():
     return _query_sorted_resolutions()
 
+
 layout = html.Div(
     [
-        html.Div(id="index-recent-resolutions-summary", style={"color": "#666", "marginBottom": "8px"}),
+        html.Div(
+            id="index-recent-resolutions-summary",
+            style={"color": "#666", "marginBottom": "8px"},
+        ),
         html.Div(id="index-recent-resolutions-list", style=_LIST_CONTAINER_STYLE),
         html.Button(
             f"Show {STEP_VISIBLE} more",
@@ -206,10 +233,20 @@ def register_callbacks():
             # Copy to avoid mutating cached dataframe downstream.
             df = _get_recent_resolutions_cached().copy()
         except Exception as e:
-            return html.Div(f"Error loading recent resolutions: {e}", style={"color": "red"}), "", _BTN_HIDDEN_STYLE
+            return (
+                html.Div(
+                    f"Error loading recent resolutions: {e}", style={"color": "red"}
+                ),
+                "",
+                _BTN_HIDDEN_STYLE,
+            )
 
         if df.empty:
-            return html.Div("No resolutions found.", style={"color": "#666"}), "0 resolutions", _BTN_HIDDEN_STYLE
+            return (
+                html.Div("No resolutions found.", style={"color": "#666"}),
+                "0 resolutions",
+                _BTN_HIDDEN_STYLE,
+            )
 
         visible_count = INITIAL_VISIBLE + ((n_clicks or 0) * STEP_VISIBLE)
         display_df = df.head(visible_count)
@@ -217,6 +254,6 @@ def register_callbacks():
 
         total = len(df)
         shown = len(display_df)
-        summary = f"Showing {shown} of {total} resolutions (newest first)"
+        summary = f"Here are the {shown} most recent resolutions voted on (of {total})"
         btn_style = _BTN_VISIBLE_STYLE if shown < total else _BTN_HIDDEN_STYLE
         return cards, summary, btn_style

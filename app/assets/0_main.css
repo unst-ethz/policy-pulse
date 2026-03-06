@@ -27,6 +27,7 @@ h2 {
   font-weight: 500;
   transition: background-color 0.2s ease;
   margin-bottom: 1.5rem;
+  cursor: pointer;
 }
 
 .cta-button:hover {
