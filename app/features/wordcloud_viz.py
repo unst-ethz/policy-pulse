@@ -22,17 +22,17 @@ def register_callbacks():
 
 layout = html.Div(
     [
-    dcc.Tabs(
-        id="wordcloud-viz-tabs",
-        value="all",
-        children=[
-            dcc.Tab(label="All Years", value="all"),
-            dcc.Tab(label="2016–2025", value="1625"),
-            dcc.Tab(label="2006–2015", value="0615"),
-            dcc.Tab(label="1996–2005", value="9605"),
-            dcc.Tab(label="1986–1995", value="8695"),
-        ],
-    ),
-    html.Div(id="wordcloud-viz-image"),
+        dcc.Tabs(
+            id="wordcloud-viz-tabs",
+            value="all",
+            children=[
+                dcc.Tab(label="All Years", value="all"),
+                dcc.Tab(label="1986–1995", value="8695"),
+                dcc.Tab(label="1996–2005", value="9605"),
+                dcc.Tab(label="2006–2015", value="0615"),
+                dcc.Tab(label="2016–2025", value="1625"),
+            ],
+        ),
+        html.Div(id="wordcloud-viz-image"),
     ]
 )

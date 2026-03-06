@@ -41,18 +41,15 @@ layout = html.Div(
             ],
             className="main-header",
         ),
-        html.H2(html.Span("At a quick glance"), className="section-title"),
+        html.H2(html.Span("Recent updates"), className="section-title"),
         recent_resolutions_panel.layout,
+        html.H2(html.Span("At a quick glance"), className="section-title"),
         html.Div(
             [
                 general_stats_panel.layout,
                 wordcloud_viz.layout,
             ],
-            style={
-                "display": "flex",
-                "flexDirection": "row",
-                "gap": "1rem",
-            }
+            className="desktop-only-dual-column",
         ),
     ],
 )

@@ -25,18 +25,21 @@ def _stats_card(icon, title, value, subtitle):
     return html.Div(
         [
             html.Div(icon, style={"fontSize": "1.5rem", "lineHeight": "1"}),
-            html.Div(title, style={"color": "#4b5563", "fontSize": "0.9rem", "marginTop": "4px"}),
-            html.Div(value, style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#1b3357", "marginTop": "2px"}),
-            html.Div(subtitle, style={"fontSize": "0.8rem", "color": "#6b7280", "marginTop": "2px"}),
+            html.Div([
+                html.Div(title, style={"color": "#4b5563", "fontSize": "0.9rem"}),
+                html.Div(value, style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#1b3357"}),
+                html.Div(subtitle, style={"fontSize": "0.8rem", "color": "#6b7280"}),
+            ], style={
+                "display": "flex",
+                "flexDirection": "column",
+                "gap": "0.25rem",
+            })
         ],
+        className="resolution-card",
         style={
-            "flex": "1",
-            "minWidth": "180px",
-            "background": "linear-gradient(135deg, #f8fbff 0%, #eef4ff 100%)",
-            "border": "1px solid #dbe7ff",
-            "borderRadius": "12px",
-            "padding": "14px",
-            "boxShadow": "0 3px 8px rgba(27,51,87,0.08)",
+            "display": "flex",
+            "flexDirection": "row",
+            "gap": "0.5rem",
         },
     )
 
@@ -87,33 +90,28 @@ def _build_stats_component():
             html.Div("Vote Composition Across All Resolutions", style={"fontWeight": "600", "color": "#1f2937", "marginBottom": "8px"}),
             html.Div(
                 [
-                    html.Div(style={"width": f"{y_pct:.2f}%", "backgroundColor": "#1a7f37", "height": "100%"}),
-                    html.Div(style={"width": f"{n_pct:.2f}%", "backgroundColor": "#cf222e", "height": "100%"}),
-                    html.Div(style={"width": f"{a_pct:.2f}%", "backgroundColor": "#9a6700", "height": "100%"}),
-                    html.Div(style={"width": f"{x_pct:.2f}%", "backgroundColor": "#0969da", "height": "100%"}),
+                    html.Div(style={"width": f"{y_pct:.2f}%", "backgroundColor": "#74bb88", "height": "100%"}),
+                    html.Div(style={"width": f"{n_pct:.2f}%", "backgroundColor": "#cc575f", "height": "100%"}),
+                    html.Div(style={"width": f"{a_pct:.2f}%", "backgroundColor": "#c19f5b", "height": "100%"}),
+                    html.Div(style={"width": f"{x_pct:.2f}%", "backgroundColor": "#6ea3e0", "height": "100%"}),
                 ],
                 style={"display": "flex", "height": "14px", "borderRadius": "999px", "overflow": "hidden", "backgroundColor": "#e5e7eb"},
             ),
             html.Div(
                 [
-                    html.Span(f"Y(Yes): {y_total:,} ({y_pct:.1f}%)", style={"color": "#1a7f37", "fontWeight": "600"}),
-                    html.Span(f"N(No): {n_total:,} ({n_pct:.1f}%)", style={"color": "#cf222e", "fontWeight": "600"}),
-                    html.Span(f"A(Abstain): {a_total:,} ({a_pct:.1f}%)", style={"color": "#9a6700", "fontWeight": "600"}),
-                    html.Span(f"X(Not Voting): {x_total:,} ({x_pct:.1f}%)", style={"color": "#0969da", "fontWeight": "600"}),
+                    html.Span(f"■ Yes: {y_total:,} ({y_pct:.1f}%)", style={"color": "#1a7f37"}),
+                    html.Span(f"■ No: {n_total:,} ({n_pct:.1f}%)", style={"color": "#cf222e"}),
+                    html.Span(f"■ Abstain: {a_total:,} ({a_pct:.1f}%)", style={"color": "#9a6700"}),
+                    html.Span(f"■ Not Voting: {x_total:,} ({x_pct:.1f}%)", style={"color": "#0969da"}),
                 ],
-                style={"display": "flex", "flexWrap": "wrap", "gap": "12px", "marginTop": "8px", "fontSize": "0.9rem"},
+                style={"display": "flex", "flexDirection": "column", "gap": "0.5rem", "marginTop": "8px", "fontSize": "0.75rem"},
             ),
         ],
         style={
             "display": "flex",
             "flexDirection": "column",
             "flexWrap": "wrap",
-            "gap": "12px",
-            "marginTop": "14px",
-            "backgroundColor": "#ffffff",
-            "border": "1px solid #e5e7eb",
-            "borderRadius": "12px",
-            "padding": "12px",
+            "minWidth": "300px",
         },
     )
 
@@ -123,18 +121,7 @@ def _get_stats_component_cached():
     return _build_stats_component()
 
 
-layout = html.Div(
-    [
-        html.Div(id="index-general-stats-content"),
-    ],
-    style={
-        "marginTop": "8px",
-        "padding": "14px",
-        "background": "linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)",
-        "border": "1px solid #e6edf8",
-        "borderRadius": "14px",
-    },
-)
+layout = html.Div(id="index-general-stats-content")
 
 
 def register_callbacks():
