@@ -23,69 +23,67 @@ _initialized = False
 def _init_wc_data():
     """Initialize word cloud data from keywords CSV file."""
     global _resolution_wc_data, _wc_word_undlid_map, _initialized
-    
+
     if _initialized:
         return
-    
+
     print("Initializing word cloud data...")
-    
+
     # Find the keywords CSV file in the app/assets directory
     # Get app directory (parent of features directory)
     app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     keywords_path = os.path.join(app_dir, "assets", "undlid_keywords.csv")
-    
+
     if not os.path.exists(keywords_path):
         print(f"Warning: Keywords file not found at {keywords_path}")
         _initialized = True
         return
-    
+
     try:
         keywords_df = pd.read_csv(keywords_path)
         data_all = pd.merge(
-            data.query_engine.query_resolutions(),
-            keywords_df,
-            on='undl_id',
-            how='left'
+            data.query_engine.query_resolutions(), keywords_df, on="undl_id", how="left"
         )
-        
+
         ignore_words = ["resolution", "general assembly"]
-        
+
         resolution_wc_data = {}
         wc_word_undlid_map = {}
-        
-        for undl_id, keywords in data_all[['undl_id', 'keywords']].values:
+
+        for undl_id, keywords in data_all[["undl_id", "keywords"]].values:
             if pd.isna(keywords):
                 continue
-                
+
             word_in_resolution = Counter()
             tokens_set = set()
-            
+
             for keyword in str(keywords).split(","):
                 keyword_clean = keyword.strip().lower()
                 if keyword_clean in ignore_words:
                     continue
                 if keyword_clean:
                     tokens_set.add(keyword_clean)
-            
+
             for token in tokens_set:
                 word_in_resolution[token] += 1
                 if token not in wc_word_undlid_map:
                     wc_word_undlid_map[token] = []
                 wc_word_undlid_map[token].append(undl_id)
-            
-            resolution_wc_data[undl_id] = {
-                'word_freq': dict(word_in_resolution)
-            }
-        
+
+            resolution_wc_data[undl_id] = {"word_freq": dict(word_in_resolution)}
+
         _resolution_wc_data = resolution_wc_data
         _wc_word_undlid_map = wc_word_undlid_map
         _initialized = True
-        
-        print(f"✅ Word cloud data initialized: {len(resolution_wc_data)} resolutions, {len(wc_word_undlid_map)} unique words")
-        
+
+        print(
+            f"✅ Word cloud data initialized: {len(resolution_wc_data)} resolutions, {len(wc_word_undlid_map)} unique words"
+        )
+
     except Exception as e:
         print(f"❌ Error initializing word cloud data: {e}")
         import traceback
+
         traceback.print_exc()
         _initialized = True
 
@@ -95,7 +93,7 @@ def _aggregate_word_freq(undl_ids: pd.Series) -> dict:
     agg_counter = Counter()
     for undl_id in undl_ids.values:
         if undl_id in _resolution_wc_data:
-            agg_counter.update(_resolution_wc_data[undl_id]['word_freq'])
+            agg_counter.update(_resolution_wc_data[undl_id]["word_freq"])
     return dict(agg_counter)
 
 
@@ -114,16 +112,16 @@ def _get_wordcloud_layout(word_freq_dict, seed=42):
     """Generate word positions using wordcloud library to avoid overlaps"""
     if not word_freq_dict:
         return {}, {}, {}
-    
+
     try:
         # Create WordCloud object with appropriate settings
         # Use a larger canvas with 2:1 aspect ratio (width:height)
         width, height = 1200, 800
-        
+
         wordcloud = WordCloud(
             width=width,
             height=height,
-            background_color='white',
+            background_color="white",
             prefer_horizontal=1.0,
             relative_scaling=0.5,
             min_font_size=16,
@@ -131,31 +129,36 @@ def _get_wordcloud_layout(word_freq_dict, seed=42):
             max_words=len(word_freq_dict),
             random_state=seed,
             collocation_threshold=0,
-            scale=1
+            scale=1,
         )
-        
+
         # Generate word cloud layout
         wordcloud.generate_from_frequencies(word_freq_dict)
         # wordcloud.to_file("wordcloud.jpg")
         # # Force layout generation by creating the image
         # # This ensures layout_ is populated with actual positions
         # _ = wordcloud.to_image()
-        
+
         # Extract positions from layout
         # The layout_ attribute contains tuples of (word, font_size, position, orientation, color)
         word_positions = {}
         sizes_from_wc = {}
         orientations_from_wc = {}
-        
-        if hasattr(wordcloud, 'layout_') and wordcloud.layout_:
+
+        if hasattr(wordcloud, "layout_") and wordcloud.layout_:
             for item in wordcloud.layout_:
                 if len(item) >= 4:
-                    word, font_size, position, orientation = item[0], item[1], item[2], item[3]
+                    word, font_size, position, orientation = (
+                        item[0],
+                        item[1],
+                        item[2],
+                        item[3],
+                    )
                     # Handle case where word might be a tuple (first character) or string
                     if isinstance(word, (tuple, list)):
                         word = word[0] if len(word) > 0 else str(word)
                     word = str(word)  # Ensure word is a string
-                    
+
                     # Position is a tuple (x, y) in pixel coordinates
                     if isinstance(position, tuple) and len(position) == 2:
                         word_positions[word] = position
@@ -165,13 +168,14 @@ def _get_wordcloud_layout(word_freq_dict, seed=42):
                     raise RuntimeError("wordcloud.layout_ item length < 3")
             # print(f"word_positions: {word_positions}")
             # print(f"sizes_from_wc: {sizes_from_wc}")
-            # print(f"orientations_from_wc: {orientations_from_wc}")  
+            # print(f"orientations_from_wc: {orientations_from_wc}")
         else:
             raise RuntimeError("wordcloud.layout_ not found")
         return word_positions, sizes_from_wc, orientations_from_wc
     except Exception as e:
         print(f"Error generating wordcloud layout: {e}")
         import traceback
+
         traceback.print_exc()
         return {}, {}, {}
 
@@ -179,14 +183,16 @@ def _get_wordcloud_layout(word_freq_dict, seed=42):
 def _get_viridis_colors(frequencies):
     """Get color mapping for word frequencies using blue colormap."""
     # Use blue color scheme - 'Blues' for light to dark
-    cmap = mpl_cm.get_cmap('Blues')
+    cmap = mpl_cm.get_cmap("Blues")
     freq_arr = np.array(frequencies, dtype=float)
     if len(freq_arr) == 0:
         return []
     if np.max(freq_arr) != np.min(freq_arr):
         # Normalize to 0.3-1.0 range instead of 0-1 to avoid very light/white colors
         # This keeps the blue theme but starts from a more visible blue
-        normed = 0.3 + 0.7 * ((freq_arr - np.min(freq_arr)) / (np.max(freq_arr) - np.min(freq_arr)))
+        normed = 0.3 + 0.7 * (
+            (freq_arr - np.min(freq_arr)) / (np.max(freq_arr) - np.min(freq_arr))
+        )
     else:
         # If all frequencies are the same, use a medium blue
         normed = np.full_like(freq_arr, 0.6)
@@ -199,98 +205,117 @@ def _build_wordcloud(filtered_data_json: str):
     if not filtered_data_json:
         return go.Figure().add_annotation(
             text="No data available. Please adjust filters.",
-            x=0.5, y=0.5, xref="paper", yref="paper",
-            showarrow=False
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+            showarrow=False,
         )
-    
+
     try:
         df = pd.read_json(StringIO(filtered_data_json), orient="split")
         if df.empty:
             return go.Figure().add_annotation(
                 text="No resolutions match the current filters.",
-                x=0.5, y=0.5, xref="paper", yref="paper",
-                showarrow=False
+                x=0.5,
+                y=0.5,
+                xref="paper",
+                yref="paper",
+                showarrow=False,
             )
-        
+
         # Check if 'undl_id' column exists
-        if 'undl_id' not in df.columns:
+        if "undl_id" not in df.columns:
             return go.Figure().add_annotation(
                 text="No data available. Please adjust filters.",
-                x=0.5, y=0.5, xref="paper", yref="paper",
-                showarrow=False
+                x=0.5,
+                y=0.5,
+                xref="paper",
+                yref="paper",
+                showarrow=False,
             )
-        
+
         # Get word frequencies for filtered resolutions
-        word_freq = _aggregate_word_freq(df['undl_id'])
-        
+        word_freq = _aggregate_word_freq(df["undl_id"])
+
         if not word_freq:
             return go.Figure().add_annotation(
                 text="No keywords found for the filtered resolutions.",
-                x=0.5, y=0.5, xref="paper", yref="paper",
-                showarrow=False
+                x=0.5,
+                y=0.5,
+                xref="paper",
+                yref="paper",
+                showarrow=False,
             )
-        
+
         # Sort and limit to top 30 words
         sorted_word_freq = sorted(word_freq.items(), key=lambda x: (-x[1], x[0]))
         if len(sorted_word_freq) > 20:
             word_freq = dict(sorted_word_freq[:20])
         else:
             word_freq = dict(sorted_word_freq)
-        
+
         words = list(word_freq.keys())
         freqs = list(word_freq.values())
-        
+
         # Get word positions from wordcloud library
         seed = 42  # Deterministic seed based on words
-        word_positions, sizes_from_wc, orientations_from_wc = _get_wordcloud_layout(word_freq, seed=seed)
+        word_positions, sizes_from_wc, orientations_from_wc = _get_wordcloud_layout(
+            word_freq, seed=seed
+        )
         word_keys = word_positions.keys()
 
         # Filter words to only those that were positioned
         words_filtered = []
         freqs_filtered = []
-        
+
         for word, freq in zip(words, freqs):
             word_key = word
             if word_key in word_keys:
                 words_filtered.append(word)
                 freqs_filtered.append(freq)
-        
+
         print(f"{len(words_filtered)}/{len(words)} words were positioned by WordCloud")
-        
+
         if not words_filtered:
             print(f"Warning: No words were positioned by WordCloud")
             return go.Figure().add_annotation(
                 text="No words positioned by WordCloud",
-                x=0.5, y=0.5, xref="paper", yref="paper",
-                showarrow=False
+                x=0.5,
+                y=0.5,
+                xref="paper",
+                yref="paper",
+                showarrow=False,
             )
-        
+
         words = words_filtered
         freqs = freqs_filtered
-        
+
         # Extract positions and normalize to plotly coordinates
         # WordCloud uses pixel coordinates (0,0) at top-left, we need to center and scale
         x_positions = []
         y_positions = []
         sizes = []
-        
+
         # WordCloud canvas dimensions (from _get_wordcloud_layout)
         wc_width, wc_height = 1200, 800
-        
+
         for word in words:
             word_key = word
             x_pixel, y_pixel = word_positions[word_key]
-            
+
             # Normalize coordinates to maintain 2:1 aspect ratio
             # Scale x to -1 to 1 range based on width
             # Scale y to -1 to 1 range based on height
             # This preserves the 2:1 aspect ratio
             x_normalized = (y_pixel / wc_width) * 3 - 1.5  # Scale to -1 to 1 range
-            y_normalized = 1 - (x_pixel / wc_height) * 2  # Scale to -1 to 1, flip y-axis (wordcloud uses top-left origin)
-            
+            y_normalized = (
+                1 - (x_pixel / wc_height) * 2
+            )  # Scale to -1 to 1, flip y-axis (wordcloud uses top-left origin)
+
             x_positions.append(x_normalized)
             y_positions.append(y_normalized)
-            
+
             # Use wordcloud's font size, but scale it appropriately for plotly
             wc_font_size = sizes_from_wc[word_key]
             # Scale font size proportionally to maintain visual consistency
@@ -302,65 +327,69 @@ def _build_wordcloud(filtered_data_json: str):
         # print(f"x_positions: {x_positions}")
         # print(f"y_positions: {y_positions}")
         # print(f"sizes: {sizes}")
-        
+
         # Colors based on frequency
         colors = _get_viridis_colors(freqs)
-        
-        hover_text = [f"<b>{w}</b><br>Appears in {f} resolutions" for w, f in zip(words, freqs)]
-        
+
+        hover_text = [
+            f"<b>{w}</b><br>Appears in {f} resolutions" for w, f in zip(words, freqs)
+        ]
+
         # Calculate hover marker positions centered on words
         # Since textposition="bottom right", the anchor is at bottom-right corner
         # We need to shift left and up to center the hover area on the word
         hover_x_positions = []
         hover_y_positions = []
         hover_sizes = []
-        
+
         # WordCloud canvas dimensions for coordinate conversion
         wc_width, wc_height = 1200, 800
         coord_range_x = 2.2  # from -1.1 to 1.1
         coord_range_y = 2.2
-        
+
         for word, size, x_pos, y_pos in zip(words, sizes, x_positions, y_positions):
             # Estimate word dimensions in pixels
             # Character width factor ~0.6, line height factor ~1.2
             word_width_px = size * len(word) * 0.6
             word_height_px = size * 1
-            
+
             # Convert pixel shifts to normalized coordinates
             # Shift left by half width, up by half height
             shift_x_normalized = (word_width_px / 2) / wc_width * coord_range_x
             shift_y_normalized = (word_height_px / 2) / wc_height * coord_range_y
-            
+
             # Center the hover marker on the word
             hover_x_positions.append(x_pos + shift_x_normalized)
-            hover_y_positions.append(y_pos - shift_y_normalized)  # + because y increases upward
-            
+            hover_y_positions.append(
+                y_pos - shift_y_normalized
+            )  # + because y increases upward
+
             # Size hover area to roughly match word size
             hover_sizes.append(size * 1.5)
-        
+
         # customdata: [hover_display_text, word] so resolution-table callback can read the word
         hover_customdata = [[ht, w] for ht, w in zip(hover_text, words)]
-        
+
         # Invisible marker trace with a larger hover area so that
         # hovering near the *center* of a word still shows the tooltip,
         # without changing the visual position of the words.
         hover_trace = go.Scatter(
             x=hover_x_positions,
             y=hover_y_positions,
-            mode='markers',
+            mode="markers",
             marker=dict(
                 size=hover_sizes,
                 opacity=0,
             ),
-            hovertemplate='%{customdata[0]}<extra></extra>',
+            hovertemplate="%{customdata[0]}<extra></extra>",
             customdata=hover_customdata,
             showlegend=False,
         )
-        
+
         text_trace = go.Scatter(
             x=x_positions,
             y=y_positions,
-            mode='text',
+            mode="text",
             text=words,
             textposition="bottom right",
             textfont=dict(size=sizes, color=colors),
@@ -368,36 +397,42 @@ def _build_wordcloud(filtered_data_json: str):
             hovertemplate=None,
             showlegend=False,
         )
-        
+
         fig = go.Figure(data=[hover_trace, text_trace])
         fig.update_layout(
             showlegend=False,
-            xaxis=dict(visible=False, range=[-1.1, 1.1], scaleanchor="y", scaleratio=1.0),
+            xaxis=dict(
+                visible=False, range=[-1.1, 1.1], scaleanchor="y", scaleratio=1.0
+            ),
             yaxis=dict(visible=False, range=[-1.1, 1.1]),
             margin=dict(l=10, r=10, t=10, b=10),
-            plot_bgcolor='white',
-            paper_bgcolor='white'
+            plot_bgcolor="white",
+            paper_bgcolor="white",
         )
-        
+
         return fig
-        
+
     except Exception as e:
         print(f"Error building word cloud: {e}")
         import traceback
+
         traceback.print_exc()
         return go.Figure().add_annotation(
             text=f"Error: {str(e)}",
-            x=0.5, y=0.5, xref="paper", yref="paper",
-            showarrow=False
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+            showarrow=False,
         )
 
 
 def register_callbacks():
     """Register callbacks for the word cloud feature."""
-    
+
     # Initialize data on first callback registration
     _init_wc_data()
-    
+
     @callback(
         Output("wordcloud-interactive-chart", "figure"),
         Input("filter-component-data-store", "data"),
@@ -407,11 +442,15 @@ def register_callbacks():
         if not filtered_data:
             return go.Figure().add_annotation(
                 text="Loading data...",
-                x=0.5, y=0.5, xref="paper", yref="paper",
-                showarrow=False, font=dict(size=16, color="#7f8c8d")
+                x=0.5,
+                y=0.5,
+                xref="paper",
+                yref="paper",
+                showarrow=False,
+                font=dict(size=16, color="#7f8c8d"),
             )
         return _build_wordcloud(filtered_data)
-    
+
     @callback(
         Output("wordcloud-interactive-meta", "children"),
         Input("filter-component-data-store", "data"),
@@ -420,18 +459,18 @@ def register_callbacks():
         """Update meta information about word cloud."""
         if not filtered_data:
             return "No data available."
-        
+
         try:
             df = pd.read_json(StringIO(filtered_data), orient="split")
             if df.empty:
                 return "No data available."
-            if 'undl_id' not in df.columns:
+            if "undl_id" not in df.columns:
                 return "No data available."
-            word_freq = _aggregate_word_freq(df['undl_id'])
-            return f"Total resolutions: {len(df):,}"    # • Unique words: {len(word_freq)}
+            word_freq = _aggregate_word_freq(df["undl_id"])
+            return f"Total resolutions: {len(df):,}"  # • Unique words: {len(word_freq)}
         except Exception as e:
             return f"Error: {str(e)}"
-    
+
     @callback(
         Output("wordcloud-interactive-table", "children"),
         Input("wordcloud-interactive-chart", "hoverData"),
@@ -441,39 +480,59 @@ def register_callbacks():
     )
     def update_resolution_table(hoverData, filtered_data, filter_params):
         """Update resolution list (cards) when hovering over a word."""
-        if hoverData is None or not hoverData or 'points' not in hoverData or not hoverData['points']:
-            return html.Div("Hover over a word to see related resolutions.", style={'color': '#7f8c8d'})
-        
+        if (
+            hoverData is None
+            or not hoverData
+            or "points" not in hoverData
+            or not hoverData["points"]
+        ):
+            return html.Div(
+                "Hover over a word to see related resolutions.",
+                style={"color": "#7f8c8d"},
+            )
+
         if not filtered_data:
-            return html.Div("No data available.", style={'color': '#7f8c8d'})
-        
+            return html.Div("No data available.", style={"color": "#7f8c8d"})
+
         try:
-            pt = hoverData['points'][0]
-            custom = pt.get('customdata')
-            word = pt.get('text') or (custom[1] if isinstance(custom, (list, tuple)) and len(custom) > 1 else None)
+            pt = hoverData["points"][0]
+            custom = pt.get("customdata")
+            word = pt.get("text") or (
+                custom[1]
+                if isinstance(custom, (list, tuple)) and len(custom) > 1
+                else None
+            )
             if not word:
-                return html.Div("No word selected.", style={'color': '#7f8c8d'})
-            
+                return html.Div("No word selected.", style={"color": "#7f8c8d"})
+
             df = pd.read_json(StringIO(filtered_data), orient="split")
-            
+
             if df.empty:
-                return html.Div("No data available.", style={'color': '#7f8c8d'})
-            
-            if 'undl_id' not in df.columns:
-                return html.Div("No data available.", style={'color': '#7f8c8d'})
-            
+                return html.Div("No data available.", style={"color": "#7f8c8d"})
+
+            if "undl_id" not in df.columns:
+                return html.Div("No data available.", style={"color": "#7f8c8d"})
+
             if word not in _wc_word_undlid_map:
-                return html.Div(f"No resolutions found for word '{word}'.", style={'color': '#7f8c8d'})
-            
-            matching = df[df['undl_id'].isin(_wc_word_undlid_map[word])].copy()
+                return html.Div(
+                    f"No resolutions found for word '{word}'.",
+                    style={"color": "#7f8c8d"},
+                )
+
+            matching = df[df["undl_id"].isin(_wc_word_undlid_map[word])].copy()
             if matching.empty:
-                return html.Div(f"No resolutions found for word '{word}' in current filter.", style={'color': '#7f8c8d'})
-            
-            matching['date'] = pd.to_datetime(matching['date'], errors='coerce')
-            matching = matching.sort_values(by=['date', 'resolution'], ascending=[True, True])
+                return html.Div(
+                    f"No resolutions found for word '{word}' in current filter.",
+                    style={"color": "#7f8c8d"},
+                )
+
+            matching["date"] = pd.to_datetime(matching["date"], errors="coerce")
+            matching = matching.sort_values(
+                by=["date", "resolution"], ascending=[True, True]
+            )
             max_rows = 10000
             display_df = matching.head(max_rows)
-            
+
             # Country filters for vote indicators (same as resolution_list)
             country1 = (filter_params or {}).get("country1_alpha3")
             country2_raw = (filter_params or {}).get("country2")
@@ -482,46 +541,89 @@ def register_callbacks():
                 comparison_countries = country2_raw
             elif isinstance(country2_raw, str) and country2_raw:
                 comparison_countries = [country2_raw]
-            
+
             cards = []
             for _, row in display_df.iterrows():
-                res_id = row.get('resolution', 'N/A')
-                link = row.get('undl_link', '#')
-                date_val = row.get('date')
-                date_str = date_val.strftime('%Y-%m-%d') if pd.notnull(date_val) else "Unknown"
-                title = row.get('title', 'Untitled')
+                res_id = row.get("resolution", "N/A")
+                link = row.get("undl_link", "#")
+                date_val = row.get("date")
+                date_str = (
+                    date_val.strftime("%Y-%m-%d") if pd.notnull(date_val) else "Unknown"
+                )
+                title = row.get("title", "Untitled")
                 indicators = []
                 if country1 and country1 in row:
-                    indicators.append(create_vote_indicator(data.get_country_name(country1), row.get(country1)))
+                    indicators.append(
+                        create_vote_indicator(
+                            data.get_country_name(country1), row.get(country1)
+                        )
+                    )
                 for c2 in comparison_countries[:5]:
                     if c2 in row:
-                        indicators.append(create_vote_indicator(data.get_country_name(c2), row.get(c2)))
-                card = html.Div([
-                    html.Div([
-                        html.A(
-                            html.Span(f"{res_id}"
-                            , style={'color': '#007bff', 'fontWeight': 'bold'}),
-                            href=link, target="_blank", style={'textDecoration': 'none'}
+                        indicators.append(
+                            create_vote_indicator(
+                                data.get_country_name(c2), row.get(c2)
+                            )
+                        )
+                card = html.Div(
+                    [
+                        html.Div(
+                            [
+                                html.A(
+                                    html.Span(
+                                        f"{res_id}",
+                                        style={
+                                            "color": "#007bff",
+                                            "fontWeight": "bold",
+                                        },
+                                    ),
+                                    href=link,
+                                    target="_blank",
+                                    style={"textDecoration": "none"},
+                                ),
+                                html.Span(
+                                    date_str,
+                                    style={
+                                        "float": "right",
+                                        "color": "#666",
+                                        "fontSize": "0.9em",
+                                    },
+                                ),
+                            ],
+                            style={"marginBottom": "0.5rem"},
                         ),
-                        html.Span(date_str, style={'float': 'right', 'color': '#666', 'fontSize': '0.9em'})
-                    ], style={'marginBottom': '0.5rem'}),
-                    html.Div(title),
-                    html.Div(indicators, style={'marginTop': '10px', 'paddingTop': '10px', 'borderTop': '1px solid #eee', 'display': 'flex', 'flexWrap': 'wrap', 'gap': '5px'}) if indicators else None
-                ], className='resolution-card')
+                        html.Div(title),
+                        html.Div(
+                            indicators,
+                            style={
+                                "marginTop": "10px",
+                                "paddingTop": "10px",
+                                "borderTop": "1px solid #eee",
+                                "display": "flex",
+                                "flexWrap": "wrap",
+                                "gap": "5px",
+                            },
+                        )
+                        if indicators
+                        else None,
+                    ],
+                    className="resolution-card",
+                )
                 cards.append(card)
-            
+
             summary = html.Div(
-                f"{len(matching)} resolutions for word '{word}'" +
-                (f" (showing first {max_rows})" if len(matching) > max_rows else ""),
-                style={'fontWeight': 'bold', 'marginBottom': '8px'}
+                f"{len(matching)} resolutions for word '{word}'"
+                + (f" (showing first {max_rows})" if len(matching) > max_rows else ""),
+                style={"fontWeight": "bold", "marginBottom": "8px"},
             )
             return html.Div([summary] + cards)
-            
+
         except Exception as e:
             print(f"Error updating resolution table: {e}")
             import traceback
+
             traceback.print_exc()
-            return html.Div(f"Error: {str(e)}", style={'color': 'red'})
+            return html.Div(f"Error: {str(e)}", style={"color": "red"})
 
 
 layout = (
@@ -530,19 +632,23 @@ layout = (
             # Meta info
             html.Div(
                 id="wordcloud-interactive-meta",
-                style={'textAlign': 'center', 'fontWeight': 'bold', 'marginBottom': '8px'}
+                style={
+                    "textAlign": "center",
+                    "fontWeight": "bold",
+                    "marginBottom": "8px",
+                },
             ),
             # Word cloud chart
             dcc.Loading(
                 children=[
                     dcc.Graph(
                         id="wordcloud-interactive-chart",
-                        style={'height': '800px'},
-                        config={'displayModeBar': False}
+                        style={"height": "800px"},
+                        config={"displayModeBar": False},
                     )
                 ],
                 type="cube",
-                color="#3498db"
+                color="#3498db",
             ),
             # Resolution table
             html.Div(
@@ -550,33 +656,32 @@ layout = (
                     html.Label(
                         "Resolutions for hovered word:",
                         style={
-                            'fontWeight': 'bold',
-                            'marginBottom': '10px',
-                            'fontSize': '14px',
-                            'color': '#2c3e50'
-                        }
+                            "fontWeight": "bold",
+                            "marginBottom": "10px",
+                            "fontSize": "14px",
+                            "color": "#2c3e50",
+                        },
                     ),
                     html.Div(
                         id="wordcloud-interactive-table",
                         style={
-                            'backgroundColor': '#ffffff',
-                            'padding': '12px',
-                            'borderRadius': '8px',
-                            'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-                            'maxHeight': '300px',
-                            'overflowY': 'auto'
-                        }
-                    )
+                            "backgroundColor": "#ffffff",
+                            "padding": "12px",
+                            "borderRadius": "8px",
+                            "boxShadow": "0 2px 4px rgba(0,0,0,0.1)",
+                            "maxHeight": "300px",
+                            "overflowY": "auto",
+                        },
+                    ),
                 ],
                 style={
-                    'marginTop': '20px',
-                    'padding': '20px',
-                    'backgroundColor': '#f8f9fa',
-                    'borderRadius': '8px',
-                    'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
-                }
-            )
+                    "marginTop": "20px",
+                    "padding": "20px",
+                    "backgroundColor": "#f8f9fa",
+                    "borderRadius": "8px",
+                    "boxShadow": "0 2px 4px rgba(0,0,0,0.1)",
+                },
+            ),
         ]
     ),
 )
-
