@@ -1,6 +1,7 @@
 from dash import html, dcc, register_page
 
 from ..features import (
+    feature_description,
     general_stats_panel,
     recent_resolutions_panel,
     wordcloud_viz,
@@ -62,6 +63,8 @@ layout = html.Div(
             className="section-title",
         ),
         case_study.layout,
+        html.H2(html.Span("About the platform"), className="section-title"),
+        feature_description.layout,
     ],
 )
 
