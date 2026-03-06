@@ -2,6 +2,7 @@ import dash
 from dash import dcc, html
 
 from .features import navbar
+from .features import footer
 from .features import breadcrumb
 
 external_scripts = [
@@ -37,6 +38,7 @@ app.layout = html.Div(
                 dash.page_container,
             ],
         ),
+        footer.layout,
     ]
 )
 breadcrumb.register_callbacks()

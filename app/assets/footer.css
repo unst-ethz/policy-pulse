@@ -1,0 +1,41 @@
+.footer {
+  margin-top: 4rem;
+  padding-top: 2rem;
+  padding-bottom: 4rem;
+  width: 100%;
+  border-top: 2px solid #bdc2c8;
+  background: white;
+}
+
+.footer .container {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+
+  @media screen and (max-width: 768px) {
+    flex-direction: column;
+  }
+}
+
+.footer-title {
+  font-size: 1.25rem;
+}
+
+.footer-subtitle {
+  opacity: 0.78;
+}
+
+.footer-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.footer a {
+  text-decoration: none;
+  color: #497bc5;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
