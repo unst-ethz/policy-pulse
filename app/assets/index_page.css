@@ -1,0 +1,45 @@
+.main-header {
+  height: 75vh;
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  justify-content: center;
+}
+
+.main-header h1 {
+  font-size: 3.6rem;
+  margin-top: 0;
+  margin-bottom: 1.2rem;
+}
+
+.main-header .main-subtitle {
+  font-size: 1.2rem;
+}
+
+.main-header-buttons {
+  margin-top: 3rem;
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+}
+
+.main-header-image-container {
+  position: absolute;
+  top: 10vh;
+  right: 0;
+  overflow: hidden;
+  width: 100vw;
+  height: 75vh;
+  z-index: -1;
+}
+
+.main-header-image {
+  width: 130vw;
+  position: absolute;
+  top: calc(75vh / 2);
+  transform: translateY(-50%);
+  right: -10vw;
+  opacity: 1;
+  -webkit-mask-image: linear-gradient(to right, #00000022 50%, black 100%);
+  mask-image: linear-gradient(to right, #00000022 50%, black 100%);
+}

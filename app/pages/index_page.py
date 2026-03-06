@@ -7,11 +7,39 @@ register_page(__name__, path="/", title="Policy Pulse: Homepage")
 
 layout = html.Div(
     [
-        html.H1("Homepage"),
-        dcc.Link(
-            "Explore Trends →",
-            href="/trends",
-            className="cta-button",
+        html.Div(
+            [
+                html.H1("Welcome to Policy Pulse"),
+                html.Span(
+                    "This project aims to make it easier to browse and understand trends on UN voting data.",
+                    className="main-subtitle",
+                ),
+                html.Div(
+                    [
+                        dcc.Link(
+                            "Explore Data →",
+                            href="/trends",
+                            className="cta-button",
+                        ),
+                        dcc.Link(
+                            "Walk me through a case study ↓",
+                            href="#case-study",
+                            className="cta-button secondary",
+                        ),
+                    ],
+                    className="main-header-buttons",
+                ),
+                html.Div(
+                    [
+                        html.Img(
+                            src="/assets/main.webp",
+                            className="main-header-image",
+                        ),
+                    ],
+                    className="main-header-image-container",
+                ),
+            ],
+            className="main-header",
         ),
         html.H2("Keyword Wordcloud for GA Resolution Subjects (Not Country Specific)"),
         *wordcloud_viz.layout,
