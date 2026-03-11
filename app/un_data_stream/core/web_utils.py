@@ -1,9 +1,12 @@
+import logging
 import re
 from typing import Optional
 
 import requests
 
 UNDL_API_URL = "https://digitallibrary.un.org/api/v1/file"
+
+logger = logging.getLogger(__name__)
 
 def fetch_latest_file_url_from_api(recid: str, file_name_pattern: str, file_format: str) -> Optional[str]:
     """
@@ -34,6 +37,7 @@ def fetch_latest_file_url_from_api(recid: str, file_name_pattern: str, file_form
         
         # Ensure we got a list
         if not isinstance(files_list, list):
+            logger.error(f"Unexpected API response format for recid {recid}: expected list, got {type(files_list).__name__}")
             return None
             
         # Iterate through files to find a match
@@ -48,7 +52,9 @@ def fetch_latest_file_url_from_api(recid: str, file_name_pattern: str, file_form
 
         return None
             
-    except (requests.RequestException, ValueError):
-        # ValueError includes JSON decoding errors
-        # TODO: Log specific exceptions for better observability instead of silently returning None
+    except requests.RequestException as e:
+        logger.error(f"HTTP error fetching file list for recid {recid} from {UNDL_API_URL}: {e}")
+        return None
+    except ValueError as e:
+        logger.error(f"Failed to decode JSON response for recid {recid}: {e}")
         return None
