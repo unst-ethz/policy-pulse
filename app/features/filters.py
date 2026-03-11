@@ -17,6 +17,7 @@ ids = {
     "filter_store": f"{prefix}-filter-store",
     "data_store": f"{prefix}-data-store",
     "location": f"{prefix}-location",
+    "keyword_search": f"{prefix}-keyword-search",
 }
 
 # Country group presets for quick comparison selection
@@ -103,6 +104,7 @@ def register_callbacks():
         Output(ids["subject_dropdown"], "value"),
         Output(ids["country2"], "value", allow_duplicate=True),
         Output(ids["preset"], "value", allow_duplicate=True),
+        Output(ids["keyword_search"], "value", allow_duplicate=True),
         Input(ids["reset_btn"], "n_clicks"),
         prevent_initial_call=True,
     )
@@ -114,6 +116,7 @@ def register_callbacks():
             None,
             [],
             None,
+            "",
         )
 
     # Callback: Update filter store and print current selections when any filter changes
@@ -125,9 +128,10 @@ def register_callbacks():
         Input(ids["subject_dropdown"], "value"),
         Input(ids["country"], "value"),
         Input(ids["country2"], "value"),
+        Input(ids["keyword_search"], "value"),
         prevent_initial_call=False,
     )
-    def update_filter_store(start_year, end_year, subject_ids, country_iso3, country2):
+    def update_filter_store(start_year, end_year, subject_ids, country_iso3, country2, keyword):
         """
         Register callbacks for the filter component.
         - Filter state management
@@ -146,6 +150,7 @@ def register_callbacks():
             "subject_ids": subject_ids if subject_ids else None,
             "country1_alpha3": country_iso3,
             "country2": country2,
+            "keyword": keyword.strip() if keyword and keyword.strip() else None,
         }
 
         # Print current selections
@@ -297,6 +302,51 @@ layout = (
             # Filters container
             html.Div(
                 [
+                    # ROW 0: Keyword Search
+                    html.Div(
+                        [
+                            html.Div(
+                                [
+                                    html.Span(
+                                        "🔍",
+                                        style={"fontSize": "18px", "marginRight": "8px"},
+                                    ),
+                                    html.Label(
+                                        "Keyword Search",
+                                        style={
+                                            "fontWeight": "600",
+                                            "color": "#495057",
+                                            "fontSize": "15px",
+                                            "marginBottom": "8px",
+                                            "display": "block",
+                                        },
+                                    ),
+                                ]
+                            ),
+                            dcc.Input(
+                                id=ids["keyword_search"],
+                                type="text",
+                                placeholder="e.g. human rights, climate (comma-separated, press Enter)",
+                                debounce=True,
+                                style={
+                                    "width": "100%",
+                                    "fontSize": "14px",
+                                    "padding": "8px 10px",
+                                    "border": "1px solid #ced4da",
+                                    "borderRadius": "4px",
+                                    "fontFamily": "inherit",
+                                    "boxSizing": "border-box",
+                                },
+                            ),
+                        ],
+                        style={
+                            "marginBottom": "20px",
+                            "padding": "15px",
+                            "backgroundColor": "#f8f9fa",
+                            "borderRadius": "8px",
+                            "border": "1px solid #e9ecef",
+                        },
+                    ),
                     # ROW 1: Main Country
                     html.Div(
                         [

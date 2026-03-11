@@ -1,7 +1,7 @@
 import os
 from collections import Counter
 from io import StringIO
-from dash import Input, Output, callback, html, dcc
+from dash import Input, Output, State, callback, html, dcc
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 import pandas as pd
@@ -10,6 +10,7 @@ import random
 from matplotlib import cm as mpl_cm
 from matplotlib import colors as mpl_colors
 from wordcloud import WordCloud
+from rapidfuzz import process as fuzz_process
 
 from .. import data
 from .resolution_list import create_vote_indicator
@@ -106,6 +107,37 @@ def _aggregate_word_undlids_map(word_list: list[str], undl_ids: pd.Series) -> di
             matching_ids = undl_ids[undl_ids.isin(_wc_word_undlid_map[word])].values
             agg_map[word].extend(matching_ids)
     return agg_map
+
+
+def search_keywords(token: str, score_cutoff: int = 80) -> set:
+    """Return the set of undl_ids whose keywords match token (exact substring + fuzzy).
+
+    Requires _init_wc_data() to have been called first.
+    """
+    if not _initialized:
+        _init_wc_data()
+
+    matched_ids: set = set()
+    token_lower = token.lower().strip()
+    if not token_lower:
+        return matched_ids
+
+    all_keys = list(_wc_word_undlid_map.keys())
+
+    # Exact / substring matches first
+    exact_matches = [k for k in all_keys if token_lower in k]
+    for k in exact_matches:
+        matched_ids.update(_wc_word_undlid_map[k])
+
+    # Fuzzy matches
+    if all_keys:
+        fuzzy_results = fuzz_process.extract(
+            token_lower, all_keys, score_cutoff=score_cutoff, limit=20
+        )
+        for match_key, _score, _idx in fuzzy_results:
+            matched_ids.update(_wc_word_undlid_map[match_key])
+
+    return matched_ids
 
 
 def _get_wordcloud_layout(word_freq_dict, seed=42):
@@ -472,6 +504,30 @@ def register_callbacks():
             return f"Error: {str(e)}"
 
     @callback(
+        Output("filter-component-keyword-search", "value", allow_duplicate=True),
+        Output("country-view-tabs", "value", allow_duplicate=True),
+        Input("wordcloud-interactive-chart", "clickData"),
+        State("filter-component-keyword-search", "value"),
+        prevent_initial_call=True,
+    )
+    def click_word_to_search(clickData, current_keyword):
+        """Append clicked word cloud word to keyword search and switch to Resolutions tab."""
+        if not clickData or "points" not in clickData or not clickData["points"]:
+            raise PreventUpdate
+        pt = clickData["points"][0]
+        custom = pt.get("customdata")
+        word = pt.get("text") or (
+            custom[1]
+            if isinstance(custom, (list, tuple)) and len(custom) > 1
+            else None
+        )
+        if not word:
+            raise PreventUpdate
+        existing = (current_keyword or "").strip()
+        new_value = f"{existing}, {word}" if existing else word
+        return new_value, "resolution_list"
+
+    @callback(
         Output("wordcloud-interactive-table", "children"),
         Input("wordcloud-interactive-chart", "hoverData"),
         Input("filter-component-data-store", "data"),
@@ -650,7 +706,7 @@ layout = (
                 type="cube",
                 color="#3498db",
             ),
-            # Resolution table
+            # Resolution table (hidden — click-to-search now handles this via the Resolutions tab)
             html.Div(
                 [
                     html.Label(
@@ -675,6 +731,7 @@ layout = (
                     ),
                 ],
                 style={
+                    "display": "none",
                     "marginTop": "20px",
                     "padding": "20px",
                     "backgroundColor": "#f8f9fa",

@@ -280,7 +280,7 @@ def update_tab_states(filter_store):
 
 
 @callback(
-    Output("country-view-tabs", "value"),
+    Output("country-view-tabs", "value", allow_duplicate=True),
     Input("country-view-tabs", "value"),
     Input("filter-component-filter-store", "data"),
     prevent_initial_call=True,
@@ -340,6 +340,17 @@ def download_resolutions_csv(n_clicks, filter_store):
         subject_ids=subject_ids,
         include_descendants=True,
     )
+
+    # Apply keyword filter: OR logic across comma-separated phrases
+    keyword = filter_store.get("keyword")
+    if keyword and keyword.strip() and not df.empty:
+        tokens = [t.strip() for t in keyword.split(",") if t.strip()]
+        matched_ids: set = set()
+        for token in tokens:
+            title_match = df["title"].str.lower().str.contains(token.lower(), regex=False, na=False)
+            matched_ids |= set(df.loc[title_match, "undl_id"].tolist())
+            matched_ids |= wordcloud_interactive.search_keywords(token)
+        df = df[df["undl_id"].isin(matched_ids)]
 
     base_cols = ["undl_id", "resolution", "date", "session", "title", "agenda_title", "subjects", "draft"]
     if "undl_link" in df.columns:

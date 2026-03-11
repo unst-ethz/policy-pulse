@@ -8,3 +8,4 @@ PyYAML==6.0.3
 rdflib==7.5.0
 Requests==2.32.5
 wordcloud==1.9.4
+rapidfuzz==3.13.0

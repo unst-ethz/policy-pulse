@@ -1,7 +1,6 @@
 from dash import callback, Input, Output, State, html, dcc
 import pandas as pd
 from .. import data
-import pandas as pd
 from pathlib import Path
 
 cwd = Path(__file__).resolve().parent
@@ -251,6 +250,18 @@ def register_callbacks():
                 multi_msg,
                 multi_msg_style,
             )
+
+        # Keyword search: OR logic across comma-separated phrases
+        keyword = filter_params.get("keyword")
+        if keyword and keyword.strip():
+            from . import wordcloud_interactive  # lazy import to avoid circular dependency
+            tokens = [t.strip() for t in keyword.split(",") if t.strip()]
+            matched_ids: set = set()
+            for token in tokens:
+                title_match = df["title"].str.lower().str.contains(token.lower(), regex=False, na=False)
+                matched_ids |= set(df.loc[title_match, "undl_id"].tolist())
+                matched_ids |= wordcloud_interactive.search_keywords(token)
+            df = df[df["undl_id"].isin(matched_ids)]
 
         # 2. Filter Logic
         filtered_df = df.copy()
