@@ -9,15 +9,15 @@ import json
 import logging
 import pickle
 import sys
-import yaml
-import requests
-import pandas as pd
 from pathlib import Path
 from typing import Any, Dict
 
+import pandas as pd
+import yaml
+
 from .fetcher import DataFetcher
-from .processor import DataProcessor
 from .merger import DataMerger
+from .processor import DataProcessor
 
 
 class DataRepository:
@@ -40,10 +40,13 @@ class DataRepository:
 
         self.logger.info("Initializing UNDataRepository")
 
-        # Check if links are still valid
-        if not self._check_URLS():
-            self.logger.error("One or more data URLs are invalid. The dataset might have been updated. Check the date in the URL.")
-            raise ValueError("Invalid data URLs in configuration.")
+        # Check if configured data sources are valid
+        if not self._resolve_and_validate_data_urls():
+            self.logger.error(
+                "One or more configured data sources are invalid. "
+                "Please review settings in data_sources.yaml."
+            )
+            raise ValueError("Failed to resolve one or more data sources. Check logs for details.")
         
         # Check if data is already processed and available
         if self._has_cached_data():
@@ -115,25 +118,45 @@ class DataRepository:
 
         self.logger.info("Logging setup complete.")
 
-    def _check_URLS(self) -> bool:
-        """Check if the URLs in the configuration are reachable."""
-        urls = [
-            source['url'] 
-            for source in self.config['data_sources'].values() 
-            if 'url' in source
-        ]
+    def _resolve_and_validate_data_urls(self) -> bool:
+        """
+        Check if the data sources in the configuration are valid and reachable.
+        Resolves dynamic URLs via API to ensure files exist.
+        """
+        
+        # We use a temporary DataFetcher to resolve URLs using the registered logic
+        # This can handle both static and dynamic sources.
+        fetcher_orchestrator = DataFetcher(self.config, self.logger)
+        
         all_valid = True
-        for url in urls:
+        
+        # 1. Check Resolutions
+        resolutions_config = self.config['data_sources'].get('resolutions', {})
+        for dataset_type, source_config in resolutions_config.items():
             try:
-                response = requests.head(url, allow_redirects=True, timeout=10)
-                if response.status_code != 200:
-                    self.logger.error(f"URL not reachable: {url} (Status code: {response.status_code})")
-                    all_valid = False
+                # Get the specific fetcher for this dataset type
+                if dataset_type in fetcher_orchestrator._dataset_fetchers:
+                    dataset_fetcher = fetcher_orchestrator._dataset_fetchers[dataset_type]
+                    # Attempt to resolve the URL (this triggers the UNDL's API check for dynamic sources)
+                    url = dataset_fetcher.resolve_url(source_config)
+                    self.logger.info(f"Successfully resolved URL for {dataset_type}: {url}")
                 else:
-                    self.logger.info(f"URL is valid: {url}")
-            except requests.RequestException as e:
-                self.logger.error(f"Error reaching URL: {url} ({e})")
+                    self.logger.warning(f"No fetcher registered for {dataset_type}, skipping URL check.")
+            except Exception as e:
+                self.logger.error(f"Failed to resolve/check URL for {dataset_type}: {e}")
                 all_valid = False
+
+        # 2. Check Thesaurus
+        thesaurus_config = self.config['data_sources'].get('thesaurus')
+        if thesaurus_config:
+            try:
+                # Thesaurus fetcher is separate in DataFetcher
+                url = fetcher_orchestrator.thesaurus_fetcher.resolve_url(thesaurus_config)
+                self.logger.info(f"Successfully resolved URL for thesaurus: {url}")
+            except Exception as e:
+                self.logger.error(f"Failed to resolve/check URL for thesaurus: {e}")
+                all_valid = False
+
         return all_valid
     
     def _has_cached_data(self) -> bool:
