@@ -76,6 +76,7 @@ def register_callbacks(query_engine):
             range_color=[0, 1],
             locations="three_letter_country",
             projection="robinson",
+            labels={"agreement": ""},  # For consistency with legend in the subject tab
         )
 
         # Change default colour for missing-data countries
@@ -100,7 +101,12 @@ def register_callbacks(query_engine):
         country_longitude = get_country_longitude(country1)
         fig.update_geos(projection_rotation_lon=-country_longitude)
 
-
+        fig.update_layout(
+            coloraxis_colorbar=dict(
+                tickvals=[0, 0.25, 0.5, 0.75, 1.0],
+                ticktext=["0 (Always voting opposed)", "0.25", "0.5", "0.75", "1 (Always voting the same)"]
+            )
+        )
 
         # Status message
         status_msg = html.Div(

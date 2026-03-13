@@ -60,7 +60,7 @@ def register_callbacks():
         fig.update_layout(
             title=f"Agreement: {get_country_name(country1)} vs {', '.join([get_country_name(c) for c in selected])}",
             xaxis_title="Date",
-            yaxis_title="Agreement",
+            yaxis_title="Agreement Score",
             yaxis=dict(range=[0, 1]),
             template="plotly_white",
         )
