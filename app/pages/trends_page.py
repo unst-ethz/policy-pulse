@@ -35,7 +35,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
             dcc.Store(id="country1-localised-name"),
             html.H1(
                 [
-                    "Analysis",
+                    "Analysis of GA Votes",
                 ]
             ),
             # Status and cache info
@@ -242,7 +242,7 @@ def update_tab_states(filter_store):
         map_content = [placeholder_no_country1]
     else:
         map_content = [
-            html.H2("Global Alignment Map"),
+            html.H2("Global Agreement Map"),
             *alignment_choropleth.layout,
         ]
     
