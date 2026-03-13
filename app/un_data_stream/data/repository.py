@@ -40,6 +40,17 @@ class DataRepository:
 
         self.logger.info("Initializing UNDataRepository")
 
+        # Check if data is already processed and available
+        if self._has_cached_data():
+            # Version Check
+            if self._check_data_version():
+                # Cached data found and version matches -> load
+                self._load_cached_data()
+                self.logger.info("Initialization complete with cached data.")
+                return
+            else:
+                self.logger.info("Data version mismatch or missing. Rebuilding data...")
+
         # Check if configured data sources are valid
         if not self._resolve_and_validate_data_urls():
             self.logger.error(
@@ -47,20 +58,10 @@ class DataRepository:
                 "Please review settings in data_sources.yaml."
             )
             raise ValueError("Failed to resolve one or more data sources. Check logs for details.")
-        
-        # Check if data is already processed and available
-        if self._has_cached_data():
-            # Version Check
-            if self._check_data_version():
-                # Cached data found and version matches -> load
-                self._load_cached_data() 
-                self.logger.info("Initialization Complete with Cached Data.")
-                return
-            else:
-                self.logger.info("Data version mismatch or missing. Rebuilding data...")
-        
+
         self._build_data()
-        self.logger.info("Initialization complete with fetched Data.")
+
+        self.logger.info("Initialization complete with fetched data.")
 
     def get_data(self) -> Dict[str, Any]:
         """Return processed data as a dictionary of DataFrames."""
