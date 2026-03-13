@@ -307,12 +307,11 @@ layout = (
                         [
                             html.Div(
                                 [
-                                    html.Span(
-                                        "🔍",
-                                        style={"fontSize": "18px", "marginRight": "8px"},
-                                    ),
                                     html.Label(
-                                        "Keyword Search",
+                                        [
+                                            html.Span("🔍", style={"marginRight": "5px"}),
+                                            "Keyword Search"
+                                        ],
                                         style={
                                             "fontWeight": "600",
                                             "color": "#495057",
@@ -352,15 +351,11 @@ layout = (
                         [
                             html.Div(
                                 [
-                                    html.Span(
-                                        "🌍",
-                                        style={
-                                            "fontSize": "18px",
-                                            "marginRight": "8px",
-                                        },
-                                    ),
                                     html.Label(
-                                        "Main Country",
+                                        [
+                                            html.Span("🌍", style={"marginRight": "5px"}),
+                                            "Main Country"
+                                        ],
                                         style={
                                             "fontWeight": "600",
                                             "color": "#495057",
@@ -405,15 +400,11 @@ layout = (
                                 [
                                     html.Div(
                                         [
-                                            html.Span(
-                                                "🔄",
-                                                style={
-                                                    "fontSize": "18px",
-                                                    "marginRight": "8px",
-                                                },
-                                            ),
                                             html.Label(
-                                                "Compare with",
+                                                [
+                                                    html.Span("🔄", style={"marginRight": "5px"}),
+                                                    "Compare with"
+                                                ],
                                                 style={
                                                     "fontWeight": "600",
                                                     "color": "#495057",
@@ -451,15 +442,11 @@ layout = (
                                 [
                                     html.Div(
                                         [
-                                            html.Span(
-                                                "⚡",
-                                                style={
-                                                    "fontSize": "18px",
-                                                    "marginRight": "8px",
-                                                },
-                                            ),
                                             html.Label(
-                                                "Quick Select",
+                                                [
+                                                    html.Span("⚡", style={"marginRight": "5px"}),
+                                                    "Quick Select"
+                                                ],
                                                 style={
                                                     "fontWeight": "600",
                                                     "color": "#495057",
@@ -506,15 +493,11 @@ layout = (
                                 [
                                     html.Div(
                                         [
-                                            html.Span(
-                                                "📅",
-                                                style={
-                                                    "fontSize": "18px",
-                                                    "marginRight": "8px",
-                                                },
-                                            ),
                                             html.Label(
-                                                "Year Range",
+                                                [
+                                                    html.Span("🗓️", style={"marginRight": "5px"}),
+                                                    "Year Range"
+                                                ],
                                                 style={
                                                     "fontWeight": "600",
                                                     "color": "#495057",
@@ -600,15 +583,11 @@ layout = (
                                 [
                                     html.Div(
                                         [
-                                            html.Span(
-                                                "📚",
-                                                style={
-                                                    "fontSize": "18px",
-                                                    "marginRight": "8px",
-                                                },
-                                            ),
                                             html.Label(
-                                                "Subjects",
+                                                [
+                                                    html.Span("📚", style={"marginRight": "5px"}),
+                                                    "Subjects"
+                                                ],
                                                 style={
                                                     "fontWeight": "600",
                                                     "color": "#495057",
