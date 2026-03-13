@@ -117,7 +117,7 @@ app = dash.Dash(__name__, external_stylesheets=['https.codepen.io/chriddyp/pen/b
 server = app.server
 
 app.layout = html.Div([
-    html.H1("Country Alignment Dashboard"),
+    html.H1("Country Agreement Dashboard"),
     html.Div(className='row', style={'padding': '20px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px'}, children=[
         html.Div(className='four columns', children=[
             html.Label("Country 1:"),
@@ -144,7 +144,7 @@ app.layout = html.Div([
     html.Hr(),
     dcc.Loading(id='loading', children=[
         html.Div(id='error-container', style={'color': 'red', 'marginBottom': '10px'}),
-        dcc.Graph(id='alignment-graph', style={'display': 'none'}),
+        dcc.Graph(id='agreement-graph', style={'display': 'none'}),
         html.Div(id='table-container')
     ]),
     dcc.Location(id='url', refresh=True)
@@ -176,8 +176,8 @@ def initialize_filters_from_url(search):
     )
 
 @app.callback(
-    Output('alignment-graph', 'figure'),
-    Output('alignment-graph', 'style'),
+    Output('agreement-graph', 'figure'),
+    Output('agreement-graph', 'style'),
     Output('table-container', 'children'),
     Output('error-container', 'children'),
     Input('country-1-dropdown', 'value'),
@@ -243,7 +243,7 @@ def update_graph(c1, c2, start_date, end_date):
 
 @app.callback(
     Output('url', 'href'),
-    Input('alignment-graph', 'clickData'),
+    Input('agreement-graph', 'clickData'),
     State('country-1-dropdown', 'value'),
     State('country-2-dropdown', 'value'),
     State('date-picker-range', 'start_date'),

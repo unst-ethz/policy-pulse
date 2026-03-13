@@ -12,8 +12,8 @@ def register_callbacks(query_engine):
 
     @callback(
         [
-            Output("alignment-choropleth", "figure"),
-            Output("alignment-choropleth-status", "children"),
+            Output("agreement-choropleth", "figure"),
+            Output("agreement-choropleth-status", "children"),
         ],
         [
             Input("filter-component-data-store", "data"),
@@ -44,7 +44,7 @@ def register_callbacks(query_engine):
             if end_year:
                 resolutions_in_year = resolutions_in_year[dates <= int(end_year)]
 
-        alignment_data = query_engine.query_agreement_between_countries(
+        agreement_data = query_engine.query_agreement_between_countries(
             country1,
             resolution_ids=(resolutions_in_year["undl_id"].tolist()),
             average=True,
@@ -52,26 +52,26 @@ def register_callbacks(query_engine):
 
         # Transpose and remove the first two rows which are for the selected
         # country etc
-        alignment_data = alignment_data.T[2:]
-        alignment_data = alignment_data.reset_index()
+        agreement_data = agreement_data.T[2:]
+        agreement_data = agreement_data.reset_index()
 
-        if alignment_data.empty:
+        if agreement_data.empty:
             # Simulate neutral 0.5 value for all countries
-            alignment_data = pd.DataFrame(
+            agreement_data = pd.DataFrame(
                 {
                     "three_letter_country": ["NAN"],
-                    "alignment": [0.5],
+                    "agreement": [0.5],
                 }
             )
 
-        alignment_data.columns = ["three_letter_country", "alignment"]
-        # Make sure the alignment column is numeric, so we can apply the
+        agreement_data.columns = ["three_letter_country", "agreement"]
+        # Make sure the agreement column is numeric, so we can apply the
         # continuous color scale
-        alignment_data[["alignment"]] = alignment_data[["alignment"]].apply(pd.to_numeric)
+        agreement_data[["agreement"]] = agreement_data[["agreement"]].apply(pd.to_numeric)
 
         fig = px.choropleth(
-            alignment_data,
-            color="alignment",
+            agreement_data,
+            color="agreement",
             color_continuous_scale=px.colors.sequential.RdBu,
             range_color=[0, 1],
             locations="three_letter_country",
@@ -108,7 +108,7 @@ def register_callbacks(query_engine):
                 html.Div(
                     [
                         html.Strong("Chart Updated Successfully! "),
-                        f"Processed {len(alignment_data[['alignment']])} data points.",
+                        f"Processed {len(agreement_data[['agreement']])} data points.",
                     ]
                 ),
             ]
@@ -120,11 +120,11 @@ def register_callbacks(query_engine):
 layout = (
     html.Div(
         [
-            html.Div(id="alignment-choropleth-status"),
+            html.Div(id="agreement-choropleth-status"),
             dcc.Loading(
                 children=[
                     dcc.Graph(
-                        id="alignment-choropleth",
+                        id="agreement-choropleth",
                         style={"height": "600px", "width": "100%"},
                     ),
                 ],

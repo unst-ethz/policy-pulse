@@ -7,9 +7,9 @@ import pandas as pd
 import random
 
 from ..features import resolution_list
-from ..features import alignment_choropleth
-from ..features import alignment_graph
-from ..features import alignment_by_subject
+from ..features import agreement_choropleth
+from ..features import agreement_graph
+from ..features import agreement_by_subject
 from ..features import wordcloud_interactive
 from ..features import filters
 from .. import data
@@ -88,11 +88,11 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                             )
                         ],
                     ),
-                    # TAB 4: Alignment by Subject
+                    # TAB 4: Agreement by Subject
                     dcc.Tab(
-                        label="Alignment by Subject",
+                        label="Agreement by Subject",
                         value="subject",
-                        id="tab-alignment-subject",
+                        id="tab-agreement-subject",
                         disabled=False,
                         children=[
                             html.Div(
@@ -154,9 +154,9 @@ clientside_callback(
 
 filters.register_callbacks()
 resolution_list.register_callbacks()
-alignment_choropleth.register_callbacks(data.query_engine)
-alignment_graph.register_callbacks()
-alignment_by_subject.register_callbacks(data.query_engine)
+agreement_choropleth.register_callbacks(data.query_engine)
+agreement_graph.register_callbacks()
+agreement_by_subject.register_callbacks(data.query_engine)
 
 
 
@@ -168,7 +168,7 @@ wordcloud_interactive.register_callbacks()
     [
         Output("tab-agreement-map", "style"),
         Output("tab-agreement-timeline", "style"),
-        Output("tab-alignment-subject", "style"),
+        Output("tab-agreement-subject", "style"),
         Output("tab-map-content", "children"),
         Output("tab-timeline-content", "children"),
         Output("tab-subject-content", "children"),
@@ -201,7 +201,7 @@ def update_tab_states(filter_store):
         "transition": "opacity 120ms ease",
     }
     # Agreement Map requires main country only.
-    # Agreement Timeline / Alignment by Subject require both main + compare country.
+    # Agreement Timeline / Agreement by Subject require both main + compare country.
     map_tab_style = tab_grayed_style if no_main_country else tab_normal_style
     timeline_tab_style = tab_grayed_style if comparison_disabled else tab_normal_style
     subject_tab_style = tab_grayed_style if comparison_disabled else tab_normal_style
@@ -243,7 +243,7 @@ def update_tab_states(filter_store):
     else:
         map_content = [
             html.H2("Global Agreement Map"),
-            *alignment_choropleth.layout,
+            *agreement_choropleth.layout,
         ]
     
     if comparison_disabled:
@@ -255,18 +255,18 @@ def update_tab_states(filter_store):
             subject_content = [placeholder_no_comparison]
     else:
         timeline_content = [
-            html.H2("Bi-country Alignment Comparison Graph"),
-            *alignment_graph.layout,
+            html.H2("Bi-country Agreement Comparison Graph"),
+            *agreement_graph.layout,
         ]
         subject_content = [
-            html.H2("Alignment by UN Subject Area"),
+            html.H2("Agreement by UN Subject Area"),
             html.P(
-                "Compare voting alignment between two countries across different UN subject areas. "
+                "Compare voting agreement between two countries across different UN subject areas. "
                 "The agreement score ranges from 0 (complete disagreement) to 1 (complete agreement). "
                 "Only subjects with at least 30 shared votes are shown.",
                 style={"color": "#7f8c8d", "marginBottom": "20px"}
             ),
-            *alignment_by_subject.layout,
+            *agreement_by_subject.layout,
         ]
     
     return (
@@ -417,7 +417,7 @@ def disable_filters_based_on_tab(selected_tab):
         # Agreement Map: disable only comparison dropdowns
         return False, True, True, False, base_style, disabled_style, disabled_style, base_style
     elif is_timeline_or_subject_tab:
-        # Agreement Timeline / Alignment by Subject: disable subject dropdown
+        # Agreement Timeline / Agreement by Subject: disable subject dropdown
         return False, False, False, True, base_style, base_style, base_style, disabled_style
     else:
         # Other tabs: enable all
@@ -516,10 +516,10 @@ def _calculate_data_uncached(
             both_voted = df[[country1, col]].notna().all(axis=1)
             agreement[col] = agreement[col].where(both_voted, np.nan)
 
-        # build output dataframe with per-country alignment and moving averages
+        # build output dataframe with per-country agreement and moving averages
         out = pd.DataFrame({"date": df["date"]})
         for col in selected:
-            align_col = f"alignment_{col}"
+            align_col = f"agreement_{col}"
             sma_col = f"sma_{col}"
 
             out[align_col] = agreement[col]
@@ -536,7 +536,7 @@ def _calculate_data_uncached(
             if last_vote_mask.any():
                 last_vote_date = df_original.loc[last_vote_mask, "date"].max()
                 print(f"  📅 {col}: Last vote date = {last_vote_date}")
-                # Set both alignment AND moving average to NaN for dates after the last vote
+                # Set both agreement AND moving average to NaN for dates after the last vote
                 rows_set_to_nan = (out["date"] > last_vote_date).sum()
                 out.loc[out["date"] > last_vote_date, align_col] = np.nan
                 out.loc[out["date"] > last_vote_date, sma_col] = np.nan
