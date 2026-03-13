@@ -78,6 +78,11 @@ def register_callbacks(query_engine):
             projection="robinson",
         )
 
+        # Change default colour for missing-data countries
+        fig.update_geos(
+            landcolor="#e1e1e1"  # light grey
+        )
+
         fig.add_trace(
             go.Choropleth(
                 locations=[country1],
@@ -91,9 +96,11 @@ def register_callbacks(query_engine):
         )
 
         # Center the map on the selected country's longitude (x-axis)
-        # Keep y-axis at equator (latitude = 0)
+        # Keep y-axis at the equator (latitude = 0)
         country_longitude = get_country_longitude(country1)
         fig.update_geos(projection_rotation_lon=-country_longitude)
+
+
 
         # Status message
         status_msg = html.Div(
