@@ -255,7 +255,7 @@ def update_tab_states(filter_store):
             subject_content = [placeholder_no_comparison]
     else:
         timeline_content = [
-            html.H2("Bi-country Agreement Comparison Graph"),
+            html.H2("Pairwise Agreement over Time"),
             *agreement_graph.layout,
         ]
         subject_content = [
