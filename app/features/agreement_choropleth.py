@@ -101,8 +101,11 @@ def register_callbacks(query_engine):
         country_longitude = get_country_longitude(country1)
         fig.update_geos(projection_rotation_lon=-country_longitude)
 
+        # Change internal padding
         fig.update_layout(
+            margin=dict(l=10, r=10, t=0, b=0),
             coloraxis_colorbar=dict(
+                len=0.9,  # Reduce legend height
                 tickvals=[0, 0.25, 0.5, 0.75, 1.0],
                 ticktext=["0 (Always voting opposed)", "0.25", "0.5", "0.75", "1 (Always voting the same)"]
             )
@@ -123,7 +126,7 @@ def register_callbacks(query_engine):
         return fig, status_msg
 
 
-layout = (
+layout = [
     html.Div(
         [
             html.Div(id="agreement-choropleth-status"),
@@ -137,6 +140,29 @@ layout = (
                 type="circle",
                 color="#3498db",
             ),
-        ],
-    ),
-)
+            # TODO: Ensure the annotation only shows once the map has loaded
+            html.Div(
+                [
+                    html.P([
+                        html.Strong("Note: "),
+                        "The map shows the pairwise vote agreement between the selected Main Country and all "
+                        "other countries (UN member states). The maximum agreement score is 1 and means that two countries "
+                        "voted the same on all General Assembly (GA) resolutions. The minimum score is 0 and means that " 
+                        'two countries always voted in opposite ways ("yes" vs. "no"). The data only covers GA resolutions  '
+                        'that were passed (accepted).'
+                    ], style={
+                        "maxWidth": "100%",
+                        "margin": "0 0 0 0",
+                        "paddingLeft": "2%",
+                        "paddingTop": "10px",
+                        "color": "#7f8c8d",
+                        "fontSize": "16px",
+                        "lineHeight": "1.6",
+                        "textAlign": "left",
+                        "borderTop": "1px solid #eee"
+                    })
+                ]
+            ),
+        ]
+    )
+]

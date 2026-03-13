@@ -6,7 +6,6 @@ from ..data import get_country_name
 
 
 def register_callbacks():
-
     @callback(
         [
             Output("agreement-chart", "figure"),
@@ -64,6 +63,7 @@ def register_callbacks():
             yaxis=dict(range=[0, 1]),
             template="plotly_white",
         )
+
         # status message
         total_points = len(df)
         start_str = (
@@ -86,7 +86,7 @@ def register_callbacks():
         return fig, status_msg
 
 
-layout = (
+layout = [
     html.Div(
         [
             html.Div(id="agreement-chart-status"),
@@ -95,6 +95,30 @@ layout = (
                 type="cube",
                 color="#3498db",
             ),
+            # TODO: Ensure the annotation only shows once the chart has loaded
+            html.Div(
+                [
+                    # TODO: Explicitly state the averaging window within the annotation.
+                    html.P([
+                        html.Strong("Note: "),
+                        "The chart shows the moving average of the pairwise vote agreement between the selected Main Country "
+                        "and one or more comparison countries over time. The maximum agreement score is 1 and means that "
+                        "two countries voted the same on all General Assembly (GA) resolutions within the moving window. "
+                        'The minimum score is 0 and means that two countries always voted in opposite ways ("yes" vs. "no"). ' 
+                        "The data only covers GA resolutions that were passed (accepted)."
+                    ], style={
+                        "maxWidth": "100%",
+                        "margin": "0 0 0 0",
+                        "paddingLeft": "2%",
+                        "paddingTop": "10px",
+                        "color": "#7f8c8d",
+                        "fontSize": "16px",
+                        "lineHeight": "1.6",
+                        "textAlign": "left",
+                        "borderTop": "1px solid #eee"
+                    })
+                ]
+            ),
         ],
-    ),
-)
+    )
+]

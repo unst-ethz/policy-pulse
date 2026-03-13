@@ -236,6 +236,7 @@ def register_callbacks(query_engine):
 
 
 # Layout for the agreement by subject feature
+# TODO: Add an annotation (explanatory caption) similar to the map and timeline tabs
 layout = [
     html.Div(id="agreement-by-subject-status", style={"marginBottom": "10px", "marginTop": "10px", "color": "#666"}),
     dcc.Loading(
