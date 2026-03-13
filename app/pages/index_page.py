@@ -17,7 +17,15 @@ layout = html.Div(
             [
                 html.H1("Welcome to Policy Pulse"),
                 html.Span(
-                    "This project aims to make it easier to browse and understand trends on UN voting data.",
+                    [
+                        "This project aims to make it easier to discover trends in ",
+                        html.B("voting data "),
+                        "from the United Nations. You can currently analyse voting data for ",
+                        html.B("accepted resolutions "),
+                        "of the ",
+                        html.B("UN General Assembly"),
+                        ". More data sources and functionalities will be added over time.",
+                    ],
                     className="main-subtitle",
                 ),
                 html.Div(
