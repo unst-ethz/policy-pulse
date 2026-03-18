@@ -41,39 +41,107 @@ layout = [
             # --- Local Controls ---
             html.Div(
                 [
-                    # Agreement Filter (Only visible when exactly 1 comparison country selected)
+                    # Controls box (always visible)
                     html.Div(
                         id="rl-agreement-filter-container",
-                        style={"display": "none"},
+                        style={
+                            "display": "flex",
+                            "alignItems": "center",
+                            "flexWrap": "wrap",
+                            "gap": "20px",
+                            "padding": "15px",
+                            "backgroundColor": "#f1f3f4",
+                            "borderRadius": "8px",
+                        },
                         children=[
-                            html.Label(
-                                "Filter by Agreement:",
-                                style={"fontWeight": "bold", "marginRight": "10px"},
-                            ),
-                            dcc.Dropdown(
-                                id="rl-agreement-dropdown",
-                                options=[
-                                    {"label": "Show All", "value": "NO_FILTER"},
-                                    {"label": "Agreed (Voted Same)", "value": "AGREED"},
-                                    {
-                                        "label": "Disagreed (Voted Differently)",
-                                        "value": "DISAGREED",
-                                    },
-                                    {
-                                        "label": "Strongly Disagreed (Y/N vs N/Y)",
-                                        "value": "STRONGLY_DISAGREED",
-                                    },
+                            # Sort by date (always visible)
+                            html.Div(
+                                [
+                                    html.Label(
+                                        "Sort by Date:",
+                                        style={"fontWeight": "bold", "marginRight": "10px"},
+                                    ),
+                                    dcc.Dropdown(
+                                        id="rl-sort-dropdown",
+                                        options=[
+                                            {"label": "Newest First", "value": "desc"},
+                                            {"label": "Oldest First", "value": "asc"},
+                                        ],
+                                        value="desc",
+                                        clearable=False,
+                                        style={
+                                            "width": "180px",
+                                            "display": "inline-block",
+                                            "verticalAlign": "middle",
+                                        },
+                                    ),
                                 ],
-                                value="NO_FILTER",
-                                clearable=False,
-                                style={
-                                    "width": "250px",
-                                    "display": "inline-block",
-                                    "verticalAlign": "middle",
-                                },
+                                style={"display": "flex", "alignItems": "center"},
+                            ),
+                            # Vote filter (only when main country selected, no comparison countries)
+                            html.Div(
+                                id="rl-vote-filter-wrapper",
+                                style={"display": "none"},
+                                children=[
+                                    html.Label(
+                                        "Filter by Vote:",
+                                        style={"fontWeight": "bold", "marginRight": "10px"},
+                                    ),
+                                    dcc.Dropdown(
+                                        id="rl-vote-filter",
+                                        options=[
+                                            {"label": "Show All", "value": "NO_FILTER"},
+                                            {"label": "Yes", "value": "Y"},
+                                            {"label": "No", "value": "N"},
+                                            {"label": "Abstain", "value": "A"},
+                                            {"label": "Not Voting", "value": "X"},
+                                        ],
+                                        value="NO_FILTER",
+                                        clearable=False,
+                                        style={
+                                            "width": "180px",
+                                            "display": "inline-block",
+                                            "verticalAlign": "middle",
+                                        },
+                                    ),
+                                ],
+                                className="fade-in",
+                            ),
+                            # Agreement filter (only when exactly 1 comparison country)
+                            html.Div(
+                                id="rl-agreement-dropdown-wrapper",
+                                style={"display": "none"},
+                                children=[
+                                    html.Label(
+                                        "Filter by Agreement:",
+                                        style={"fontWeight": "bold", "marginRight": "10px"},
+                                    ),
+                                    dcc.Dropdown(
+                                        id="rl-agreement-dropdown",
+                                        options=[
+                                            {"label": "Show All", "value": "NO_FILTER"},
+                                            {"label": "Agreed (Voted Same)", "value": "AGREED"},
+                                            {
+                                                "label": "Disagreed (Voted Differently)",
+                                                "value": "DISAGREED",
+                                            },
+                                            {
+                                                "label": "Strongly Disagreed (Y/N vs N/Y)",
+                                                "value": "STRONGLY_DISAGREED",
+                                            },
+                                        ],
+                                        value="NO_FILTER",
+                                        clearable=False,
+                                        style={
+                                            "width": "250px",
+                                            "display": "inline-block",
+                                            "verticalAlign": "middle",
+                                        },
+                                    ),
+                                ],
+                                className="fade-in",
                             ),
                         ],
-                        className="fade-in",
                     ),
                     # Placeholder or info text when multiple countries selected?
                     # Making it empty if not single country usually looks cleaner.
@@ -84,30 +152,6 @@ layout = [
                             "color": "#666",
                             "fontStyle": "italic",
                         },
-                    ),
-                    # Sort by date
-                    html.Div(
-                        [
-                            html.Label(
-                                "Sort by Date:",
-                                style={"fontWeight": "bold", "marginRight": "10px"},
-                            ),
-                            dcc.Dropdown(
-                                id="rl-sort-dropdown",
-                                options=[
-                                    {"label": "Newest First", "value": "desc"},
-                                    {"label": "Oldest First", "value": "asc"},
-                                ],
-                                value="desc",
-                                clearable=False,
-                                style={
-                                    "width": "180px",
-                                    "display": "inline-block",
-                                    "verticalAlign": "middle",
-                                },
-                            ),
-                        ],
-                        style={"display": "inline-block", "marginTop": "10px"},
                     ),
                 ],
                 style={"marginBottom": "20px", "minHeight": "5px"},
@@ -151,19 +195,21 @@ def register_callbacks():
         Output("rl-results-list", "children"),
         Output("rl-results-summary", "children"),
         Output("rl-load-more-btn", "style"),
-        Output("rl-agreement-filter-container", "style"),
+        Output("rl-agreement-dropdown-wrapper", "style"),
+        Output("rl-vote-filter-wrapper", "style"),
         Output("rl-multi-country-msg", "children"),
         Output("rl-multi-country-msg", "style"),
         Input(
             "filter-component-filter-store", "data"
         ),  # Global Filter PARAMETERS (Start, End, Subject, Country1, Country2)
         Input("rl-agreement-dropdown", "value"),  # Local Filter (Conditional)
+        Input("rl-vote-filter", "value"),  # Vote filter (main country only)
         Input("rl-load-more-btn", "n_clicks"),  # Pagination
         Input("rl-sort-dropdown", "value"),  # Date sort order
         State("country1-iso-alpha3", "data"),  # Current Main Country (fallback)
     )
     def update_resolution_list(
-        filter_params, agreement_filter, n_clicks, sort_order, country1_backup
+        filter_params, agreement_filter, vote_filter, n_clicks, sort_order, country1_backup
     ):
         # Default Styles
         btn_style_hidden = {"display": "none"}
@@ -180,6 +226,7 @@ def register_callbacks():
                 html.Div("Loading...", style={"padding": "20px"}),
                 "",
                 btn_style_hidden,
+                {"display": "none"},
                 {"display": "none"},
                 "",
                 {"display": "none"},
@@ -200,9 +247,10 @@ def register_callbacks():
         elif isinstance(country2_raw, str) and country2_raw:
             comparison_countries = [country2_raw]
 
-        # UI State Logic: Agreement Filter Visibility
+        # UI State Logic: Filter Visibility
         show_agreement_filter = False
         agreement_container_style = {"display": "none"}
+        vote_filter_style = {"display": "none"}
         multi_msg = ""
         multi_msg_style = {"display": "none"}
 
@@ -211,14 +259,15 @@ def register_callbacks():
             if country1:
                 show_agreement_filter = True
                 agreement_container_style = {
-                    "display": "block",
-                    "padding": "15px",
-                    "backgroundColor": "#f1f3f4",
-                    "borderRadius": "8px",
+                    "display": "flex",
+                    "alignItems": "center",
                 }
         elif len(comparison_countries) > 1:
             multi_msg = f"Comparing against top 5 of {len(comparison_countries)} selected countries. Agreement filter disabled for multi-select."
             multi_msg_style = {"display": "block", "marginBottom": "10px"}
+        elif country1:
+            # Show vote filter only when main country is selected with no comparison countries
+            vote_filter_style = {"display": "flex", "alignItems": "center"}
 
         # 1. Query Data
         try:
@@ -270,6 +319,7 @@ def register_callbacks():
                 "",
                 btn_style_hidden,
                 agreement_container_style,
+                vote_filter_style,
                 multi_msg,
                 multi_msg_style,
             )
@@ -282,6 +332,7 @@ def register_callbacks():
                 "0 results",
                 btn_style_hidden,
                 agreement_container_style,
+                vote_filter_style,
                 multi_msg,
                 multi_msg_style,
             )
@@ -313,6 +364,10 @@ def register_callbacks():
                     cond1 = (filtered_df[country1] == "Y") & (filtered_df[c2] == "N")
                     cond2 = (filtered_df[country1] == "N") & (filtered_df[c2] == "Y")
                     filtered_df = filtered_df[cond1 | cond2]
+
+        if country1 and not comparison_countries and vote_filter and vote_filter != "NO_FILTER":
+            if country1 in filtered_df.columns:
+                filtered_df = filtered_df[filtered_df[country1] == vote_filter]
 
         total_count = len(filtered_df)
 
@@ -404,6 +459,7 @@ def register_callbacks():
             summary,
             btn_style,
             agreement_container_style,
+            vote_filter_style,
             multi_msg,
             multi_msg_style,
         )
