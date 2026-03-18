@@ -85,6 +85,30 @@ layout = [
                             "fontStyle": "italic",
                         },
                     ),
+                    # Sort by date
+                    html.Div(
+                        [
+                            html.Label(
+                                "Sort by Date:",
+                                style={"fontWeight": "bold", "marginRight": "10px"},
+                            ),
+                            dcc.Dropdown(
+                                id="rl-sort-dropdown",
+                                options=[
+                                    {"label": "Newest First", "value": "desc"},
+                                    {"label": "Oldest First", "value": "asc"},
+                                ],
+                                value="desc",
+                                clearable=False,
+                                style={
+                                    "width": "180px",
+                                    "display": "inline-block",
+                                    "verticalAlign": "middle",
+                                },
+                            ),
+                        ],
+                        style={"display": "inline-block", "marginTop": "10px"},
+                    ),
                 ],
                 style={"marginBottom": "20px", "minHeight": "5px"},
             ),  # Keep some space
@@ -135,10 +159,11 @@ def register_callbacks():
         ),  # Global Filter PARAMETERS (Start, End, Subject, Country1, Country2)
         Input("rl-agreement-dropdown", "value"),  # Local Filter (Conditional)
         Input("rl-load-more-btn", "n_clicks"),  # Pagination
+        Input("rl-sort-dropdown", "value"),  # Date sort order
         State("country1-iso-alpha3", "data"),  # Current Main Country (fallback)
     )
     def update_resolution_list(
-        filter_params, agreement_filter, n_clicks, country1_backup
+        filter_params, agreement_filter, n_clicks, sort_order, country1_backup
     ):
         # Default Styles
         btn_style_hidden = {"display": "none"}
@@ -210,7 +235,7 @@ def register_callbacks():
                     include_descendants=True,
                 )
             else:
-                min_starting_date = "2099-01-01"
+                min_starting_date = min_starting_date = joining_dates[joining_dates['country'] == underlying_countries[0]]['min_date'].to_list()[0]
                 for c in underlying_countries:
                     if (
                         joining_dates[joining_dates["country"] == c][
@@ -264,7 +289,7 @@ def register_callbacks():
             df = df[df["undl_id"].isin(matched_ids)]
 
         # 2. Filter Logic
-        filtered_df = df.copy()
+        filtered_df = df.copy().sort_values("date", ascending=(sort_order == "asc"), na_position="last")
 
         if country1 and show_agreement_filter and agreement_filter != "NO_FILTER":
             c2 = comparison_countries[0]
