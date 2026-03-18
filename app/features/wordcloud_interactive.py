@@ -682,6 +682,7 @@ def register_callbacks():
             return html.Div(f"Error: {str(e)}", style={"color": "red"})
 
 
+# TODO: Add an annotation (explanatory caption) similar to the map and timeline tabs
 layout = (
     html.Div(
         [

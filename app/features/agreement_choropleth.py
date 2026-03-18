@@ -12,8 +12,8 @@ def register_callbacks(query_engine):
 
     @callback(
         [
-            Output("alignment-choropleth", "figure"),
-            Output("alignment-choropleth-status", "children"),
+            Output("agreement-choropleth", "figure"),
+            Output("agreement-choropleth-status", "children"),
         ],
         [
             Input("filter-component-data-store", "data"),
@@ -44,7 +44,7 @@ def register_callbacks(query_engine):
             if end_year:
                 resolutions_in_year = resolutions_in_year[dates <= int(end_year)]
 
-        alignment_data = query_engine.query_agreement_between_countries(
+        agreement_data = query_engine.query_agreement_between_countries(
             country1,
             resolution_ids=(resolutions_in_year["undl_id"].tolist()),
             average=True,
@@ -52,30 +52,36 @@ def register_callbacks(query_engine):
 
         # Transpose and remove the first two rows which are for the selected
         # country etc
-        alignment_data = alignment_data.T[2:]
-        alignment_data = alignment_data.reset_index()
+        agreement_data = agreement_data.T[2:]
+        agreement_data = agreement_data.reset_index()
 
-        if alignment_data.empty:
+        if agreement_data.empty:
             # Simulate neutral 0.5 value for all countries
-            alignment_data = pd.DataFrame(
+            agreement_data = pd.DataFrame(
                 {
                     "three_letter_country": ["NAN"],
-                    "alignment": [0.5],
+                    "agreement": [0.5],
                 }
             )
 
-        alignment_data.columns = ["three_letter_country", "alignment"]
-        # Make sure the alignment column is numeric, so we can apply the
+        agreement_data.columns = ["three_letter_country", "agreement"]
+        # Make sure the agreement column is numeric, so we can apply the
         # continuous color scale
-        alignment_data[["alignment"]] = alignment_data[["alignment"]].apply(pd.to_numeric)
+        agreement_data[["agreement"]] = agreement_data[["agreement"]].apply(pd.to_numeric)
 
         fig = px.choropleth(
-            alignment_data,
-            color="alignment",
+            agreement_data,
+            color="agreement",
             color_continuous_scale=px.colors.sequential.RdBu,
             range_color=[0, 1],
             locations="three_letter_country",
             projection="robinson",
+            labels={"agreement": ""},  # For consistency with legend in the subject tab
+        )
+
+        # Change default colour for missing-data countries
+        fig.update_geos(
+            landcolor="#e1e1e1"  # light grey
         )
 
         fig.add_trace(
@@ -91,9 +97,19 @@ def register_callbacks(query_engine):
         )
 
         # Center the map on the selected country's longitude (x-axis)
-        # Keep y-axis at equator (latitude = 0)
+        # Keep y-axis at the equator (latitude = 0)
         country_longitude = get_country_longitude(country1)
         fig.update_geos(projection_rotation_lon=-country_longitude)
+
+        # Change internal padding
+        fig.update_layout(
+            margin=dict(l=10, r=10, t=0, b=0),
+            coloraxis_colorbar=dict(
+                len=0.9,  # Reduce legend height
+                tickvals=[0, 0.25, 0.5, 0.75, 1.0],
+                ticktext=["0 (Always voting opposed)", "0.25", "0.5", "0.75", "1 (Always voting the same)"]
+            )
+        )
 
         # Status message
         status_msg = html.Div(
@@ -101,7 +117,7 @@ def register_callbacks(query_engine):
                 html.Div(
                     [
                         html.Strong("Chart Updated Successfully! "),
-                        f"Processed {len(alignment_data[['alignment']])} data points.",
+                        f"Processed {len(agreement_data[['agreement']])} data points.",
                     ]
                 ),
             ]
@@ -110,20 +126,43 @@ def register_callbacks(query_engine):
         return fig, status_msg
 
 
-layout = (
+layout = [
     html.Div(
         [
-            html.Div(id="alignment-choropleth-status"),
+            html.Div(id="agreement-choropleth-status"),
             dcc.Loading(
                 children=[
                     dcc.Graph(
-                        id="alignment-choropleth",
+                        id="agreement-choropleth",
                         style={"height": "600px", "width": "100%"},
                     ),
                 ],
                 type="circle",
                 color="#3498db",
             ),
-        ],
-    ),
-)
+            # TODO: Ensure the annotation only shows once the map has loaded
+            html.Div(
+                [
+                    html.P([
+                        html.Strong("Note: "),
+                        "The map shows the pairwise vote agreement between the selected Main Country and all "
+                        "other countries (UN member states). The maximum agreement score is 1 and means that two countries "
+                        "voted the same on all General Assembly (GA) resolutions. The minimum score is 0 and means that " 
+                        'two countries always voted in opposite ways ("yes" vs. "no"). The data only covers GA resolutions  '
+                        'that were passed (accepted).'
+                    ], style={
+                        "maxWidth": "100%",
+                        "margin": "0 0 0 0",
+                        "paddingLeft": "2%",
+                        "paddingTop": "10px",
+                        "color": "#7f8c8d",
+                        "fontSize": "16px",
+                        "lineHeight": "1.6",
+                        "textAlign": "left",
+                        "borderTop": "1px solid #eee"
+                    })
+                ]
+            ),
+        ]
+    )
+]

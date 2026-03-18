@@ -1,7 +1,7 @@
 """
-Alignment by Subject Feature
+Agreement by Subject Feature
 
-This component visualizes voting alignment between two countries across
+This component visualizes voting agreement between two countries across
 different UN subject areas, showing which topics they agree or disagree on.
 """
 
@@ -113,22 +113,22 @@ def calculate_agreement(query_engine, c1, c2, start_date, end_date, subject_list
 
 
 def register_callbacks(query_engine):
-    """Register callbacks for the alignment by subject feature."""
+    """Register callbacks for the agreement by subject feature."""
     
     @callback(
         [
-            Output("alignment-by-subject-graph", "figure"),
-            Output("alignment-by-subject-graph", "style"),
-            Output("alignment-by-subject-table", "children"),
-            Output("alignment-by-subject-status", "children"),
+            Output("agreement-by-subject-graph", "figure"),
+            Output("agreement-by-subject-graph", "style"),
+            Output("agreement-by-subject-table", "children"),
+            Output("agreement-by-subject-status", "children"),
         ],
         [
             Input("filter-component-filter-store", "data"),
         ],
         prevent_initial_call=False
     )
-    def update_subject_alignment(filter_params):
-        """Update the alignment by subject visualization using global filters."""
+    def update_subject_agreement(filter_params):
+        """Update the agreement by subject visualization using global filters."""
         if not filter_params:
              return {}, {'display': 'none'}, None, ""
 
@@ -151,7 +151,7 @@ def register_callbacks(query_engine):
         if c1 == c2:
             return {}, {'display': 'none'}, None, "Please select two different countries."
         
-        # Calculate alignment
+        # Calculate agreement
         df = calculate_agreement(
             query_engine, c1, c2, start_date, end_date, 
             TOP_LEVEL_SUBJECTS, SUBJECT_ID_TO_LABEL_MAP
@@ -169,7 +169,7 @@ def register_callbacks(query_engine):
             x='agreement_score', 
             y='subject_label', 
             orientation='h',
-            title=f"Voting Alignment: {get_country_name(c1)} vs {get_country_name(c2)}",
+            title=f"Voting Agreement: {get_country_name(c1)} vs {get_country_name(c2)}",
             labels={'agreement_score': 'Agreement Score', 'subject_label': 'Subject'},
             hover_data=['total_votes'],
             color='agreement_score',
@@ -188,16 +188,16 @@ def register_callbacks(query_engine):
             xaxis={'range': [0, 1]},
             template="plotly_white",
             coloraxis_colorbar=dict(
-                title="Score",
+                title="",  # Label is already shown on the x-axis; perhaps we don't need it again in the colourbar
                 tickvals=[0, 0.25, 0.5, 0.75, 1.0],
-                ticktext=["0 (Disagree)", "0.25", "0.5", "0.75", "1 (Agree)"]
+                ticktext=["0 (Always voting opposed)", "0.25", "0.5", "0.75", "1 (Always voting the same)"]
             )
         )
         
         # Create data table
         table = html.Div([
             html.Hr(),
-            html.H4("Subject Alignment Data"),
+            html.H4("Subject Agreement Data"),
             dash_table.DataTable(
                 data=df.to_dict('records'),
                 columns=[
@@ -235,19 +235,20 @@ def register_callbacks(query_engine):
         return fig, {'display': 'block'}, table, status_msg
 
 
-# Layout for the alignment by subject feature
+# Layout for the agreement by subject feature
+# TODO: Add an annotation (explanatory caption) similar to the map and timeline tabs
 layout = [
-    html.Div(id="alignment-by-subject-status", style={"marginBottom": "10px", "marginTop": "10px", "color": "#666"}),
+    html.Div(id="agreement-by-subject-status", style={"marginBottom": "10px", "marginTop": "10px", "color": "#666"}),
     dcc.Loading(
-        id="alignment-by-subject-loading",
+        id="agreement-by-subject-loading",
         type="circle",
         color="#3498db",
         children=[
             dcc.Graph(
-                id="alignment-by-subject-graph",
+                id="agreement-by-subject-graph",
                 style={'display': 'none'}
             ),
         ],
     ),
-    html.Div(id="alignment-by-subject-table"),
+    html.Div(id="agreement-by-subject-table"),
 ]

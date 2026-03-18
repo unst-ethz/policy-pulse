@@ -6,11 +6,10 @@ from ..data import get_country_name
 
 
 def register_callbacks():
-
     @callback(
         [
-            Output("alignment-chart", "figure"),
-            Output("alignment-chart-status", "children"),
+            Output("agreement-chart", "figure"),
+            Output("agreement-chart-status", "children"),
         ],
         [
             Input("filter-component-filter-store", "data"),
@@ -35,7 +34,7 @@ def register_callbacks():
         colors = ["blue", "orange", "green", "red", "purple", "brown", "pink", "gray", "olive", "cyan"]
         for i, c in enumerate(selected):
             sma_col = f"sma_{c}"
-            align_col = f"alignment_{c}"
+            align_col = f"agreement_{c}"
             if sma_col in df.columns:
                 fig.add_trace(
                     go.Scatter(
@@ -52,18 +51,19 @@ def register_callbacks():
                         x=df["date"],
                         y=df[align_col],
                         mode="lines",
-                        name=f"{c} ({country1}) alignment",
+                        name=f"{c} ({country1}) agreement",
                         line=dict(color=colors[i % len(colors)]),
                     )
                 )
 
         fig.update_layout(
-            title=f"Alignment: {get_country_name(country1)} vs {', '.join([get_country_name(c) for c in selected])}",
+            title=f"Agreement: {get_country_name(country1)} vs {', '.join([get_country_name(c) for c in selected])}",
             xaxis_title="Date",
-            yaxis_title="Agreement",
+            yaxis_title="Agreement Score",
             yaxis=dict(range=[0, 1]),
             template="plotly_white",
         )
+
         # status message
         total_points = len(df)
         start_str = (
@@ -86,15 +86,39 @@ def register_callbacks():
         return fig, status_msg
 
 
-layout = (
+layout = [
     html.Div(
         [
-            html.Div(id="alignment-chart-status"),
+            html.Div(id="agreement-chart-status"),
             dcc.Loading(
-                children=[dcc.Graph(id="alignment-chart", style={"height": "600px"})],
+                children=[dcc.Graph(id="agreement-chart", style={"height": "600px"})],
                 type="cube",
                 color="#3498db",
             ),
+            # TODO: Ensure the annotation only shows once the chart has loaded
+            html.Div(
+                [
+                    # TODO: Explicitly state the averaging window within the annotation.
+                    html.P([
+                        html.Strong("Note: "),
+                        "The chart shows the moving average of the pairwise vote agreement between the selected Main Country "
+                        "and one or more comparison countries over time. The maximum agreement score is 1 and means that "
+                        "two countries voted the same on all General Assembly (GA) resolutions within the moving window. "
+                        'The minimum score is 0 and means that two countries always voted in opposite ways ("yes" vs. "no"). ' 
+                        "The data only covers GA resolutions that were passed (accepted)."
+                    ], style={
+                        "maxWidth": "100%",
+                        "margin": "0 0 0 0",
+                        "paddingLeft": "2%",
+                        "paddingTop": "10px",
+                        "color": "#7f8c8d",
+                        "fontSize": "16px",
+                        "lineHeight": "1.6",
+                        "textAlign": "left",
+                        "borderTop": "1px solid #eee"
+                    })
+                ]
+            ),
         ],
-    ),
-)
+    )
+]

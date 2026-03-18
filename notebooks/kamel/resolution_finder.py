@@ -68,7 +68,7 @@ app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
     html.Div([
         html.H1("UN Resolution Explorer", style={'display': 'inline-block', 'marginRight': '20px'}),
-        html.A("Go to Country Alignment", id='nav-link', href="http://127.0.0.1:8050/", target="_self", style={'float': 'right', 'marginTop': '20px', 'fontSize': '18px', 'textDecoration': 'none', 'border': '1px solid #007BFF', 'padding': '10px', 'borderRadius': '5px', 'color': '#007BFF'})
+        html.A("Go to Country Agreement", id='nav-link', href="http://127.0.0.1:8050/", target="_self", style={'float': 'right', 'marginTop': '20px', 'fontSize': '18px', 'textDecoration': 'none', 'border': '1px solid #007BFF', 'padding': '10px', 'borderRadius': '5px', 'color': '#007BFF'})
     ], style={'marginBottom': '20px'}),
     
     dcc.Store(id='filtered-data-store'),

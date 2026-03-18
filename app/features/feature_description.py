@@ -36,7 +36,7 @@ layout = html.Div(
                                     "Only accepted resolutions at the United Nations General Assembly (UNGA) are taken into account. This may skew the results heavily towards certain policy areas or resolutions with higher consensus."
                                 ),
                                 html.Li(
-                                    "Voting patterns, alignment, and trends are unweighted by the number of resolutions in the specific subject area. This means that some subjects with a disproportionally high amount of resolutions may skew the results when viewing two country's alignment."
+                                    "Voting patterns, agreement, and trends are unweighted by the number of resolutions in the specific subject area. This means that some subjects with a disproportionally high amount of resolutions may skew the results when viewing two country's agreement."
                                 ),
                             ]
                         ),
