@@ -236,6 +236,7 @@ def register_callbacks():
                 )
             else:
                 min_starting_date = min_starting_date = joining_dates[joining_dates['country'] == underlying_countries[0]]['min_date'].to_list()[0]
+                max_ending_date = joining_dates[joining_dates['country'] == underlying_countries[0]]['max_date'].to_list()[0]
                 for c in underlying_countries:
                     if (
                         joining_dates[joining_dates["country"] == c][
@@ -246,11 +247,20 @@ def register_callbacks():
                         min_starting_date = joining_dates[
                             joining_dates["country"] == c
                         ]["min_date"].to_list()[0]
+                if (
+                        joining_dates[joining_dates["country"] == c][
+                            "max_date"
+                        ].to_list()[0]
+                        > max_ending_date
+                    ):
+                        max_ending_date = joining_dates[
+                            joining_dates["country"] == c
+                        ]["max_date"].to_list()[0]
                 df = data.query_engine.query_resolutions(
                     start_date=start_date
                     if min_starting_date < start_date
                     else min_starting_date,
-                    end_date=end_date,
+                    end_date=end_date if max_ending_date > end_date else max_ending_date,
                     subject_ids=subject_ids,
                     include_descendants=True,
                 )
