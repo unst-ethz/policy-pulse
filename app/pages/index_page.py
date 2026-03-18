@@ -57,14 +57,14 @@ layout = html.Div(
             ],
             className="desktop-only-dual-column",
         ),
+        html.H2(html.Span("About the platform"), className="section-title"),
+        feature_description.layout,
         html.H2(
-            html.Span("Case Study: The Impact of ABC"),
+            html.Span("Case Study: How has Switzerland voted at the UN?"),
             id="case-study",
             className="section-title",
         ),
         case_study.layout,
-        html.H2(html.Span("About the platform"), className="section-title"),
-        feature_description.layout,
     ],
 )
 
