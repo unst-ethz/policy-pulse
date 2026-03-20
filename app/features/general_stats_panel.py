@@ -21,14 +21,17 @@ def _safe_pct(part, whole):
     return (part / whole) * 100.0
 
 
-def _stats_card(icon, title, value, subtitle):
+def _stats_card(icon, title, value, subtitle, subtitle_style=None):
+    merged_subtitle_style = {"fontSize": "0.8rem", "color": "#6b7280"}
+    if subtitle_style:
+        merged_subtitle_style.update(subtitle_style)
     return html.Div(
         [
             html.Div(icon, style={"fontSize": "1.5rem", "lineHeight": "1"}),
             html.Div([
                 html.Div(title, style={"color": "#4b5563", "fontSize": "0.9rem"}),
                 html.Div(value, style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#1b3357"}),
-                html.Div(subtitle, style={"fontSize": "0.8rem", "color": "#6b7280"}),
+                html.Div(subtitle, style=merged_subtitle_style),
             ], style={
                 "display": "flex",
                 "flexDirection": "column",
@@ -62,8 +65,6 @@ def _build_stats_component():
     unique_subjects = (
         getattr(data.query_engine, "resolution_subject_table", pd.DataFrame()).get("subject_id", pd.Series(dtype="object")).nunique()
     )
-    avg_participation = df["total_ms"].fillna(0).mean() if "total_ms" in df.columns else 0
-
     y_total = _safe_count(df["total_yes"].fillna(0).sum()) if "total_yes" in df.columns else 0
     n_total = _safe_count(df["total_no"].fillna(0).sum()) if "total_no" in df.columns else 0
     a_total = _safe_count(df["total_abstentions"].fillna(0).sum()) if "total_abstentions" in df.columns else 0
@@ -77,17 +78,23 @@ def _build_stats_component():
 
     return html.Div(
         [
-            _stats_card("📄", "Resolutions", f"{total_resolutions:,}", "Total records"),
+            _stats_card("📄", "Accepted Resolutions", f"{total_resolutions:,}", "Total records"),
             _stats_card(
                 "📅",
                 "Year Span",
                 f"{year_min}-{year_max}" if year_min and year_max else "N/A",
                 f"{year_span} years covered" if year_span else "No valid date range",
             ),
-            _stats_card("🌍", "Countries", f"{num_countries:,}", "Voting columns available"),
-            _stats_card("🏷️", "Subjects", f"{unique_subjects:,}", f"{total_subject_links:,} resolution-subject links"),
-            _stats_card("🗳️", "Avg Participation", f"{avg_participation:.1f}", "Member states per resolution"),
-            html.Div("Vote Composition Across All Resolutions", style={"fontWeight": "600", "color": "#1f2937", "marginBottom": "8px"}),
+            _stats_card(
+                "🌍",
+                "Countries",
+                f"{num_countries:,}",
+                f"UN member entities appearing in dataset",
+                subtitle_style={"whiteSpace": "nowrap"},
+            ),
+            # _stats_card("🏷️", "Subjects", f"{unique_subjects:,}", f""),
+            _stats_card("🏷️", "Subjects", f"{unique_subjects:,}", f"{total_subject_links:,} resolutions with assigned subjects"),
+            html.Div("Vote Composition Across Accepted Resolutions", style={"fontWeight": "600", "color": "#1f2937", "marginBottom": "8px"}),
             html.Div(
                 [
                     html.Div(style={"width": f"{y_pct:.2f}%", "backgroundColor": "#74bb88", "height": "100%"}),
