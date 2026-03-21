@@ -210,7 +210,9 @@ def update_tab_states(filter_store):
             country2 = None
 
     no_main_country = country1 is None or country1 == ""
-    comparison_disabled = no_main_country or (country2 is None or country2 == "")
+    comparison_disabled = no_main_country or (
+        country2 is None or country2 == "" or country2 == country1
+    )
     tab_normal_style = {}
     tab_grayed_style = {
         "opacity": 0.45,
