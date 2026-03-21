@@ -44,7 +44,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
             dcc.Store(id="country1-localised-name"),
             html.H1(
                 [
-                    "Analysis of GA Votes",
+                    "Explore GA Votes yourself",
                 ]
             ),
             filters.layout(other_keyword_arguments),
@@ -67,7 +67,10 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                                     html.P(
                                         "Browse all UN General Assembly resolutions matching the current filters. "
                                         "Use the sort and search controls below to explore the list, and click any resolution to view its full details.",
-                                        style={"color": "#7f8c8d", "marginBottom": "20px"}
+                                        style={
+                                            "color": "#7f8c8d",
+                                            "marginBottom": "20px",
+                                        },
                                     ),
                                     *resolution_list.layout,
                                 ],
@@ -125,7 +128,10 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                                     html.P(
                                         "Visualises the most frequent words appearing in UN resolution titles for the selected filters. "
                                         "Larger words appear more often. Hover over a word to see how many resolutions contain it.",
-                                        style={"color": "#7f8c8d", "marginBottom": "20px"}
+                                        style={
+                                            "color": "#7f8c8d",
+                                            "marginBottom": "20px",
+                                        },
                                     ),
                                     *wordcloud_interactive.layout,
                                 ],
@@ -586,7 +592,7 @@ def _calculate_data_uncached(
                         f"There are no resolutions for which "
                         f"{data.get_country_name(country1)} and any of the "
                         f"selected comparison countries both voted. "
-                        f"Please adjust your filters."
+                        f"Some features may be unavailable."
                     ),
                 ),
                 None,
