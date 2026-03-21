@@ -1,4 +1,5 @@
-from dash import Input, Output, callback, html, dcc
+from dash import Input, Output, State, callback, clientside_callback, html, dcc
+import feffery_antd_components as fac
 import pandas as pd
 import urllib.parse
 
@@ -521,25 +522,19 @@ def layout(page_query_params: dict[str, str] | None = None):
                                             ),
                                         ]
                                     ),
-                                    dcc.Dropdown(
+                                    fac.AntdTreeSelect(
                                         id=ids["country2"],
-                                        options=[
-                                            {
-                                                "label": data.get_country_name(country),
-                                                "value": country,
-                                                "search": data.get_country_search_terms(country),
-                                            }
-                                            for country in data.available_countries
-                                        ],
-                                        value=initial_filters["country2"],
-                                        multi=True,
-                                        clearable=True,
-                                        placeholder="Select countries to compare...",
-                                        style={
-                                            "width": "100%",
-                                            "fontSize": "14px",
-                                        },
-                                        searchable=True,
+                                        treeData=data.REGION_TREE_DATA,
+                                        treeCheckable=True,
+                                        showCheckedStrategy="show-child",
+                                        treeNodeFilterProp="title",
+                                        placeholder="Search or browse countries...",
+                                        allowClear=True,
+                                        multiple=True,
+                                        treeDefaultExpandAll=False,
+                                        treeLine=True,
+                                        style={"width": "100%"},
+                                        locale="en-us",
                                     ),
                                 ],
                                 style={"flex": "1"},
