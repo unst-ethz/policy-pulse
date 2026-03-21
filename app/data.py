@@ -12,7 +12,7 @@ query_engine = ResolutionQueryEngine(repo=repo)
 available_countries = query_engine.get_available_countries()
 
 # Build name lookups from successor_states.csv
-_SUCCESSOR_STATES_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "successor_states.csv")
+_SUCCESSOR_STATES_PATH = os.path.join(os.path.dirname(__file__), "assets", "successor_states.csv")
 _successor_df = pd.read_csv(_SUCCESSOR_STATES_PATH, parse_dates=["start_date", "end_date"])
 
 # Historical codes that pycountry can't resolve (truly retired states like SUN, DDR, CSK)
