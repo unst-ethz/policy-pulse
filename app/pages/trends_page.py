@@ -2,7 +2,16 @@ import functools
 import time
 import numpy as np
 from typing import List
-from dash import Input, Output, State, callback, clientside_callback, html, dcc, register_page
+from dash import (
+    Input,
+    Output,
+    State,
+    callback,
+    clientside_callback,
+    html,
+    dcc,
+    register_page,
+)
 import pandas as pd
 import random
 
@@ -42,7 +51,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
             html.Div(
                 id="status-display",
             ),
-            *filters.layout,
+            filters.layout(other_keyword_arguments),
             # Tab Navigation
             dcc.Tabs(
                 id="country-view-tabs",
@@ -159,8 +168,6 @@ agreement_graph.register_callbacks()
 agreement_by_subject.register_callbacks(data.query_engine)
 
 
-
-
 wordcloud_interactive.register_callbacks()
 
 
@@ -191,7 +198,7 @@ def update_tab_states(filter_store):
             country2 = country2_raw
         else:
             country2 = None
-    
+
     no_main_country = country1 is None or country1 == ""
     comparison_disabled = no_main_country or (country2 is None or country2 == "")
     tab_normal_style = {}
@@ -205,7 +212,7 @@ def update_tab_states(filter_store):
     map_tab_style = tab_grayed_style if no_main_country else tab_normal_style
     timeline_tab_style = tab_grayed_style if comparison_disabled else tab_normal_style
     subject_tab_style = tab_grayed_style if comparison_disabled else tab_normal_style
-    
+
     # Placeholder content for disabled tabs
     placeholder_no_country1 = html.Div(
         [
@@ -217,11 +224,11 @@ def update_tab_states(filter_store):
                     "textAlign": "center",
                     "padding": "40px",
                     "fontStyle": "italic",
-                }
+                },
             )
         ]
     )
-    
+
     placeholder_no_comparison = html.Div(
         [
             html.P(
@@ -232,11 +239,11 @@ def update_tab_states(filter_store):
                     "textAlign": "center",
                     "padding": "40px",
                     "fontStyle": "italic",
-                }
+                },
             )
         ]
     )
-    
+
     # Content when enabled - wrap in a list to match Dash's expected format
     if no_main_country:
         map_content = [placeholder_no_country1]
@@ -245,7 +252,7 @@ def update_tab_states(filter_store):
             html.H2("Global Agreement Map"),
             *agreement_choropleth.layout,
         ]
-    
+
     if comparison_disabled:
         if country1 is None or country1 == "":
             timeline_content = [placeholder_no_country1]
@@ -264,11 +271,11 @@ def update_tab_states(filter_store):
                 "Compare voting agreement between two countries across different UN subject areas. "
                 "The agreement score ranges from 0 (complete disagreement) to 1 (complete agreement). "
                 "Only subjects with at least 30 shared votes are shown.",
-                style={"color": "#7f8c8d", "marginBottom": "20px"}
+                style={"color": "#7f8c8d", "marginBottom": "20px"},
             ),
             *agreement_by_subject.layout,
         ]
-    
+
     return (
         map_tab_style,
         timeline_tab_style,
@@ -307,8 +314,18 @@ def toggle_download_button(filter_store):
     }
     country1 = (filter_store or {}).get("country1_alpha3")
     if not country1:
-        return True, {**base_style, "backgroundColor": "#adb5bd", "color": "white", "cursor": "not-allowed"}
-    return False, {**base_style, "backgroundColor": "#1a73e8", "color": "white", "cursor": "pointer"}
+        return True, {
+            **base_style,
+            "backgroundColor": "#adb5bd",
+            "color": "white",
+            "cursor": "not-allowed",
+        }
+    return False, {
+        **base_style,
+        "backgroundColor": "#1a73e8",
+        "color": "white",
+        "cursor": "pointer",
+    }
 
 
 @callback(
@@ -347,12 +364,25 @@ def download_resolutions_csv(n_clicks, filter_store):
         tokens = [t.strip() for t in keyword.split(",") if t.strip()]
         matched_ids: set = set()
         for token in tokens:
-            title_match = df["title"].str.lower().str.contains(token.lower(), regex=False, na=False)
+            title_match = (
+                df["title"]
+                .str.lower()
+                .str.contains(token.lower(), regex=False, na=False)
+            )
             matched_ids |= set(df.loc[title_match, "undl_id"].tolist())
             matched_ids |= wordcloud_interactive.search_keywords(token)
         df = df[df["undl_id"].isin(matched_ids)]
 
-    base_cols = ["undl_id", "resolution", "date", "session", "title", "agenda_title", "subjects", "draft"]
+    base_cols = [
+        "undl_id",
+        "resolution",
+        "date",
+        "session",
+        "title",
+        "agenda_title",
+        "subjects",
+        "draft",
+    ]
     if "undl_link" in df.columns:
         base_cols.append("undl_link")
 
@@ -395,13 +425,13 @@ def disable_filters_based_on_tab(selected_tab):
     is_map_tab = selected_tab == "map"
     is_wordcloud_tab = selected_tab == "wordcloud"
     is_timeline_or_subject_tab = selected_tab in ["timeline", "subject"]
-    
+
     # Base styles
     base_style = {
         "width": "100%",
         "fontSize": "14px",
     }
-    
+
     # Disabled styles (grayed out)
     disabled_style = {
         **base_style,
@@ -409,19 +439,55 @@ def disable_filters_based_on_tab(selected_tab):
         "cursor": "not-allowed",
         "backgroundColor": "#e9ecef",
     }
-    
+
     if is_wordcloud_tab:
         # Word Cloud: disable all country dropdowns
-        return True, True, True, False, disabled_style, disabled_style, disabled_style, base_style
+        return (
+            True,
+            True,
+            True,
+            False,
+            disabled_style,
+            disabled_style,
+            disabled_style,
+            base_style,
+        )
     elif is_map_tab:
         # Agreement Map: disable only comparison dropdowns
-        return False, True, True, False, base_style, disabled_style, disabled_style, base_style
+        return (
+            False,
+            True,
+            True,
+            False,
+            base_style,
+            disabled_style,
+            disabled_style,
+            base_style,
+        )
     elif is_timeline_or_subject_tab:
         # Agreement Timeline / Agreement by Subject: disable subject dropdown
-        return False, False, False, True, base_style, base_style, base_style, disabled_style
+        return (
+            False,
+            False,
+            False,
+            True,
+            base_style,
+            base_style,
+            base_style,
+            disabled_style,
+        )
     else:
         # Other tabs: enable all
-        return False, False, False, False, base_style, base_style, base_style, base_style
+        return (
+            False,
+            False,
+            False,
+            False,
+            base_style,
+            base_style,
+            base_style,
+            base_style,
+        )
 
 
 @callback(
