@@ -21,49 +21,61 @@ ids = {
 }
 
 # Country group presets for quick comparison selection
-PRESETS = {
+# Groups are based on official UN bodies and regional groupings
+COUNTRY_PRESETS = {
     "p5": {
-        "label": "P5 (Security Council)",
+        "label": "P5 – Security Council Permanent Members",
         "countries": ["USA", "GBR", "FRA", "RUS", "CHN"],
     },
-    "g7": {
-        "label": "G7",
-        "countries": ["USA", "GBR", "FRA", "DEU", "ITA", "JPN", "CAN"],
+    "africa_group": {
+        "label": "African Group (Representative)",
+        "countries": ["NGA", "ZAF", "EGY", "KEN", "ETH"],
     },
-    "brics": {
-        "label": "BRICS",
-        "countries": ["BRA", "RUS", "IND", "CHN", "ZAF"],
+    "asia_pacific": {
+        "label": "Asia-Pacific Group (Representative)",
+        "countries": ["IND", "JPN", "IDN", "BGD", "PAK"],
     },
-    "eu_major": {
-        "label": "EU (Major)",
-        "countries": ["DEU", "FRA", "ITA", "ESP", "NLD", "POL", "SWE"],
+    "grulac": {
+        "label": "GRULAC – Latin America & Caribbean",
+        "countries": ["BRA", "MEX", "ARG", "COL", "CHL"],
     },
-    "nordic": {
-        "label": "Nordic",
-        "countries": ["SWE", "NOR", "FIN", "DNK", "ISL"],
+    "sids": {
+        "label": "Small Island Developing States (SIDS)",
+        "countries": ["MDV", "FJI", "JAM", "TTO", "VUT"],
     },
 }
 
 # Era presets for quick year range selection
+# Periods are anchored to UN institutional milestones, not geopolitical blocs
 ERA_PRESETS = {
-    "cold_war": {
-        "label": "Cold War (1947–1991)",
-        "start": 1947,
+    "un_founding": {
+        "label": "UN Founding Era (1945–1954)",
+        "start": 1945,
+        "end": 1954,
+    },
+    "decolonization": {
+        "label": "Decolonization Era (1955–1974)",
+        "start": 1955,
+        "end": 1974,
+    },
+    "nieo_period": {
+        "label": "North–South Dialogue (1974–1991)",
+        "start": 1974,
         "end": 1991,
     },
-    "post_cold_war": {
-        "label": "Post Cold War (1992–2001)",
+    "post_bipolarity": {
+        "label": "Post-Bipolarity Era (1992–2000)",
         "start": 1992,
-        "end": 2001,
+        "end": 2000,
     },
-    "war_on_terror": {
-        "label": "War on Terror (2001–2014)",
+    "mdg_era": {
+        "label": "Millennium Development Goals (2001–2015)",
         "start": 2001,
-        "end": 2014,
+        "end": 2015,
     },
-    "recent": {
-        "label": "Recent (2015–present)",
-        "start": 2015,
+    "sdg_era": {
+        "label": "Sustainable Development Goals (2016–present)",
+        "start": 2016,
         "end": None,  # will use latest year
     },
 }
@@ -147,9 +159,9 @@ def register_callbacks():
         prevent_initial_call=True,
     )
     def apply_preset(preset_key):
-        if not preset_key or preset_key not in PRESETS:
+        if not preset_key or preset_key not in COUNTRY_PRESETS:
             return []
-        return PRESETS[preset_key]["countries"]
+        return COUNTRY_PRESETS[preset_key]["countries"]
 
     # Callback: Reset all filters except main country
     @callback(
@@ -379,6 +391,11 @@ def layout(page_query_params: dict[str, str] | None = None):
                     "marginBottom": "10px",
                 },
             ),
+            html.P(
+                "Use the controls below to narrow down the resolutions by keyword, country, year range, or subject area. "
+                "Select a main country to enable voting agreement analysis across the tabs.",
+                style={"color": "#7f8c8d", "marginBottom": "20px"}
+            ),
             # Filters container
             html.Div(
                 [
@@ -457,7 +474,7 @@ def layout(page_query_params: dict[str, str] | None = None):
                                     {
                                         "label": data.get_country_name(country),
                                         "value": country,
-                                        "search": data.get_country_name(country),
+                                        "search": data.get_country_search_terms(country),
                                     }
                                     for country in data.available_countries
                                 ],
@@ -510,6 +527,7 @@ def layout(page_query_params: dict[str, str] | None = None):
                                             {
                                                 "label": data.get_country_name(country),
                                                 "value": country,
+                                                "search": data.get_country_search_terms(country),
                                             }
                                             for country in data.available_countries
                                         ],
@@ -553,7 +571,7 @@ def layout(page_query_params: dict[str, str] | None = None):
                                         id=ids["preset"],
                                         options=[
                                             {"label": p["label"], "value": k}
-                                            for k, p in PRESETS.items()
+                                            for k, p in COUNTRY_PRESETS.items()
                                         ],
                                         value=initial_filters["preset"],
                                         placeholder="Choose a group...",
