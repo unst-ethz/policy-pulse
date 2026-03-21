@@ -87,7 +87,7 @@ class ResolutionQueryEngine:
             ]
             self.logger.info(f"After subject filter: {len(filtered_df)} resolutions")
         
-        self.logger.info(f"\nFinal result: {len(filtered_df)} resolutions")
+        self.logger.info(f"Final result: {len(filtered_df)} resolutions")
         return filtered_df
 
     def query_agreement_matrix(self, resolution_ids: Optional[List[str]]) -> Dict[str, Any]:
