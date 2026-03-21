@@ -47,11 +47,10 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                     "Analysis of GA Votes",
                 ]
             ),
-            # Status and cache info
+            filters.layout(other_keyword_arguments),
             html.Div(
                 id="status-display",
             ),
-            filters.layout(other_keyword_arguments),
             # Tab Navigation
             dcc.Tabs(
                 id="country-view-tabs",
