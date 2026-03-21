@@ -573,7 +573,25 @@ def _calculate_data_uncached(
         # start after first row where country1 and at least one selected country voted
         mask_any = (~df[country1].isna()) & df[selected].notna().any(axis=1)
         if not mask_any.any():
-            return ("No overlapping votes between the selected countries.", None, None)
+            return (
+                html.Div(
+                    style={
+                        "padding": "10px",
+                        "marginBlock": "20px",
+                        "backgroundColor": "#efe1bb",
+                        "border": "1px solid #e8da6f",
+                        "borderRadius": "8px",
+                    },
+                    children=(
+                        f"There are no resolutions for which "
+                        f"{data.get_country_name(country1)} and any of the "
+                        f"selected comparison countries both voted. "
+                        f"Please adjust your filters."
+                    ),
+                ),
+                None,
+                None,
+            )
         first_pos = mask_any.values.argmax()
 
         # Keep a reference to the original df for finding last vote dates
