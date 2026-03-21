@@ -9,3 +9,4 @@ rdflib==7.5.0
 Requests==2.32.5
 wordcloud==1.9.4
 rapidfuzz==3.13.0
+feffery-antd-components>=0.4.5

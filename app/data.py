@@ -64,6 +64,141 @@ def get_country_search_terms(iso3_code: str) -> str:
         return " ".join([base_name] + aliases)
     return base_name
 
+
+# Build M49 region tree for AntdTreeSelect
+_M49_PATH = os.path.join(os.path.dirname(__file__), "assets", "m49_regional_groupings.csv")
+
+
+def get_region_tree_data() -> list[dict]:
+    """Build nested treeData for AntdTreeSelect from M49 regional groupings CSV.
+
+    Returns a nested hierarchy: World → Region → Sub-region → [Intermediate Region] → Country.
+    Each node has: key, title, value, and children (list of child nodes).
+    """
+    df = pd.read_csv(_M49_PATH, sep=";")
+
+    # Collect nodes by code for deduplication and parent lookup
+    regions: dict[str, dict] = {}
+    sub_regions: dict[str, dict] = {}
+    inter_regions: dict[str, dict] = {}
+    countries: dict[str, dict] = {}
+
+    # Track parent relationships
+    region_to_world: dict[str, bool] = {}
+    sub_to_region: dict[str, str] = {}
+    inter_to_sub: dict[str, str] = {}
+    country_to_parent: dict[str, str] = {}
+
+    for _, row in df.iterrows():
+        iso3 = row.get("ISO-alpha3 Code")
+        if not isinstance(iso3, str) or not iso3.strip():
+            continue
+
+        # Region
+        r_code = str(int(float(row["Region Code"]))).zfill(3)
+        if r_code not in regions:
+            regions[r_code] = {"key": r_code, "title": row["Region Name"], "value": r_code}
+            region_to_world[r_code] = True
+
+        # Sub-region
+        sr_code = str(int(float(row["Sub-region Code"]))).zfill(3)
+        if sr_code not in sub_regions:
+            sub_regions[sr_code] = {"key": sr_code, "title": row["Sub-region Name"], "value": sr_code}
+            sub_to_region[sr_code] = r_code
+
+        # Intermediate region (optional)
+        parent_code = sr_code
+        ir_raw = row.get("Intermediate Region Code")
+        if isinstance(ir_raw, float) and not pd.isna(ir_raw):
+            ir_code = str(int(ir_raw)).zfill(3)
+            if ir_code not in inter_regions:
+                inter_regions[ir_code] = {"key": ir_code, "title": row["Intermediate Region Name"], "value": ir_code}
+                inter_to_sub[ir_code] = sr_code
+            parent_code = ir_code
+
+        # Country leaf
+        if iso3 not in countries:
+            countries[iso3] = {"key": iso3, "title": get_country_name(iso3), "value": iso3}
+            country_to_parent[iso3] = parent_code
+
+    # Build tree bottom-up: attach countries to their parents
+    for iso3, node in countries.items():
+        parent = country_to_parent[iso3]
+        if parent in inter_regions:
+            inter_regions[parent].setdefault("children", []).append(node)
+        elif parent in sub_regions:
+            sub_regions[parent].setdefault("children", []).append(node)
+
+    # Attach intermediate regions to sub-regions
+    for ir_code, node in inter_regions.items():
+        sr_code = inter_to_sub[ir_code]
+        sub_regions[sr_code].setdefault("children", []).append(node)
+
+    # Attach sub-regions to regions
+    for sr_code, node in sub_regions.items():
+        r_code = sub_to_region[sr_code]
+        regions[r_code].setdefault("children", []).append(node)
+
+    # Use joining_dates.csv as the authoritative source for countries with voting data
+    _joining_path = os.path.join(os.path.dirname(__file__), "assets", "joining_dates.csv")
+    _voting_df = pd.read_csv(_joining_path)
+    valid = set(_voting_df["country"].tolist())
+
+    for parent_dict in [inter_regions, sub_regions]:
+        for code, node in parent_dict.items():
+            if "children" in node:
+                node["children"] = [
+                    c for c in node["children"]
+                    if "children" in c or c["value"] in valid  # keep groups, filter leaves
+                ]
+
+    # Remove empty intermediate/sub-region/region nodes (no children left)
+    for ir_code, node in list(inter_regions.items()):
+        if not node.get("children"):
+            sr_code = inter_to_sub[ir_code]
+            sub_regions[sr_code]["children"] = [
+                c for c in sub_regions[sr_code].get("children", []) if c["key"] != ir_code
+            ]
+
+    for sr_code, node in list(sub_regions.items()):
+        if not node.get("children"):
+            r_code = sub_to_region[sr_code]
+            regions[r_code]["children"] = [
+                c for c in regions[r_code].get("children", []) if c["key"] != sr_code
+            ]
+
+    # Build world root with regions as children
+    world = {
+        "key": "001",
+        "title": "World",
+        "value": "001",
+        "children": [r for r in regions.values() if r.get("children")],
+    }
+
+    # Add historical countries (voted but no longer in M49)
+    m49_codes = set(countries.keys())
+    historical_codes = sorted(valid - m49_codes)
+    historical_children = []
+    for code in historical_codes:
+        name = get_country_name(code)
+        historical_children.append({"key": code, "title": name, "value": code})
+
+    if historical_children:
+        historical_node = {
+            "key": "historical",
+            "title": "Historical States",
+            "value": "historical",
+            "children": historical_children,
+        }
+        print(f"Region tree: {len(m49_codes)} current + {len(historical_children)} historical countries")
+        return [world, historical_node]
+
+    print(f"Region tree: {len(m49_codes)} current countries, no historical found")
+    return [world]
+
+
+REGION_TREE_DATA = get_region_tree_data()
+
 # Top level subjects (level 0 in the hierarchy)
 TOP_LEVEL_SUBJECTS = {
     'http://metadata.un.org/thesaurus/10', 
