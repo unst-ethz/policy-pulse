@@ -311,6 +311,11 @@ layout = (
                     "marginBottom": "10px",
                 },
             ),
+            html.P(
+                "Use the controls below to narrow down the resolutions by keyword, country, year range, or subject area. "
+                "Select a main country to enable voting agreement analysis across the tabs.",
+                style={"color": "#7f8c8d", "marginBottom": "20px"}
+            ),
             # Filters container
             html.Div(
                 [

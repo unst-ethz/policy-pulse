@@ -56,6 +56,11 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                             html.Div(
                                 [
                                     html.H2("Preview of resolutions"),
+                                    html.P(
+                                        "Browse all UN General Assembly resolutions matching the current filters. "
+                                        "Use the sort and search controls below to explore the list, and click any resolution to view its full details.",
+                                        style={"color": "#7f8c8d", "marginBottom": "20px"}
+                                    ),
                                     *resolution_list.layout,
                                 ],
                                 className="tab-content",
@@ -109,6 +114,11 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                             html.Div(
                                 [
                                     html.H2("Resolution Title Word Cloud"),
+                                    html.P(
+                                        "Visualises the most frequent words appearing in UN resolution titles for the selected filters. "
+                                        "Larger words appear more often. Hover over a word to see how many resolutions contain it.",
+                                        style={"color": "#7f8c8d", "marginBottom": "20px"}
+                                    ),
                                     *wordcloud_interactive.layout,
                                 ],
                                 className="tab-content",
