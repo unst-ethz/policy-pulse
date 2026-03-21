@@ -82,6 +82,60 @@ ERA_PRESETS = {
 }
 
 
+def get_default_filter_values():
+    return {
+        "start_year": data.get_earliest_year(),
+        "end_year": data.get_latest_year(),
+        "era_preset": None,
+        "subject_ids": None,
+        "country1_alpha3": None,
+        "country2": [],
+        "preset": None,
+        "keyword": "",
+    }
+
+
+def parse_query_list_value(raw_value):
+    if isinstance(raw_value, list):
+        return raw_value
+    else:
+        return [raw_value] if raw_value else []
+
+
+def parse_page_query_params(page_query_params):
+    parsed_filters = {}
+
+    start_year = page_query_params.get("start_year", "")
+    if start_year != "":
+        try:
+            parsed_filters["start_year"] = int(start_year)
+        except (TypeError, ValueError):
+            pass
+
+    end_year = page_query_params.get("end_year", "")
+    if end_year != "":
+        try:
+            parsed_filters["end_year"] = int(end_year)
+        except (TypeError, ValueError):
+            pass
+
+    country1 = page_query_params.get("country1_alpha3", "")
+    if country1 != "":
+        parsed_filters["country1_alpha3"] = country1
+
+    keyword = page_query_params.get("keyword", "")
+    if keyword != "":
+        parsed_filters["keyword"] = keyword
+
+    parsed_filters["country2"] = parse_query_list_value(
+        page_query_params.get("country2", "")
+    )
+    subject_ids = parse_query_list_value(page_query_params.get("subject_ids", ""))
+    parsed_filters["subject_ids"] = subject_ids if subject_ids else None
+
+    return parsed_filters
+
+
 def register_callbacks():
 
     # Callback: Apply era preset to year dropdowns
@@ -94,9 +148,10 @@ def register_callbacks():
     def apply_era_preset(preset_key):
         if not preset_key or preset_key not in ERA_PRESETS:
             from dash import no_update
+
             return no_update, no_update
         era = ERA_PRESETS[preset_key]
-        return era["start"], era["end"] or data.get_latest_year()
+        return era["start"], era["end"] or get_default_filter_values()["end_year"]
 
     # Callback: Apply preset to comparison countries
     @callback(
@@ -115,6 +170,7 @@ def register_callbacks():
         Output(ids["end_year"], "value"),
         Output(ids["era_preset"], "value"),
         Output(ids["subject_dropdown"], "value"),
+        Output(ids["country"], "value"),
         Output(ids["country2"], "value", allow_duplicate=True),
         Output(ids["preset"], "value", allow_duplicate=True),
         Output(ids["keyword_search"], "value", allow_duplicate=True),
@@ -122,14 +178,16 @@ def register_callbacks():
         prevent_initial_call=True,
     )
     def reset_filters(n_clicks):
+        default_filters = get_default_filter_values()
         return (
-            data.get_earliest_year(),
-            data.get_latest_year(),
-            None,
-            None,
-            [],
-            None,
-            "",
+            default_filters["start_year"],
+            default_filters["end_year"],
+            default_filters["era_preset"],
+            default_filters["subject_ids"],
+            default_filters["country1_alpha3"],
+            default_filters["country2"],
+            default_filters["preset"],
+            default_filters["keyword"],
         )
 
     # Callback: Update filter store and print current selections when any filter changes
@@ -144,26 +202,40 @@ def register_callbacks():
         Input(ids["keyword_search"], "value"),
         prevent_initial_call=False,
     )
-    def update_filter_store(start_year, end_year, subject_ids, country_iso3, country2, keyword):
+    def update_filter_store(
+        start_year, end_year, subject_ids, country_iso3, country2, keyword
+    ):
         """
         Register callbacks for the filter component.
         - Filter state management
         - Print current selections when filters change
         - Query data when filters change
         """
-        # Convert years to inclusive date range (Jan 1 of start year to Dec 31 of end year)
-        start_date = f"{start_year}-01-01" if start_year else None
-        end_date = f"{end_year}-12-31" if end_year else None
+        start_year = data.get_earliest_year() if start_year is None else start_year
+        end_year = data.get_latest_year() if end_year is None else end_year
 
         filter_data = {
-            "start_date": start_date,
-            "end_date": end_date,
+            "start_date": f"{start_year}-01-01" if start_year else None,
+            "end_date": f"{end_year}-12-31" if end_year else None,
             "start_year": start_year,
             "end_year": end_year,
-            "subject_ids": subject_ids if subject_ids else None,
+            "subject_ids": subject_ids,
             "country1_alpha3": country_iso3,
             "country2": country2,
             "keyword": keyword.strip() if keyword and keyword.strip() else None,
+        }
+
+        # Remove all None values for cleaner URL and easier parsing
+        url_filters = {
+            k: v
+            for k, v in filter_data.items()
+            if v is not None
+            # Exclude empty lists from URL params
+            and v != []
+            and (
+                # Exclude the date fields as they are derived from year fields
+                k != "start_date" and k != "end_date"
+            )
         }
 
         # Print current selections
@@ -174,7 +246,7 @@ def register_callbacks():
         print(f"  Country: {country_iso3 if country_iso3 else 'None'}")
         print("=" * 50 + "\n")
 
-        return filter_data, "?" + urllib.parse.urlencode(filter_data)
+        return filter_data, f"?{urllib.parse.urlencode(url_filters, doseq=True)}"
 
     # Callback: Query data when filters change
     @callback(
@@ -185,6 +257,7 @@ def register_callbacks():
     def query_data_on_filter_change(filter_data):
         """Query data based on current filter selections."""
         try:
+            # Convert years to inclusive date range (Jan 1 of start year to Dec 31 of end year)
             start_date = filter_data.get("start_date") if filter_data else None
             end_date = filter_data.get("end_date") if filter_data else None
             subject_ids = filter_data.get("subject_ids") if filter_data else None
@@ -220,16 +293,12 @@ def register_callbacks():
             #     if c2 in df.columns:
             #         vote_cols.append(c2)
             # cols = [c for c in base_cols + vote_cols if c in df.columns]
-            
+
             # if not cols:
             cols = base_cols
 
             # Convert to JSON for storage
-            result_df = (
-                df[cols].copy()
-                if not df.empty
-                else pd.DataFrame()
-            )
+            result_df = df[cols].copy() if not df.empty else pd.DataFrame()
 
             print(f"\n✅ Queried {len(result_df)} resolutions")
             if country:
@@ -245,8 +314,19 @@ def register_callbacks():
             return None
 
 
-layout = (
-    html.Div(
+def layout(page_query_params: dict[str, str] | None = None):
+    initial_filters = get_default_filter_values()
+    earliest_year, latest_year = (
+        initial_filters["start_year"],
+        initial_filters["end_year"],
+    )
+
+    # If any filters are defined in the URL, those get priority over defaults.
+    # Parse query values to expected component types.
+    if page_query_params:
+        initial_filters.update(parse_page_query_params(page_query_params))
+
+    return html.Div(
         style={
             "maxWidth": "1400px",
             "margin": "0 auto",
@@ -300,7 +380,7 @@ layout = (
                                     "cursor": "pointer",
                                     "fontFamily": "inherit",
                                 },
-                            )
+                            ),
                         ],
                         style={"display": "flex", "gap": "8px"},
                     ),
@@ -327,8 +407,10 @@ layout = (
                                 [
                                     html.Label(
                                         [
-                                            html.Span("🔍", style={"marginRight": "5px"}),
-                                            "Keyword Search"
+                                            html.Span(
+                                                "🔍", style={"marginRight": "5px"}
+                                            ),
+                                            "Keyword Search",
                                         ],
                                         style={
                                             "fontWeight": "600",
@@ -345,6 +427,7 @@ layout = (
                                 type="text",
                                 placeholder="e.g. human rights, climate (comma-separated, press Enter)",
                                 debounce=True,
+                                value=initial_filters["keyword"],
                                 style={
                                     "width": "100%",
                                     "fontSize": "14px",
@@ -371,8 +454,10 @@ layout = (
                                 [
                                     html.Label(
                                         [
-                                            html.Span("🌍", style={"marginRight": "5px"}),
-                                            "Main Country"
+                                            html.Span(
+                                                "🌍", style={"marginRight": "5px"}
+                                            ),
+                                            "Main Country",
                                         ],
                                         style={
                                             "fontWeight": "600",
@@ -394,6 +479,7 @@ layout = (
                                     }
                                     for country in data.available_countries
                                 ],
+                                value=initial_filters["country1_alpha3"],
                                 placeholder="Select a country...",
                                 clearable=True,
                                 style={
@@ -420,8 +506,11 @@ layout = (
                                         [
                                             html.Label(
                                                 [
-                                                    html.Span("🔄", style={"marginRight": "5px"}),
-                                                    "Compare with"
+                                                    html.Span(
+                                                        "🔄",
+                                                        style={"marginRight": "5px"},
+                                                    ),
+                                                    "Compare with",
                                                 ],
                                                 style={
                                                     "fontWeight": "600",
@@ -457,8 +546,11 @@ layout = (
                                         [
                                             html.Label(
                                                 [
-                                                    html.Span("⚡", style={"marginRight": "5px"}),
-                                                    "Quick Select"
+                                                    html.Span(
+                                                        "⚡",
+                                                        style={"marginRight": "5px"},
+                                                    ),
+                                                    "Quick Select",
                                                 ],
                                                 style={
                                                     "fontWeight": "600",
@@ -476,6 +568,7 @@ layout = (
                                             {"label": p["label"], "value": k}
                                             for k, p in COUNTRY_PRESETS.items()
                                         ],
+                                        value=initial_filters["preset"],
                                         placeholder="Choose a group...",
                                         clearable=True,
                                         style={
@@ -508,8 +601,11 @@ layout = (
                                         [
                                             html.Label(
                                                 [
-                                                    html.Span("🗓️", style={"marginRight": "5px"}),
-                                                    "Year Range"
+                                                    html.Span(
+                                                        "🗓️",
+                                                        style={"marginRight": "5px"},
+                                                    ),
+                                                    "Year Range",
                                                 ],
                                                 style={
                                                     "fontWeight": "600",
@@ -528,14 +624,17 @@ layout = (
                                                 options=[
                                                     {"label": str(y), "value": y}
                                                     for y in range(
-                                                        data.get_earliest_year(),
-                                                        data.get_latest_year() + 1,
+                                                        earliest_year,
+                                                        latest_year + 1,
                                                     )
                                                 ],
-                                                value=data.get_earliest_year(),
+                                                value=initial_filters["start_year"],
                                                 clearable=False,
                                                 searchable=True,
-                                                style={"flex": "1", "fontSize": "14px"},
+                                                style={
+                                                    "flex": "1",
+                                                    "fontSize": "14px",
+                                                },
                                             ),
                                             html.Span(
                                                 "–",
@@ -551,14 +650,17 @@ layout = (
                                                 options=[
                                                     {"label": str(y), "value": y}
                                                     for y in range(
-                                                        data.get_earliest_year(),
-                                                        data.get_latest_year() + 1,
+                                                        earliest_year,
+                                                        latest_year + 1,
                                                     )
                                                 ],
-                                                value=data.get_latest_year(),
+                                                value=initial_filters["end_year"],
                                                 clearable=False,
                                                 searchable=True,
-                                                style={"flex": "1", "fontSize": "14px"},
+                                                style={
+                                                    "flex": "1",
+                                                    "fontSize": "14px",
+                                                },
                                             ),
                                         ],
                                         style={
@@ -574,6 +676,7 @@ layout = (
                                             {"label": e["label"], "value": k}
                                             for k, e in ERA_PRESETS.items()
                                         ],
+                                        value=initial_filters["era_preset"],
                                         placeholder="Quick select era...",
                                         clearable=True,
                                         style={
@@ -598,8 +701,11 @@ layout = (
                                         [
                                             html.Label(
                                                 [
-                                                    html.Span("📚", style={"marginRight": "5px"}),
-                                                    "Subjects"
+                                                    html.Span(
+                                                        "📚",
+                                                        style={"marginRight": "5px"},
+                                                    ),
+                                                    "Subjects",
                                                 ],
                                                 style={
                                                     "fontWeight": "600",
@@ -614,6 +720,7 @@ layout = (
                                     dcc.Dropdown(
                                         id=ids["subject_dropdown"],
                                         options=data.available_subjects(),
+                                        value=initial_filters["subject_ids"],
                                         multi=True,
                                         placeholder="Select one or more subjects...",
                                         style={
@@ -641,5 +748,4 @@ layout = (
                 ]
             ),
         ],
-    ),
-)
+    )
