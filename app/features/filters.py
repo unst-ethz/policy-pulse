@@ -389,7 +389,7 @@ layout = (
                                     {
                                         "label": data.get_country_name(country),
                                         "value": country,
-                                        "search": data.get_country_name(country),
+                                        "search": data.get_country_search_terms(country),
                                     }
                                     for country in data.available_countries
                                 ],
@@ -438,6 +438,7 @@ layout = (
                                             {
                                                 "label": data.get_country_name(country),
                                                 "value": country,
+                                                "search": data.get_country_search_terms(country),
                                             }
                                             for country in data.available_countries
                                         ],

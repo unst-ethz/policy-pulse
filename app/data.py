@@ -11,17 +11,58 @@ query_engine = ResolutionQueryEngine(repo=repo)
 
 available_countries = query_engine.get_available_countries()
 
+# Build name lookups from successor_states.csv
+_SUCCESSOR_STATES_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "successor_states.csv")
+_successor_df = pd.read_csv(_SUCCESSOR_STATES_PATH, parse_dates=["start_date", "end_date"])
+
+# Historical codes that pycountry can't resolve (truly retired states like SUN, DDR, CSK)
+# Maps code → (display_name, start_year, end_year)
+_HISTORICAL_NAME_MAP: dict[str, tuple[str, int, int]] = {}
+
+# Same-code name changes (Burma→Myanmar, Dahomey→Benin, etc.)
+# Maps current code → list of historical names for alias search
+_SAME_CODE_ALIASES: dict[str, list[str]] = {}
+
+for _ms_code, _group in _successor_df[_successor_df["status"] == "fs"].groupby("ms_code"):
+    if pycountry.countries.get(alpha_3=_ms_code) is None:
+        # Truly retired code — use the last (most recent) name as display name
+        _last = _group.sort_values("start_date").iloc[-1]
+        _start_year = int(_group["start_date"].min().year)
+        _end_year = int(_group["end_date"].dropna().max().year) if _group["end_date"].notna().any() else None
+        if _end_year:
+            _HISTORICAL_NAME_MAP[_ms_code] = (_last["ms_name"], _start_year, _end_year)
+    else:
+        # Same ISO3 code persists — collect historical names as search aliases
+        _aliases = _group["ms_name"].tolist()
+        if _aliases:
+            _SAME_CODE_ALIASES[_ms_code] = _aliases
+
+
 def get_country_name(
     iso3_code: str | None,
 ) -> str:  # we need to support multiple languages at some point
-    """Get English country name from ISO3 code."""
+    """Get English country name from ISO3 code, with year range for historical states."""
     if iso3_code is None:
         return "Unknown"
     try:
         country = pycountry.countries.get(alpha_3=iso3_code)
-        return country.name if country else iso3_code
+        if country:
+            return country.name
+        if iso3_code in _HISTORICAL_NAME_MAP:
+            name, start_year, end_year = _HISTORICAL_NAME_MAP[iso3_code]
+            return f"{name} ({start_year}\u2013{end_year})"
+        return iso3_code
     except:
         return iso3_code
+
+
+def get_country_search_terms(iso3_code: str) -> str:
+    """Return search string including historical name aliases for same-ISO3 name changes."""
+    base_name = get_country_name(iso3_code)
+    aliases = _SAME_CODE_ALIASES.get(iso3_code, [])
+    if aliases:
+        return " ".join([base_name] + aliases)
+    return base_name
 
 # Top level subjects (level 0 in the hierarchy)
 TOP_LEVEL_SUBJECTS = {
