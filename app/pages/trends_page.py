@@ -540,11 +540,7 @@ def _calculate_data_uncached(
     # remove country1 if accidentally selected
     selected = [c for c in selected if c != country1]
     if len(selected) == 0:
-        return (
-            "No valid countries selected to compare against. Please choose valid countries (excluding the primary country).",
-            None,
-            None,
-        )
+        return (None, None, None)
 
     print(f"🔄 Calculating {country1} vs {selected} (span: {time_span})")
     start_time = time.time()
