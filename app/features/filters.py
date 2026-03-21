@@ -82,16 +82,6 @@ def get_default_filter_values():
     }
 
 
-def normalize_to_list(value):
-    if value in (None, "", []):
-        return []
-    if isinstance(value, list):
-        return value
-    if isinstance(value, str):
-        return [value]
-    return []
-
-
 def parse_query_list_value(raw_value):
     if isinstance(raw_value, list):
         return raw_value
@@ -211,18 +201,14 @@ def register_callbacks():
         start_year = data.get_earliest_year() if start_year is None else start_year
         end_year = data.get_latest_year() if end_year is None else end_year
 
-        # Normalize multi-select values.
-        normalized_country2 = normalize_to_list(country2)
-        normalized_subject_ids = normalize_to_list(subject_ids)
-
         filter_data = {
             "start_date": f"{start_year}-01-01" if start_year else None,
             "end_date": f"{end_year}-12-31" if end_year else None,
             "start_year": start_year,
             "end_year": end_year,
-            "subject_ids": normalized_subject_ids if normalized_subject_ids else None,
+            "subject_ids": subject_ids,
             "country1_alpha3": country_iso3,
-            "country2": normalized_country2 if normalized_country2 else None,
+            "country2": country2,
             "keyword": keyword.strip() if keyword and keyword.strip() else None,
         }
 
@@ -529,7 +515,7 @@ def layout(page_query_params: dict[str, str] | None = None):
                                         ],
                                         value=initial_filters["country2"],
                                         multi=True,
-                                        clearable=False,
+                                        clearable=True,
                                         placeholder="Select countries to compare...",
                                         style={
                                             "width": "100%",
