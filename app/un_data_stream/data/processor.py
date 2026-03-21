@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 from typing import Dict, Any, List, Tuple
 
+from app.un_data_stream.data.progress import progressbar
+
 
 from ..processors.ga_processor import GAResolutionProcessor
 from ..processors.sc_processor import SCResolutionProcessor
@@ -135,7 +137,7 @@ class DataProcessor:
       # Step 2: Calculate agreement matrix for each resolution
       agreement_matrices = {}
       
-      for idx, row in resolutions_df.iterrows():
+      for idx, row in progressbar(resolutions_df.iterrows(), total=len(resolutions_df)):
           undl_id = row['undl_id']
           agreement_matrix = self._calculate_single_resolution_matrix(row, country_columns)
           agreement_matrices[undl_id] = agreement_matrix
