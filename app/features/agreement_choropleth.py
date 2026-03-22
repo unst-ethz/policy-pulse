@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.express as px
 
 from .country_coordinates import get_country_longitude
+from ..data import get_country_name
 
 
 
@@ -14,6 +15,7 @@ def register_callbacks(query_engine):
         [
             Output("agreement-choropleth", "figure"),
             Output("agreement-choropleth-status", "children"),
+            Output("agreement-choropleth-note", "children"),
         ],
         [
             Input("filter-component-data-store", "data"),
@@ -22,16 +24,16 @@ def register_callbacks(query_engine):
     )
     def generate_chart(filtered_data, filter_store):
         if not filtered_data or not filter_store:
-            return go.Figure(), ""
+            return go.Figure(), "", ""
         all_resolutions = pd.read_json(filtered_data, orient="split")
         if all_resolutions.empty:
             status_msg = html.Div([html.Div([html.Strong("No resolutions to plot")])])
-            return go.Figure(), status_msg
+            return go.Figure(), status_msg, ""
 
         country1 = filter_store.get("country1_alpha3")
         if country1 is None:
             status_msg = html.Div([html.Div([html.Strong("Please select a primary country")])])
-            return go.Figure(), status_msg
+            return go.Figure(), status_msg, ""
 
         start_year = filter_store.get("start_year")
         end_year = filter_store.get("end_year")
@@ -112,18 +114,33 @@ def register_callbacks(query_engine):
         )
 
         # Status message
+        country1_name = get_country_name(country1)
         status_msg = html.Div(
-            [
-                html.Div(
-                    [
-                        html.Strong("Chart Updated Successfully! "),
-                        f"Processed {len(agreement_data[['agreement']])} data points.",
-                    ]
-                ),
-            ]
+            f"Showing agreement data for {len(agreement_data[['agreement']])} countries.",
+            style={"color": "#7f8c8d", "fontSize": "14px", "padding": "4px 0"},
         )
+        # f"{country1_name} is highlighted in green.
+        note_msg = html.P([
+            html.Strong("Note: "),
+            f"The map shows the pairwise vote agreement between {country1_name} and all "
+            "other countries (UN member states). An agreement score of 1 (dark blue) means that two countries "
+            "voted the same on all General Assembly (GA) resolutions. A score of 0 (dark red) means that "
+            'two countries always voted in opposite ways ("yes" vs. "no"). '
+            "The data only covers GA resolutions "
+            "that were passed (accepted)."
+        ], style={
+            "maxWidth": "100%",
+            "margin": "0 0 0 0",
+            "paddingLeft": "2%",
+            "paddingTop": "10px",
+            "color": "#7f8c8d",
+            "fontSize": "16px",
+            "lineHeight": "1.6",
+            "textAlign": "left",
+            "borderTop": "1px solid #eee"
+        })
 
-        return fig, status_msg
+        return fig, status_msg, note_msg
 
 
 layout = [
@@ -140,29 +157,7 @@ layout = [
                 type="circle",
                 color="#3498db",
             ),
-            # TODO: Ensure the annotation only shows once the map has loaded
-            html.Div(
-                [
-                    html.P([
-                        html.Strong("Note: "),
-                        "The map shows the pairwise vote agreement between the selected Main Country and all "
-                        "other countries (UN member states). The maximum agreement score is 1 and means that two countries "
-                        "voted the same on all General Assembly (GA) resolutions. The minimum score is 0 and means that " 
-                        'two countries always voted in opposite ways ("yes" vs. "no"). The data only covers GA resolutions  '
-                        'that were passed (accepted).'
-                    ], style={
-                        "maxWidth": "100%",
-                        "margin": "0 0 0 0",
-                        "paddingLeft": "2%",
-                        "paddingTop": "10px",
-                        "color": "#7f8c8d",
-                        "fontSize": "16px",
-                        "lineHeight": "1.6",
-                        "textAlign": "left",
-                        "borderTop": "1px solid #eee"
-                    })
-                ]
-            ),
+            html.Div(id="agreement-choropleth-note"),
         ]
     )
 ]

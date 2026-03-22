@@ -258,8 +258,14 @@ def update_tab_states(filter_store):
     if no_main_country:
         map_content = [placeholder_no_country1]
     else:
+        country1_name = data.get_country_name(country1)
         map_content = [
             html.H2("Global Agreement Map"),
+            html.P(
+                f"Shows how closely each country's UN General Assembly voting agrees with {country1_name}. "
+                "Agreement scores range from 0 (always opposed) to 1 (always agreeing).",
+                style={"color": "#7f8c8d", "marginBottom": "20px"},
+            ),
             *agreement_choropleth.layout,
         ]
 
@@ -273,12 +279,17 @@ def update_tab_states(filter_store):
     else:
         timeline_content = [
             html.H2("Pairwise Agreement over Time"),
+            html.P(
+                f"Tracks how voting agreement between {country1_name} and the selected comparison countries has evolved over time using a moving average. "
+                f"The graph starts from the first resolution where both {country1_name} and any chosen comparison country have voted.",
+                style={"color": "#7f8c8d", "marginBottom": "20px"},
+            ),
             *agreement_graph.layout,
         ]
         subject_content = [
             html.H2("Agreement by UN Subject Area"),
             html.P(
-                "Compare voting agreement between two countries across different UN subject areas. "
+                f"Compare voting agreement between {country1_name} and the selected comparison country across different UN subject areas. "
                 "The agreement score ranges from 0 (complete disagreement) to 1 (complete agreement). "
                 "Only subjects with at least 30 shared votes are shown.",
                 style={"color": "#7f8c8d", "marginBottom": "20px"},

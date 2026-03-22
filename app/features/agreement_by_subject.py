@@ -227,10 +227,10 @@ def register_callbacks(query_engine):
             )
         ])
         
-        status_msg = html.Div([
-            html.Strong("Chart Updated Successfully! "),
-            f"Analyzed {len(df)} subjects based on resolutions from {start_date} to {end_date}."
-        ])
+        status_msg = html.Div(
+            f"Analyzed {len(df)} subjects based on resolutions from {start_date} to {end_date}.",
+            style={"color": "#7f8c8d", "fontSize": "14px", "padding": "4px 0"},
+        )
         
         return fig, {'display': 'block'}, table, status_msg
 
