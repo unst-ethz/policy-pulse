@@ -473,7 +473,7 @@ def layout(page_query_params: dict[str, str] | None = None):
                                 id=ids["country"],
                                 options=[
                                     {
-                                        "label": data.get_country_name(country),
+                                        "label": data.get_country_display_name(country),
                                         "value": country,
                                         "search": data.get_country_search_terms(country),
                                     }

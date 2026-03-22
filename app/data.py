@@ -56,6 +56,17 @@ def get_country_name(
         return iso3_code
 
 
+def get_country_display_name(iso3_code: str) -> str:
+    """Get country name with historical aliases in brackets, e.g. 'Myanmar (Burma)'."""
+    base_name = get_country_name(iso3_code)
+    aliases = _SAME_CODE_ALIASES.get(iso3_code, [])
+    # Filter out aliases that match the current name
+    historical = [a for a in aliases if a != base_name]
+    if historical:
+        return f"{base_name} (historical: {', '.join(historical)})"
+    return base_name
+
+
 def get_country_search_terms(iso3_code: str) -> str:
     """Return search string including historical name aliases for same-ISO3 name changes."""
     base_name = get_country_name(iso3_code)

@@ -10,6 +10,7 @@ def register_callbacks():
         [
             Output("agreement-chart", "figure"),
             Output("agreement-chart-status", "children"),
+            Output("agreement-chart-note", "children"),
         ],
         [
             Input("filter-component-filter-store", "data"),
@@ -19,7 +20,7 @@ def register_callbacks():
     def generate_chart(filter_store, moving_average_data):
         # moving_average_data is JSON produced by to_json; parse it
         if moving_average_data is None or not filter_store:
-            return go.Figure(), html.Div("No data")
+            return go.Figure(), html.Div("No data"), ""
 
         country1 = filter_store.get("country1_alpha3")
         country2 = filter_store.get("country2")
@@ -76,14 +77,32 @@ def register_callbacks():
             if not df["date"].isna().all()
             else "N/A"
         )
+        country1_name = get_country_name(country1)
         status_msg = html.Div(
-            [
-                html.Strong("Chart Updated Successfully. "),
-                f"{total_points:,} points from {start_str} to {end_str}",
-            ]
+            f"Overlapping vote period: {start_str} to {end_str} ({total_points:,} data points).",
+            style={"color": "#7f8c8d", "fontSize": "14px", "padding": "4px 0"},
         )
 
-        return fig, status_msg
+        note_msg = html.P([
+            html.Strong("Note: "),
+            f"The chart shows the moving average of the pairwise vote agreement between {country1_name} "
+            "and the selected comparison countries over time. An agreement score of 1 means that "
+            "two countries voted the same on all General Assembly (GA) resolutions within the moving window. "
+            'A score of 0 means that two countries always voted in opposite ways ("yes" vs. "no"). '
+            "The data only covers GA resolutions that were passed (accepted)."
+        ], style={
+            "maxWidth": "100%",
+            "margin": "0 0 0 0",
+            "paddingLeft": "2%",
+            "paddingTop": "10px",
+            "color": "#7f8c8d",
+            "fontSize": "16px",
+            "lineHeight": "1.6",
+            "textAlign": "left",
+            "borderTop": "1px solid #eee"
+        })
+
+        return fig, status_msg, note_msg
 
 
 layout = [
@@ -95,30 +114,7 @@ layout = [
                 type="cube",
                 color="#3498db",
             ),
-            # TODO: Ensure the annotation only shows once the chart has loaded
-            html.Div(
-                [
-                    # TODO: Explicitly state the averaging window within the annotation.
-                    html.P([
-                        html.Strong("Note: "),
-                        "The chart shows the moving average of the pairwise vote agreement between the selected Main Country "
-                        "and one or more comparison countries over time. The maximum agreement score is 1 and means that "
-                        "two countries voted the same on all General Assembly (GA) resolutions within the moving window. "
-                        'The minimum score is 0 and means that two countries always voted in opposite ways ("yes" vs. "no"). ' 
-                        "The data only covers GA resolutions that were passed (accepted)."
-                    ], style={
-                        "maxWidth": "100%",
-                        "margin": "0 0 0 0",
-                        "paddingLeft": "2%",
-                        "paddingTop": "10px",
-                        "color": "#7f8c8d",
-                        "fontSize": "16px",
-                        "lineHeight": "1.6",
-                        "textAlign": "left",
-                        "borderTop": "1px solid #eee"
-                    })
-                ]
-            ),
+            html.Div(id="agreement-chart-note"),
         ],
     )
 ]
