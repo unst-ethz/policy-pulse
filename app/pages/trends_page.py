@@ -44,14 +44,13 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
             dcc.Store(id="country1-localised-name"),
             html.H1(
                 [
-                    "Analysis of GA Votes",
+                    "Explore GA Votes yourself",
                 ]
             ),
-            # Status and cache info
+            filters.layout(other_keyword_arguments),
             html.Div(
                 id="status-display",
             ),
-            filters.layout(other_keyword_arguments),
             # Tab Navigation
             dcc.Tabs(
                 id="country-view-tabs",
@@ -68,7 +67,10 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                                     html.P(
                                         "Browse all UN General Assembly resolutions matching the current filters. "
                                         "Use the sort and search controls below to explore the list, and click any resolution to view its full details.",
-                                        style={"color": "#7f8c8d", "marginBottom": "20px"}
+                                        style={
+                                            "color": "#7f8c8d",
+                                            "marginBottom": "20px",
+                                        },
                                     ),
                                     *resolution_list.layout,
                                 ],
@@ -126,7 +128,10 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                                     html.P(
                                         "Visualises the most frequent words appearing in UN resolution titles for the selected filters. "
                                         "Larger words appear more often. Hover over a word to see how many resolutions contain it.",
-                                        style={"color": "#7f8c8d", "marginBottom": "20px"}
+                                        style={
+                                            "color": "#7f8c8d",
+                                            "marginBottom": "20px",
+                                        },
                                     ),
                                     *wordcloud_interactive.layout,
                                 ],
@@ -210,7 +215,9 @@ def update_tab_states(filter_store):
             country2 = None
 
     no_main_country = country1 is None or country1 == ""
-    comparison_disabled = no_main_country or (country2 is None or country2 == "")
+    comparison_disabled = no_main_country or (
+        country2 is None or country2 == "" or country2 == country1
+    )
     tab_normal_style = {}
     tab_grayed_style = {
         "opacity": 0.45,
@@ -549,11 +556,7 @@ def _calculate_data_uncached(
     # remove country1 if accidentally selected
     selected = [c for c in selected if c != country1]
     if len(selected) == 0:
-        return (
-            "No valid countries selected to compare against. Please choose valid countries (excluding the primary country).",
-            None,
-            None,
-        )
+        return (None, None, None)
 
     print(f"🔄 Calculating {country1} vs {selected} (span: {time_span})")
     start_time = time.time()
@@ -587,7 +590,25 @@ def _calculate_data_uncached(
         # start after first row where country1 and at least one selected country voted
         mask_any = (~df[country1].isna()) & df[selected].notna().any(axis=1)
         if not mask_any.any():
-            return ("No overlapping votes between the selected countries.", None, None)
+            return (
+                html.Div(
+                    style={
+                        "padding": "10px",
+                        "marginBlock": "20px",
+                        "backgroundColor": "#efe1bb",
+                        "border": "1px solid #e8da6f",
+                        "borderRadius": "8px",
+                    },
+                    children=(
+                        f"There are no resolutions for which "
+                        f"{data.get_country_name(country1)} and any of the "
+                        f"selected comparison countries both voted. "
+                        f"Some features may be unavailable."
+                    ),
+                ),
+                None,
+                None,
+            )
         first_pos = mask_any.values.argmax()
 
         # Keep a reference to the original df for finding last vote dates
