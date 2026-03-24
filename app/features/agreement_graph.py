@@ -1,6 +1,7 @@
 from dash import dcc, Input, Output, callback, html
 import plotly.graph_objects as go
 import pandas as pd
+import numpy as np
 from io import StringIO
 from ..data import get_country_name
 
@@ -17,78 +18,89 @@ def register_callbacks():
             Input("moving-average-data", "data"),
         ],
     )
-    def generate_chart(filter_store, moving_average_data):
-        # moving_average_data is JSON produced by to_json; parse it
-        if moving_average_data is None or not filter_store:
+    def generate_chart(filter_store, session_data):
+        if session_data is None or not filter_store:
             return go.Figure(), html.Div("No data"), ""
 
         country1 = filter_store.get("country1_alpha3")
         country2 = filter_store.get("country2")
 
-        df = pd.read_json(StringIO(moving_average_data))
-        df["date"] = pd.to_datetime(df["date"])
+        df = pd.read_json(StringIO(session_data))
 
         # ensure country2 is a list
         selected = country2 if isinstance(country2, (list, tuple)) else [country2]
 
+        # detect special/emergency sessions (contain "sp" e.g. "1sp", "7emsp")
+        is_special = df["session"].astype(str).str.contains("sp", case=False, na=False)
+
         fig = go.Figure()
-        colors = ["blue", "orange", "green", "red", "purple", "brown", "pink", "gray", "olive", "cyan"]
+        colors = ["blue", "orange", "green", "purple", "brown", "pink", "gray", "olive", "cyan", "teal"]
         for i, c in enumerate(selected):
-            sma_col = f"sma_{c}"
-            align_col = f"agreement_{c}"
-            if sma_col in df.columns:
-                fig.add_trace(
-                    go.Scatter(
-                        x=df["date"],
-                        y=df[sma_col],
-                        mode="lines",
-                        name=f"{get_country_name(c)}",  # f"{c} ({country1}) SMA",
-                        line=dict(color=colors[i % len(colors)]),
-                    )
+            avg_col = f"avg_agreement_{c}"
+            n_col = f"n_votes_{c}"
+            if avg_col not in df.columns:
+                continue
+
+            # filter to non-NaN rows so all dots are connected
+            mask = df[avg_col].notna()
+            df_c = df.loc[mask].copy()
+            special_c = is_special.loc[mask]
+            country_color = colors[i % len(colors)]
+
+            hover_data = np.column_stack([
+                df_c["session"].values,
+                df_c[n_col].values if n_col in df_c.columns else np.zeros(len(df_c)),
+            ])
+
+            # per-point marker colors: red for special sessions, country color otherwise
+            marker_colors = ["red" if s else country_color for s in special_c]
+
+            fig.add_trace(
+                go.Scatter(
+                    x=df_c["year"],
+                    y=df_c[avg_col],
+                    mode="markers+lines",
+                    name=get_country_name(c),
+                    line=dict(color=country_color),
+                    marker=dict(size=6, color=marker_colors),
+                    customdata=hover_data,
+                    hovertemplate=(
+                        "Session %{customdata[0]}<br>"
+                        "Year: %{x}<br>"
+                        "Agreement: %{y:.3f}<br>"
+                        "Shared votes: %{customdata[1]:.0f}"
+                        "<extra>%{fullData.name}</extra>"
+                    ),
                 )
-            elif align_col in df.columns:
-                fig.add_trace(
-                    go.Scatter(
-                        x=df["date"],
-                        y=df[align_col],
-                        mode="lines",
-                        name=f"{c} ({country1}) agreement",
-                        line=dict(color=colors[i % len(colors)]),
-                    )
-                )
+            )
 
         fig.update_layout(
             title=f"Agreement: {get_country_name(country1)} vs {', '.join([get_country_name(c) for c in selected])}",
-            xaxis_title="Date",
+            xaxis_title="Year",
             yaxis_title="Agreement Score",
             yaxis=dict(range=[0, 1]),
             template="plotly_white",
         )
 
         # status message
-        total_points = len(df)
-        start_str = (
-            df["date"].min().strftime("%Y-%m-%d")
-            if not df["date"].isna().all()
-            else "N/A"
-        )
-        end_str = (
-            df["date"].max().strftime("%Y-%m-%d")
-            if not df["date"].isna().all()
-            else "N/A"
-        )
+        n_sessions = len(df)
+        year_min = int(df["year"].min()) if not df["year"].isna().all() else "N/A"
+        year_max = int(df["year"].max()) if not df["year"].isna().all() else "N/A"
         country1_name = get_country_name(country1)
         status_msg = html.Div(
-            f"Overlapping vote period: {start_str} to {end_str} ({total_points:,} data points).",
+            f"Covers {n_sessions} sessions from {year_min} to {year_max}.",
             style={"color": "#7f8c8d", "fontSize": "14px", "padding": "4px 0"},
         )
 
         note_msg = html.P([
             html.Strong("Note: "),
-            f"The chart shows the moving average of the pairwise vote agreement between {country1_name} "
-            "and the selected comparison countries over time. An agreement score of 1 means that "
-            "two countries voted the same on all General Assembly (GA) resolutions within the moving window. "
-            'A score of 0 means that two countries always voted in opposite ways ("yes" vs. "no"). '
+            f"The chart shows the average pairwise vote agreement between {country1_name} "
+            "and the selected comparison countries per UN General Assembly session. "
+            "Each point represents the mean agreement score across all resolutions in that session "
+            "where both countries voted. An agreement score of 1 means identical votes on all resolutions; "
+            '0 means complete disagreement ("yes" vs. "no"). '
+            "Only sessions with at least 3 shared votes are shown. "
+            "Red dots indicate special or emergency sessions. "
             "The data only covers GA resolutions that were passed (accepted)."
         ], style={
             "maxWidth": "100%",

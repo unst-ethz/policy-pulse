@@ -287,8 +287,8 @@ def update_tab_states(filter_store):
         timeline_content = [
             html.H2("Pairwise Agreement over Time"),
             html.P(
-                f"Tracks how voting agreement between {country1_name} and the selected comparison countries has evolved over time using a moving average. "
-                f"The graph starts from the first resolution where both {country1_name} and any chosen comparison country have voted.",
+                f"Tracks how voting agreement between {country1_name} and the selected comparison countries has evolved across UN General Assembly sessions. "
+                f"Each point represents the average agreement for one session. Only sessions with at least 3 shared votes are shown.",
                 style={"color": "#7f8c8d", "marginBottom": "20px"},
             ),
             *agreement_graph.layout,
@@ -538,56 +538,44 @@ def _calculate_data_wrapper(filter_store):
         return ("No comparison country selected.", None, None)
     selected_tuple = tuple(country2) if isinstance(country2, list) else (country2,)
 
-    return _calculate_data_uncached(country1, selected_tuple, 350)
+    return _calculate_data_uncached(country1, selected_tuple)
 
 
 @functools.lru_cache(maxsize=100)
-def _calculate_data_uncached(
-    country1: str | None, selected_tuple: tuple, time_span: int
-):
-    """Calculate moving average data for country pair (cached)."""
+def _calculate_data_uncached(country1: str | None, selected_tuple: tuple):
+    """Calculate per-session agreement data for country pairs (cached)."""
     if country1 is None:
-        # Don't calculate yet if no primary country is selected
         return (None, None, None)
 
-    # Normalize country2 to a list
-    selected = list(selected_tuple)  # convert back to list for processing
-
-    # remove country1 if accidentally selected
+    selected = list(selected_tuple)
     selected = [c for c in selected if c != country1]
     if len(selected) == 0:
         return (None, None, None)
 
-    print(f"🔄 Calculating {country1} vs {selected} (span: {time_span})")
+    print(f"🔄 Calculating session agreement: {country1} vs {selected}")
     start_time = time.time()
 
     try:
         vote_mapping = {"Y": 1, "A": 0, "N": -1}
 
-        # Pull only required columns
-        cols = ["date", country1] + selected
+        cols = ["date", "session", country1] + selected
         df = data.query_engine.query_resolutions()[cols].copy()
 
-        # normalize and map votes to numeric (robust handling)
+        # normalize and map votes to numeric
         vote_cols = [country1] + selected
-        # convert to string, strip whitespace, uppercase
         df[vote_cols] = (
             df[vote_cols].astype(str).apply(lambda s: s.str.strip().str.upper())
         )
-        # replace common null-like strings with actual NaN
         df[vote_cols] = df[vote_cols].replace(
             {"": pd.NA, "NAN": pd.NA, "NONE": pd.NA, "<NA>": pd.NA}
         )
-        # map to numbers
         df[vote_cols] = df[vote_cols].replace(vote_mapping)
-        # coerce any remaining non-numeric to NaN
         df[vote_cols] = df[vote_cols].apply(pd.to_numeric, errors="coerce")
 
-        # ensure dates and sort
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
         df = df.sort_values("date").reset_index(drop=True)
 
-        # start after first row where country1 and at least one selected country voted
+        # check that at least one overlapping vote exists
         mask_any = (~df[country1].isna()) & df[selected].notna().any(axis=1)
         if not mask_any.any():
             return (
@@ -609,51 +597,60 @@ def _calculate_data_uncached(
                 None,
                 None,
             )
-        first_pos = mask_any.values.argmax()
 
-        # Keep a reference to the original df for finding last vote dates
-        df_original = df.copy()
-        df = df.iloc[first_pos:].reset_index(drop=True)
-
-        # compute per-country agreement (vectorized)
+        # compute per-resolution agreement (vectorized)
         diffs = df[selected].subtract(df[country1], axis=0).abs()
         agreement = 1.0 - (diffs / 2.0)
 
-        # set agreement to NaN where either side didn't vote
         for col in selected:
             both_voted = df[[country1, col]].notna().all(axis=1)
             agreement[col] = agreement[col].where(both_voted, np.nan)
 
-        # build output dataframe with per-country agreement and moving averages
-        out = pd.DataFrame({"date": df["date"]})
+        # build temporary df for session-level groupby
+        tmp = pd.DataFrame({"session": df["session"], "date": df["date"]})
         for col in selected:
-            align_col = f"agreement_{col}"
-            sma_col = f"sma_{col}"
+            tmp[f"agreement_{col}"] = agreement[col]
 
-            out[align_col] = agreement[col]
+        # derive year per session (median date's year)
+        session_year = tmp.groupby("session")["date"].median().dt.year
+        session_year.name = "year"
 
-            out[sma_col] = (
-                out[align_col]
-                .rolling(window=time_span, min_periods=time_span // 4)
-                .mean()
-            )
+        # aggregate per session per country
+        out_parts = [session_year]
+        for col in selected:
+            agree_col = f"agreement_{col}"
+            avg_col = f"avg_agreement_{col}"
+            n_col = f"n_votes_{col}"
 
-            # Find the last date this country actually voted
-            # Use the original unfiltered df to find the last non-null vote for this country
-            last_vote_mask = df_original[col].notna()
-            if last_vote_mask.any():
-                last_vote_date = df_original.loc[last_vote_mask, "date"].max()
-                print(f"  📅 {col}: Last vote date = {last_vote_date}")
-                # Set both agreement AND moving average to NaN for dates after the last vote
-                rows_set_to_nan = (out["date"] > last_vote_date).sum()
-                out.loc[out["date"] > last_vote_date, align_col] = np.nan
-                out.loc[out["date"] > last_vote_date, sma_col] = np.nan
-                print(f"      Set {rows_set_to_nan} rows to NaN after {last_vote_date}")
+            grouped = tmp.groupby("session")[agree_col]
+            avg_agreement = grouped.mean()
+            avg_agreement.name = avg_col
+            n_votes = grouped.apply(lambda x: x.notna().sum())
+            n_votes.name = n_col
+
+            # minimum 3 votes threshold
+            avg_agreement = avg_agreement.where(n_votes >= 3, np.nan)
+
+            out_parts.extend([avg_agreement, n_votes])
+
+        out = pd.concat(out_parts, axis=1).reset_index()
+        out = out.sort_values(["year", "session"]).reset_index(drop=True)
+
+        # last-vote cutoff: find last session each country voted in
+        for col in selected:
+            avg_col = f"avg_agreement_{col}"
+            n_col = f"n_votes_{col}"
+            has_votes = out[avg_col].notna()
+            if has_votes.any():
+                last_idx = has_votes.values[::-1].argmax()
+                last_session_pos = len(has_votes) - 1 - last_idx
+                out.loc[out.index[last_session_pos + 1:], avg_col] = np.nan
+                print(f"  📅 {col}: last active session = {out.loc[out.index[last_session_pos], 'session']}")
 
         calc_time = time.time() - start_time
-        print(f"✅ Calculated in {calc_time:.2f}s ({len(out):,} points)")
+        print(f"✅ Calculated in {calc_time:.2f}s ({len(out)} sessions)")
 
-        return (None, out.to_json(date_format="iso"), calc_time)
+        return (None, out.to_json(), calc_time)
 
     except Exception as e:
         print(f"❌ Calculation error: {e}")
