@@ -84,7 +84,7 @@ def register_callbacks():
         )
 
         note_msg = html.P([
-            html.Strong("Note: "),
+            html.Strong("Details: "),
             f"The chart shows the moving average of the pairwise vote agreement between {country1_name} "
             "and the selected comparison countries over time. An agreement score of 1 means that "
             "two countries voted the same on all General Assembly (GA) resolutions within the moving window. "

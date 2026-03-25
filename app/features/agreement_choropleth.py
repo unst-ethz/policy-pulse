@@ -144,7 +144,7 @@ def register_callbacks(query_engine):
         # f"{country1_name} is highlighted in green.
         note_msg = html.P(
             [
-                html.Strong("Note: "),
+                html.Strong("Details: "),
                 f"The map shows the pairwise vote agreement between {country1_name} and all "
                 "other countries (UN member states). An agreement score of 1 (dark blue) means that two countries "
                 "voted the same on all General Assembly (GA) resolutions. A score of 0 (dark red) means that "
