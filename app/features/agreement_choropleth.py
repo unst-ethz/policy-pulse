@@ -3,10 +3,9 @@ import plotly.graph_objects as go
 import pandas as pd
 import plotly.express as px
 
-from app import data
+from .. import data
 
 from .country_coordinates import get_country_longitude
-from ..data import get_country_name
 
 
 def register_callbacks(query_engine):
@@ -62,9 +61,11 @@ def register_callbacks(query_engine):
 
         # Make new column by applying data.get_country_name to three_letter_country
         agreement_data["Country"] = agreement_data["three_letter_country"].apply(
-            data.get_country_name
+            data.get_country_display_name
         )
-        agreement_data["Agreement"] = agreement_data["agreement_raw"].apply(lambda x: f"{x:.2f} with {data.get_country_name(country1)}")
+        agreement_data["Agreement"] = agreement_data["agreement_raw"].apply(
+            lambda x: f"{x:.2f} with {data.get_country_display_name(country1)}"
+        )
 
         if agreement_data.empty:
             # Simulate neutral 0.5 value for all countries
@@ -90,8 +91,14 @@ def register_callbacks(query_engine):
             locations="three_letter_country",
             projection="robinson",
             hover_name="Country",
-            hover_data={"Agreement": True, "three_letter_country": False, "agreement_raw": False},
-            labels={"agreement_raw": ""},  # For consistency with legend in the subject tab
+            hover_data={
+                "Agreement": True,
+                "three_letter_country": False,
+                "agreement_raw": False,
+            },
+            labels={
+                "agreement_raw": ""
+            },  # For consistency with legend in the subject tab
         )
 
         # Change default colour for missing-data countries
@@ -133,27 +140,30 @@ def register_callbacks(query_engine):
         )
 
         # Status message
-        country1_name = get_country_name(country1)
+        country1_name = data.get_country_display_name(country1)
         # f"{country1_name} is highlighted in green.
-        note_msg = html.P([
-            html.Strong("Note: "),
-            f"The map shows the pairwise vote agreement between {country1_name} and all "
-            "other countries (UN member states). An agreement score of 1 (dark blue) means that two countries "
-            "voted the same on all General Assembly (GA) resolutions. A score of 0 (dark red) means that "
-            'two countries always voted in opposite ways ("yes" vs. "no"). '
-            "The data only covers GA resolutions "
-            "that were passed (accepted)."
-        ], style={
-            "maxWidth": "100%",
-            "margin": "0 0 0 0",
-            "paddingLeft": "2%",
-            "paddingTop": "10px",
-            "color": "#7f8c8d",
-            "fontSize": "16px",
-            "lineHeight": "1.6",
-            "textAlign": "left",
-            "borderTop": "1px solid #eee"
-        })
+        note_msg = html.P(
+            [
+                html.Strong("Note: "),
+                f"The map shows the pairwise vote agreement between {country1_name} and all "
+                "other countries (UN member states). An agreement score of 1 (dark blue) means that two countries "
+                "voted the same on all General Assembly (GA) resolutions. A score of 0 (dark red) means that "
+                'two countries always voted in opposite ways ("yes" vs. "no"). '
+                "The data only covers GA resolutions "
+                "that were passed (accepted).",
+            ],
+            style={
+                "maxWidth": "100%",
+                "margin": "0 0 0 0",
+                "paddingLeft": "2%",
+                "paddingTop": "10px",
+                "color": "#7f8c8d",
+                "fontSize": "16px",
+                "lineHeight": "1.6",
+                "textAlign": "left",
+                "borderTop": "1px solid #eee",
+            },
+        )
 
         return fig, None, note_msg
 
