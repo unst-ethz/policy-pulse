@@ -55,6 +55,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
             dcc.Tabs(
                 id="country-view-tabs",
                 value="resolution_list",
+                style={"marginTop": "1rem"},
                 children=[
                     # TAB 1: Resolution List
                     dcc.Tab(
@@ -535,7 +536,7 @@ def _calculate_data_wrapper(filter_store):
 
     # normalize country2 to tuple (hashable)
     if country2 is None:
-        return ("No comparison country selected.", None, None)
+        return ("", None, None)
     selected_tuple = tuple(country2) if isinstance(country2, list) else (country2,)
 
     return _calculate_data_uncached(country1, selected_tuple, 350)
