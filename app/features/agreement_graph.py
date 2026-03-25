@@ -93,7 +93,7 @@ def register_callbacks():
         )
 
         note_msg = html.P([
-            html.Strong("Note: "),
+            html.Strong("Details: "),
             f"The chart shows the average pairwise vote agreement between {country1_name} "
             "and the selected comparison countries per UN General Assembly session. "
             "Each point represents the mean agreement score across all resolutions in that session "
