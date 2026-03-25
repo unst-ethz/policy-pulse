@@ -3,10 +3,9 @@ import plotly.graph_objects as go
 import pandas as pd
 import plotly.express as px
 
+from .. import data
+
 from .country_coordinates import get_country_longitude
-from ..data import get_country_name
-
-
 
 
 def register_callbacks(query_engine):
@@ -32,7 +31,9 @@ def register_callbacks(query_engine):
 
         country1 = filter_store.get("country1_alpha3")
         if country1 is None:
-            status_msg = html.Div([html.Div([html.Strong("Please select a primary country")])])
+            status_msg = html.Div(
+                [html.Div([html.Strong("Please select a primary country")])]
+            )
             return go.Figure(), status_msg, ""
 
         start_year = filter_store.get("start_year")
@@ -56,29 +57,48 @@ def register_callbacks(query_engine):
         # country etc
         agreement_data = agreement_data.T[2:]
         agreement_data = agreement_data.reset_index()
+        agreement_data.columns = ["three_letter_country", "agreement_raw"]
+
+        # Make new column by applying data.get_country_name to three_letter_country
+        agreement_data["Country"] = agreement_data["three_letter_country"].apply(
+            data.get_country_display_name
+        )
+        agreement_data["Agreement"] = agreement_data["agreement_raw"].apply(
+            lambda x: f"{x:.2f} with {data.get_country_display_name(country1)}"
+        )
 
         if agreement_data.empty:
             # Simulate neutral 0.5 value for all countries
             agreement_data = pd.DataFrame(
                 {
                     "three_letter_country": ["NAN"],
-                    "agreement": [0.5],
+                    "Country": ["No data for selected filters"],
+                    "agreement_raw": [0.5],
                 }
             )
 
-        agreement_data.columns = ["three_letter_country", "agreement"]
         # Make sure the agreement column is numeric, so we can apply the
         # continuous color scale
-        agreement_data[["agreement"]] = agreement_data[["agreement"]].apply(pd.to_numeric)
+        agreement_data[["agreement_raw"]] = agreement_data[["agreement_raw"]].apply(
+            pd.to_numeric
+        )
 
         fig = px.choropleth(
             agreement_data,
-            color="agreement",
+            color="agreement_raw",
             color_continuous_scale=px.colors.sequential.RdBu,
             range_color=[0, 1],
             locations="three_letter_country",
             projection="robinson",
-            labels={"agreement": ""},  # For consistency with legend in the subject tab
+            hover_name="Country",
+            hover_data={
+                "Agreement": True,
+                "three_letter_country": False,
+                "agreement_raw": False,
+            },
+            labels={
+                "agreement_raw": ""
+            },  # For consistency with legend in the subject tab
         )
 
         # Change default colour for missing-data countries
@@ -109,38 +129,43 @@ def register_callbacks(query_engine):
             coloraxis_colorbar=dict(
                 len=0.9,  # Reduce legend height
                 tickvals=[0, 0.25, 0.5, 0.75, 1.0],
-                ticktext=["0 (Always voting opposed)", "0.25", "0.5", "0.75", "1 (Always voting the same)"]
-            )
+                ticktext=[
+                    "0 (Always voting opposed)",
+                    "0.25",
+                    "0.5",
+                    "0.75",
+                    "1 (Always voting the same)",
+                ],
+            ),
         )
 
         # Status message
-        country1_name = get_country_name(country1)
-        status_msg = html.Div(
-            f"Showing agreement data for {len(agreement_data[['agreement']])} countries.",
-            style={"color": "#7f8c8d", "fontSize": "14px", "padding": "4px 0"},
-        )
+        country1_name = data.get_country_display_name(country1)
         # f"{country1_name} is highlighted in green.
-        note_msg = html.P([
-            html.Strong("Note: "),
-            f"The map shows the pairwise vote agreement between {country1_name} and all "
-            "other countries (UN member states). An agreement score of 1 (dark blue) means that two countries "
-            "voted the same on all General Assembly (GA) resolutions. A score of 0 (dark red) means that "
-            'two countries always voted in opposite ways ("yes" vs. "no"). '
-            "The data only covers GA resolutions "
-            "that were passed (accepted)."
-        ], style={
-            "maxWidth": "100%",
-            "margin": "0 0 0 0",
-            "paddingLeft": "2%",
-            "paddingTop": "10px",
-            "color": "#7f8c8d",
-            "fontSize": "16px",
-            "lineHeight": "1.6",
-            "textAlign": "left",
-            "borderTop": "1px solid #eee"
-        })
+        note_msg = html.P(
+            [
+                html.Strong("Note: "),
+                f"The map shows the pairwise vote agreement between {country1_name} and all "
+                "other countries (UN member states). An agreement score of 1 (dark blue) means that two countries "
+                "voted the same on all General Assembly (GA) resolutions. A score of 0 (dark red) means that "
+                'two countries always voted in opposite ways ("yes" vs. "no"). '
+                "The data only covers GA resolutions "
+                "that were passed (accepted).",
+            ],
+            style={
+                "maxWidth": "100%",
+                "margin": "0 0 0 0",
+                "paddingLeft": "2%",
+                "paddingTop": "10px",
+                "color": "#7f8c8d",
+                "fontSize": "16px",
+                "lineHeight": "1.6",
+                "textAlign": "left",
+                "borderTop": "1px solid #eee",
+            },
+        )
 
-        return fig, status_msg, note_msg
+        return fig, None, note_msg
 
 
 layout = [
