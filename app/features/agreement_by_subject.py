@@ -114,7 +114,36 @@ def calculate_agreement(query_engine, c1, c2, start_date, end_date, subject_list
 
 def register_callbacks(query_engine):
     """Register callbacks for the agreement by subject feature."""
-    
+
+    @callback(
+        Output("agreement-by-subject-country2-select", "options"),
+        Output("agreement-by-subject-country2-select", "value"),
+        Output("agreement-by-subject-country2-wrapper", "style"),
+        Input("filter-component-filter-store", "data"),
+        prevent_initial_call=False,
+    )
+    def update_country2_options(filter_params):
+        """Populate the comparison country picker from the filter store."""
+        hidden = {"display": "none"}
+        visible = {"display": "flex", "alignItems": "center", "gap": "8px", "marginBottom": "10px"}
+
+        if not filter_params:
+            return [], None, hidden
+
+        c2_input = filter_params.get("country2")
+        countries = []
+        if isinstance(c2_input, list):
+            countries = c2_input
+        elif isinstance(c2_input, str) and c2_input:
+            countries = [c2_input]
+
+        if not countries:
+            return [], None, hidden
+
+        options = [{"label": get_country_name(c), "value": c} for c in countries]
+        # Default to first country
+        return options, countries[0], visible
+
     @callback(
         [
             Output("agreement-by-subject-graph", "figure"),
@@ -124,25 +153,20 @@ def register_callbacks(query_engine):
         ],
         [
             Input("filter-component-filter-store", "data"),
+            Input("agreement-by-subject-country2-select", "value"),
         ],
         prevent_initial_call=False
     )
-    def update_subject_agreement(filter_params):
+    def update_subject_agreement(filter_params, selected_c2):
         """Update the agreement by subject visualization using global filters."""
         if not filter_params:
              return {}, {'display': 'none'}, None, ""
 
         c1 = filter_params.get("country1_alpha3")
-        c2_input = filter_params.get("country2")
         start_date = filter_params.get("start_date")
         end_date = filter_params.get("end_date")
 
-        # Handle Country 2 (take first if list)
-        c2 = None
-        if isinstance(c2_input, list) and len(c2_input) > 0:
-            c2 = c2_input[0]
-        elif isinstance(c2_input, str) and c2_input:
-            c2 = c2_input
+        c2 = selected_c2 or None
         
         if not c1 or not c2:
             msg = "Please select a comparison country in the sidebar settings." if c1 else "Please select a primary country."
@@ -238,6 +262,19 @@ def register_callbacks(query_engine):
 # Layout for the agreement by subject feature
 # TODO: Add an annotation (explanatory caption) similar to the map and timeline tabs
 layout = [
+    html.Div(
+        id="agreement-by-subject-country2-wrapper",
+        style={"display": "none"},
+        children=[
+            html.Span("Comparing with:", style={"whiteSpace": "nowrap", "fontSize": "14px", "color": "#555"}),
+            dcc.Dropdown(
+                id="agreement-by-subject-country2-select",
+                placeholder="Select comparison country…",
+                clearable=False,
+                style={"minWidth": "220px"},
+            ),
+        ],
+    ),
     html.Div(id="agreement-by-subject-status", style={"marginBottom": "10px", "marginTop": "10px", "color": "#666"}),
     dcc.Loading(
         id="agreement-by-subject-loading",
