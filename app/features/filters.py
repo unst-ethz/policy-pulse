@@ -214,6 +214,10 @@ def register_callbacks():
         start_year = data.get_earliest_year() if start_year is None else start_year
         end_year = data.get_latest_year() if end_year is None else end_year
 
+        # Strip the synthetic root node — selecting "All Subjects" means no filter
+        if isinstance(subject_ids, list):
+            subject_ids = [s for s in subject_ids if s != "__all_subjects__"] or None
+
         filter_data = {
             "start_date": f"{start_year}-01-01" if start_year else None,
             "end_date": f"{end_year}-12-31" if end_year else None,
@@ -226,17 +230,18 @@ def register_callbacks():
         }
 
         # Remove all None values for cleaner URL and easier parsing
-        url_filters = {
-            k: v
-            for k, v in filter_data.items()
-            if v is not None
-            # Exclude empty lists from URL params
-            and v != []
-            and (
-                # Exclude the date fields as they are derived from year fields
-                k != "start_date" and k != "end_date"
-            )
-        }
+        url_filters = {}
+        for k, v in filter_data.items():
+            if v is None or v == []:
+                continue
+            if k in ("start_date", "end_date"):
+                continue
+            # Strip synthetic UI-only sentinel values from URL
+            if k == "subject_ids" and isinstance(v, list):
+                v = [s for s in v if not s.startswith("__")]
+                if not v:
+                    continue
+            url_filters[k] = v
 
         # Print current selections
         print("\n" + "=" * 50)
@@ -717,17 +722,20 @@ def layout(page_query_params: dict[str, str] | None = None):
                                             ),
                                         ]
                                     ),
-                                    dcc.Dropdown(
+                                    fac.AntdTreeSelect(
                                         id=ids["subject_dropdown"],
-                                        options=data.available_subjects(),
+                                        treeData=data.SUBJECT_TREE_DATA,
+                                        treeCheckable=True,
+                                        showCheckedStrategy="show-parent",
+                                        treeNodeFilterProp="title",
+                                        placeholder="Search or browse subjects...",
+                                        allowClear=True,
+                                        multiple=True,
+                                        treeDefaultExpandAll=False,
+                                        treeLine=True,
+                                        style={"width": "100%"},
+                                        locale="en-us",
                                         value=initial_filters["subject_ids"],
-                                        multi=True,
-                                        placeholder="Select one or more subjects...",
-                                        style={
-                                            "width": "100%",
-                                            "fontSize": "14px",
-                                        },
-                                        searchable=True,
                                     ),
                                 ],
                                 style={

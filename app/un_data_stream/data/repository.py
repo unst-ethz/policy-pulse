@@ -70,6 +70,7 @@ class DataRepository:
             'resolution_subject': self.resolution_subject_table,
             'subject': self.subject_table,
             'closure': self.closure_table,
+            'broader': self.broader_table,
             'agreement_matrices': self.agreement_matrices,
             'country_columns': self.country_columns
         }
@@ -168,6 +169,7 @@ class DataRepository:
             'resolution_subject_table.csv',
             'subject_table.csv',
             'closure_table.csv',
+            'broader_table.csv',
             'agreement_matrices.pkl'
         ]
         all_exist = all((data_path / file).exists() for file in required_files)
@@ -218,6 +220,7 @@ class DataRepository:
         self.resolution_subject_table = pd.read_csv(data_path / 'resolution_subject_table.csv')
         self.subject_table = pd.read_csv(data_path / 'subject_table.csv')
         self.closure_table = pd.read_csv(data_path / 'closure_table.csv')
+        self.broader_table = pd.read_csv(data_path / 'broader_table.csv')
         self.logger.info("Cached data loaded successfully.")
 
         # Load agreement matrices
@@ -237,6 +240,7 @@ class DataRepository:
         self.resolution_subject_table.to_csv(data_path / 'resolution_subject_table.csv', index=False)
         self.subject_table.to_csv(data_path / 'subject_table.csv', index=False)
         self.closure_table.to_csv(data_path / 'closure_table.csv', index=False)
+        self.broader_table.to_csv(data_path / 'broader_table.csv', index=False)
 
         with open(data_path / 'agreement_matrices.pkl', 'wb') as f:
             agreement_data = {
@@ -270,6 +274,7 @@ class DataRepository:
         thesaurus_tables = processor.process_thesaurus(thesaurus_graph)
         self.subject_table = thesaurus_tables.get('subject_table', pd.DataFrame())
         self.closure_table = thesaurus_tables.get('closure_table', pd.DataFrame())
+        self.broader_table = thesaurus_tables.get('broader_table', pd.DataFrame())
         
         # Process individual resolution datasets
         processed_datasets = processor.process_resolutions(resolutions_raw, subject_table=self.subject_table)
@@ -297,6 +302,7 @@ class DataRepository:
         expanded_subjects = list(expanded_subjects)
         self.subject_table = self.subject_table[self.subject_table['subject_id'].isin(expanded_subjects)]
         self.closure_table = self.closure_table[self.closure_table['ancestor_id'].isin(expanded_subjects)]
+        self.broader_table = self.broader_table[self.broader_table['parent_id'].isin(expanded_subjects)]
 
 
         # Save processed data

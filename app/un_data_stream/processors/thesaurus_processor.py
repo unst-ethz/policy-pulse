@@ -22,22 +22,26 @@ class ThesaurusProcessor:
         self.logger = logger
     
     def process(self, thesaurus_graph) -> Dict[str, pd.DataFrame]:
-        """Process thesaurus into subject and closure tables."""
-        
+        """Process thesaurus into subject, closure, and broader tables."""
+
         self.logger.info("Processing thesaurus data")
-        
+
         # Extract subjects data with multilingual labels
         subjects_data = self._extract_subjects_data(thesaurus_graph)
-        
+
         # Create subjects table
         subject_table = self._create_subjects_table(subjects_data)
-        
-        # Create closure table for hierarchical relationships
+
+        # Create closure table for hierarchical queries
         closure_table = self._create_closure_table(thesaurus_graph)
-        
+
+        # Create broader table: direct parent->child pairs only, for tree navigation
+        broader_table = self._create_broader_table(thesaurus_graph)
+
         return {
             "subject_table": subject_table,
-            "closure_table": closure_table
+            "closure_table": closure_table,
+            "broader_table": broader_table,
         }
     
     def _extract_subjects_data(self, g) -> Dict[str, Dict[str, Any]]:
@@ -249,3 +253,37 @@ class ThesaurusProcessor:
         #         self.logger.info(f"  Depth {depth}: {count:,} relationships")
         
         return closure_df
+
+    def _create_broader_table(self, g) -> pd.DataFrame:
+        """
+        Extract direct parent-child pairs from the thesaurus for tree navigation.
+
+        Uses only SKOS.broader (child declares its parent) and
+        SKOS.hasTopConcept (scheme declares its top-level children).
+        No transitive expansion — one row per direct edge only.
+
+        Returns:
+            pd.DataFrame with columns:
+                - parent_id (str): URI of the parent concept or scheme
+                - child_id  (str): URI of the child concept
+        """
+        rows = []
+        seen = set()
+
+        def add(parent: str, child: str):
+            pair = (parent, child)
+            if pair not in seen:
+                seen.add(pair)
+                rows.append({"parent_id": parent, "child_id": child})
+
+        # SKOS.broader: the subject of the triple is the child
+        for child, parent in g.subject_objects(SKOS.broader):
+            add(str(parent), str(child))
+
+        # SKOS.hasTopConcept: the subject is the scheme (parent)
+        for scheme in g.subjects(RDF.type, SKOS.ConceptScheme):
+            for top_concept in g.objects(scheme, SKOS.hasTopConcept):
+                add(str(scheme), str(top_concept))
+
+        self.logger.info(f"Broader table: {len(rows)} direct parent-child pairs")
+        return pd.DataFrame(rows, columns=["parent_id", "child_id"])

@@ -60,31 +60,38 @@ class ResolutionQueryEngine:
         
         # 2. Apply subject filters
         if subject_ids is not None and len(subject_ids) > 0:
-            if include_descendants:
-                # Expand subject_ids to include all descendants
-                expanded_subjects = set(subject_ids)
-                
-                for subject_id in subject_ids:
-                    # Find all descendants of this subject
-                    descendants = self.closure_table[
-                        self.closure_table['ancestor_id'] == subject_id
-                    ]['descendant_id'].unique()
-                    expanded_subjects.update(descendants)
-                
-                self.logger.info(f"Expanded {len(subject_ids)} subjects to {len(expanded_subjects)} (including descendants)")
-                subject_filter = list(expanded_subjects)
-            else:
-                subject_filter = subject_ids
-            
-            # Find resolutions with these subjects
-            matching_resolution_ids = self.resolution_subject_table[
-                self.resolution_subject_table['subject_id'].isin(subject_filter)
-            ]['undl_id'].unique()
-            
-            # Filter resolutions
-            filtered_df = filtered_df[
-                filtered_df['undl_id'].isin(matching_resolution_ids)
-            ]
+            # Separate the synthetic "no subject" sentinel from real subject IDs
+            include_no_subject = "__no_subject__" in subject_ids
+            real_subject_ids = [s for s in subject_ids if s != "__no_subject__" and s != "__all_subjects__"]
+
+            matching_ids = set()
+
+            if include_no_subject:
+                # Resolutions that have no entry in the subject table at all
+                all_with_subject = set(self.resolution_subject_table["undl_id"].unique())
+                no_subject_ids = set(filtered_df["undl_id"].unique()) - all_with_subject
+                matching_ids.update(no_subject_ids)
+                self.logger.info(f"No-subject resolutions: {len(no_subject_ids)}")
+
+            if real_subject_ids:
+                if include_descendants:
+                    expanded_subjects = set(real_subject_ids)
+                    for subject_id in real_subject_ids:
+                        descendants = self.closure_table[
+                            self.closure_table['ancestor_id'] == subject_id
+                        ]['descendant_id'].unique()
+                        expanded_subjects.update(descendants)
+                    self.logger.info(f"Expanded {len(real_subject_ids)} subjects to {len(expanded_subjects)} (including descendants)")
+                    subject_filter = list(expanded_subjects)
+                else:
+                    subject_filter = real_subject_ids
+
+                subject_resolution_ids = self.resolution_subject_table[
+                    self.resolution_subject_table['subject_id'].isin(subject_filter)
+                ]['undl_id'].unique()
+                matching_ids.update(subject_resolution_ids)
+
+            filtered_df = filtered_df[filtered_df['undl_id'].isin(matching_ids)]
             self.logger.info(f"After subject filter: {len(filtered_df)} resolutions")
         
         self.logger.info(f"Final result: {len(filtered_df)} resolutions")

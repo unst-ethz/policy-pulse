@@ -251,6 +251,79 @@ def available_subjects() -> list[dict[str, Any]]:
     return subject_options
 
 
+def get_subject_tree_data() -> list[dict]:
+    """Build nested treeData for AntdTreeSelect from the thesaurus hierarchy.
+
+    Uses the broader_table (direct SKOS.broader / hasTopConcept pairs only),
+    not the closure_table, so the source reflects the actual declared hierarchy.
+    A globally-visited set ensures each node appears exactly once even if the
+    source data contains cycles.
+    """
+    _data = repo.get_data()
+    subject_df = _data["subject"]
+    broader_df = _data["broader"]
+
+    # Build label lookup (subject_id -> English label)
+    label_map: dict[str, str] = {
+        row["subject_id"]: row["label_en"]
+        for _, row in subject_df.iterrows()
+        if row.get("label_en") and isinstance(row.get("label_en"), str)
+    }
+
+    valid_subjects = set(subject_df["subject_id"].tolist())
+
+    # Build direct parent -> children map from the broader table
+    direct_children: dict[str, list[str]] = {}
+    for _, row in broader_df.iterrows():
+        direct_children.setdefault(row["parent_id"], []).append(row["child_id"])
+
+    # Global visited set: each node is placed in the tree exactly once.
+    # This naturally breaks any cycles present in the source SKOS data.
+    visited: set[str] = set()
+
+    def build_node(subject_id: str) -> dict | None:
+        if subject_id in visited:
+            return None
+        label = label_map.get(subject_id)
+        if not label:
+            return None
+        visited.add(subject_id)
+        node: dict = {"key": subject_id, "title": label, "value": subject_id}
+        children_ids = direct_children.get(subject_id, [])
+        children = []
+        for child_id in sorted(children_ids, key=lambda x: label_map.get(x, "")):
+            if child_id not in visited and child_id in valid_subjects:
+                child_node = build_node(child_id)
+                if child_node:
+                    children.append(child_node)
+        if children:
+            node["children"] = children
+        return node
+
+    scheme_nodes = []
+    for scheme_id in sorted(TOP_LEVEL_SUBJECTS, key=lambda x: label_map.get(x, "")):
+        node = build_node(scheme_id)
+        if node:
+            scheme_nodes.append(node)
+
+    no_subject_node = {
+        "key": "__no_subject__",
+        "title": "No Subject",
+        "value": "__no_subject__",
+    }
+
+    root = {
+        "key": "__all_subjects__",
+        "title": "All Subjects",
+        "value": "__all_subjects__",
+        "children": [no_subject_node] + scheme_nodes,
+    }
+    return [root]
+
+
+SUBJECT_TREE_DATA = get_subject_tree_data()
+
+
 def get_earliest_data_date():
     # 1946-01-26
     data = repo.get_data()
