@@ -148,6 +148,7 @@ def _get_wordcloud_layout(word_freq_dict, seed=42):
     try:
         # Create WordCloud object with appropriate settings
         # Use a larger canvas with 2:1 aspect ratio (width:height)
+        # width, height = 1600, 900
         width, height = 1200, 800
 
         wordcloud = WordCloud(
@@ -331,6 +332,7 @@ def _build_wordcloud(filtered_data_json: str):
 
         # WordCloud canvas dimensions (from _get_wordcloud_layout)
         wc_width, wc_height = 1200, 800
+        # wc_width, wc_height = 1600, 900
 
         for word in words:
             word_key = word
@@ -364,7 +366,8 @@ def _build_wordcloud(filtered_data_json: str):
         colors = _get_viridis_colors(freqs)
 
         hover_text = [
-            f"<b>{w}</b><br>Appears in {f} resolutions" for w, f in zip(words, freqs)
+            f"Click to see resolutions containing <b>{word}</b>" for word in words
+            # f"<b>{w}</b><br>Appears in {f} resolutions" for w, f in zip(words, freqs)
         ]
 
         # Calculate hover marker positions centered on words
@@ -376,13 +379,14 @@ def _build_wordcloud(filtered_data_json: str):
 
         # WordCloud canvas dimensions for coordinate conversion
         wc_width, wc_height = 1200, 800
+        # wc_width, wc_height = 1600, 900
         coord_range_x = 2.2  # from -1.1 to 1.1
         coord_range_y = 2.2
 
         for word, size, x_pos, y_pos in zip(words, sizes, x_positions, y_positions):
             # Estimate word dimensions in pixels
             # Character width factor ~0.6, line height factor ~1.2
-            word_width_px = size * len(word) * 0.6
+            word_width_px = size * len(word) * 0.8
             word_height_px = size * 1
 
             # Convert pixel shifts to normalized coordinates
@@ -499,7 +503,8 @@ def register_callbacks():
             if "undl_id" not in df.columns:
                 return "No data available."
             word_freq = _aggregate_word_freq(df["undl_id"])
-            return f"Total resolutions: {len(df):,}"  # • Unique words: {len(word_freq)}
+            return f""  # • Unique words: {len(word_freq)}
+            # return f"Total accepted resolutions: {len(df):,}"  # • Unique words: {len(word_freq)}
         except Exception as e:
             return f"Error: {str(e)}"
 
@@ -695,13 +700,31 @@ layout = (
                     "marginBottom": "8px",
                 },
             ),
+            # html.Div(
+            #     "Use the camera icon (top-right) to download PNG",
+            #     style={
+            #         "textAlign": "center",
+            #         "fontSize": "13px",
+            #         "color": "#6b7280",
+            #         "marginBottom": "10px",
+            #     },
+            # ),
             # Word cloud chart
             dcc.Loading(
                 children=[
                     dcc.Graph(
                         id="wordcloud-interactive-chart",
                         style={"height": "800px"},
-                        config={"displayModeBar": False},
+                        config={
+                            "displayModeBar": True,
+                            "toImageButtonOptions": {
+                                "format": "png",
+                                "filename": "wordcloud",
+                                "height": 1000,
+                                "width": 1800,
+                                "scale": 2,
+                            },
+                        },
                     )
                 ],
                 type="cube",
@@ -711,7 +734,7 @@ layout = (
             html.Div(
                 [
                     html.Label(
-                        "Resolutions for hovered word:",
+                        "Accepted resolutions for hovered word:",
                         style={
                             "fontWeight": "bold",
                             "marginBottom": "10px",

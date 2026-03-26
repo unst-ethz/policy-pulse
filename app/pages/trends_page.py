@@ -127,8 +127,8 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                                 [
                                     html.H2("Resolution Title Word Cloud"),
                                     html.P(
-                                        "Visualises the most frequent words appearing in UN resolution titles for the selected filters. "
-                                        "Larger words appear more often. Hover over a word to see how many resolutions contain it.",
+                                        "Display the most frequently occurring words or phrases in UN accepted resolution titles based on the selected filters. More frequent terms appear in larger sizes and darker colors. Hover over a term and click it to see how many resolutions include it, along with the corresponding resolutions. This provides users with a high-level overview of the domains the resolutions focus on.",
+                                        # "Larger words appear more often. Hover over a word and click on it to see how many resolutions contain it and corresponding resolutions.",
                                         style={
                                             "color": "#7f8c8d",
                                             "marginBottom": "20px",

@@ -171,7 +171,7 @@ layout = [
                     ),
                     html.Div(id="rl-results-list"),
                     html.Button(
-                        "Load More Resolutions",
+                        "Load More Accepted Resolutions",
                         id="rl-load-more-btn",
                         n_clicks=0,
                         style={
