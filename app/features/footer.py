@@ -7,7 +7,7 @@ layout = html.Footer(
                 [
                     html.Span("UN-ETH Policy Pulse", className="footer-title"),
                     html.Span(
-                        "A student project within the United Nations Student Team at ETH Zürich",
+                        "A student project within the United Nations Student Team at ETH Zürich, in collaboration with the UN Dag Hammarskjöld Library.",
                         className="footer-subtitle",
                     ),
                 ],
