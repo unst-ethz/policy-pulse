@@ -540,6 +540,7 @@ def layout(page_query_params: dict[str, str] | None = None):
                                         treeLine=True,
                                         style={"width": "100%"},
                                         locale="en-us",
+                                        value=initial_filters["country2"],
                                     ),
                                 ],
                                 style={"flex": "1"},
