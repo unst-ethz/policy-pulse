@@ -7,7 +7,8 @@ layout = html.Footer(
                 [
                     html.Span("UN-ETH Policy Pulse", className="footer-title"),
                     html.Span(
-                        "A student project within the United Nations Student Team at ETH Zürich, in collaboration with the UN Dag Hammarskjöld Library.",
+                        "A volunteer project of the United Nations Student Team at ETH Zürich, "
+                        "in collaboration with the UN Dag Hammarskjöld Library.",
                         className="footer-subtitle",
                     ),
                 ],
@@ -20,12 +21,12 @@ layout = html.Footer(
                         href="https://ethz.ch",
                     ),
                     html.A(
-                        "United Nations Student Team",
+                        "UN-ETH Student Team",
                         href="https://un-eth.ethz.ch/exchanges/un-eth-student-team.html",
                     ),
                     html.A(
-                        "UN-ETH Partnership",
-                        href="https://un-eth.ethz.ch/",
+                        "Dag Hammarskjöld Library",
+                        href="https://www.un.org/en/library",
                     ),
                 ],
                 className="footer-column",
