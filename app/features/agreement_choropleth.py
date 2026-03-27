@@ -145,12 +145,12 @@ def register_callbacks(query_engine):
         note_msg = html.P(
             [
                 html.Strong("Details: "),
-                f"The map shows the pairwise vote agreement between {country1_name} and all "
+                f"The map shows the pairwise vote agreement between {country1_name} and "
                 "other countries (UN member states). An agreement score of 1 (dark blue) means that two countries "
                 "voted the same on all General Assembly (GA) resolutions. A score of 0 (dark red) means that "
-                'two countries always voted in opposite ways ("yes" vs. "no"). '
-                "The data only covers GA resolutions "
-                "that were passed (accepted).",
+                'two countries always voted in opposite ways ("yes" vs. "no"). The data only covers GA resolutions '
+                "that were passed (accepted). The map provides a simplified global overview and some smaller " 
+                "nations and territories are currently not shown."
             ],
             style={
                 "maxWidth": "100%",

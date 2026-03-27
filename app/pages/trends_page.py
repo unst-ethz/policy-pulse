@@ -44,7 +44,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
             dcc.Store(id="country1-localised-name"),
             html.H1(
                 [
-                    "Explore GA Votes yourself",
+                    "Explore GA Votes Yourself",
                 ]
             ),
             filters.layout(other_keyword_arguments),

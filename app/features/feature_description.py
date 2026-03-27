@@ -3,11 +3,10 @@ from dash import html
 layout = html.Div(
     [
         html.P(
-            "The Policy Pulse platform is built by the United Nations Student Team (UNST) at ETH Zürich — "
-            "a student-run initiative that bridges STEM fields and international policy — "
-            "in collaboration with the UN Digital Library (DHL). "
-            "Our goal is to make UN voting data accessible to delegates, students, researchers, and anyone with an interest in international relations, "
-            "with a low barrier to entry regardless of technical background. "
+            "The Policy Pulse platform is built by volunteers of the United Nations Student Team (UNST) at ETH Zürich — "
+            "a student-run initiative that bridges STEM fields and international policy. In a collaboration with "
+            "the UN Digital Library (UNDL), we aim to make UN voting data more easily accessible, lowering barriers "
+            "to entry for delegates, students, researchers, and anyone with an interest in international relations."
         ),
         html.Div(
             [
