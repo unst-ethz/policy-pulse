@@ -68,7 +68,7 @@ layout = html.Div(
         html.H2(html.Span("About the platform"), className="section-title"),
         feature_description.layout,
         html.H2(
-            html.Span("Case Study: How has Switzerland voted at the UN?"),
+            html.Span("Case Studies: How can you use the platform?"),
             id="case-study",
             className="section-title",
         ),
