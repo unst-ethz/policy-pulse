@@ -263,7 +263,7 @@ def register_callbacks():
                     "alignItems": "center",
                 }
         elif len(comparison_countries) > 1:
-            multi_msg = f"Comparing against top 5 of {len(comparison_countries)} selected countries. Agreement filter disabled for multi-select."
+            multi_msg = f"Comparing against {len(comparison_countries)} selected countries. Agreement filter disabled for multi-select."
             multi_msg_style = {"display": "block", "marginBottom": "10px"}
         elif country1:
             # Show vote filter only when main country is selected with no comparison countries
@@ -404,8 +404,8 @@ def register_callbacks():
                     create_vote_indicator(data.get_country_name(country1), c1_vote)
                 )
 
-            # Comparators (Force limit to 5 to avoid UI clutter)
-            for c2 in comparison_countries[:5]:
+            # Comparators (all selected countries)
+            for c2 in comparison_countries:
                 if c2 in row:
                     indicators.append(
                         create_vote_indicator(data.get_country_name(c2), row.get(c2))
@@ -415,37 +415,35 @@ def register_callbacks():
                 [
                     html.Div(
                         [
-                            html.A(
-                                html.Span(
-                                    f"{res_id}",
-                                    style={"color": "#007bff", "fontWeight": "bold"},
-                                ),
-                                href=link,
-                                target="_blank",
-                                style={"textDecoration": "none"},
+                            html.Div(
+                                [
+                                    html.A(
+                                        html.Span(
+                                            f"{res_id}",
+                                            style={"color": "#007bff", "fontWeight": "bold"},
+                                        ),
+                                        href=link,
+                                        target="_blank",
+                                        style={"textDecoration": "none"},
+                                    ),
+                                    html.Span(
+                                        date_str,
+                                        style={
+                                            "color": "#666",
+                                            "fontSize": "0.9em",
+                                            "marginLeft": "12px",
+                                        },
+                                    ),
+                                ],
+                                style={"marginBottom": "0.5rem"},
                             ),
-                            html.Span(
-                                date_str,
-                                style={
-                                    "float": "right",
-                                    "color": "#666",
-                                    "fontSize": "0.9em",
-                                },
-                            ),
+                            html.Div(title),
                         ],
-                        style={"marginBottom": "0.5rem"},
+                        className="resolution-card-main",
                     ),
-                    html.Div(title),
                     html.Div(
-                        indicators,
-                        style={
-                            "marginTop": "10px",
-                            "paddingTop": "10px",
-                            "borderTop": "1px solid #eee",
-                            "display": "flex",
-                            "flexWrap": "wrap",
-                            "gap": "5px",
-                        },
+                        [html.Div(ind, className="voting-list-row") for ind in indicators],
+                        className="voting-list",
                     )
                     if indicators
                     else None,
