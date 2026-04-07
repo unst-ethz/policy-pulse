@@ -1,7 +1,8 @@
 import os
+import re
 from collections import Counter
 from io import StringIO
-from dash import Input, Output, State, callback, html, dcc
+from dash import Input, Output, State, callback, html, dcc, no_update
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 import pandas as pd
@@ -16,14 +17,23 @@ from .. import data
 from .resolution_list import create_vote_indicator
 
 # Initialize word cloud data on module load
-_resolution_wc_data = {}
-_wc_word_undlid_map = {}
+_resolution_wc_data_by_mode = {}
+_wc_word_undlid_map_by_mode = {}
+_category_term_to_subject_ids = {}
 _initialized = False
+_DEFAULT_MODE = "default"
+_WORDCLOUD_MODES = {
+    "default": {"label": "Default", "source": "undlid_keywords.csv:keywords"},
+    "geopolitical": {"label": "Geopolitical", "source": "undlid_keywords_3d_noun_fixed.csv:Geopolitical"},
+    "thematic": {"label": "Thematic", "source": "undlid_keywords_3d_noun_fixed.csv:Thematic"},
+    "action": {"label": "Action", "source": "undlid_keywords_3d_noun_fixed.csv:Action"},
+    "category": {"label": "Category", "source": "query_resolutions():subjects"},
+}
 
 
 def _init_wc_data():
     """Initialize word cloud data from keywords CSV file."""
-    global _resolution_wc_data, _wc_word_undlid_map, _initialized
+    global _resolution_wc_data_by_mode, _wc_word_undlid_map_by_mode, _category_term_to_subject_ids, _initialized
 
     if _initialized:
         return
@@ -33,53 +43,184 @@ def _init_wc_data():
     # Find the keywords CSV file in the app/assets directory
     # Get app directory (parent of features directory)
     app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    keywords_path = os.path.join(app_dir, "assets", "undlid_keywords.csv")
-
-    if not os.path.exists(keywords_path):
-        print(f"Warning: Keywords file not found at {keywords_path}")
-        _initialized = True
-        return
-
     try:
-        keywords_df = pd.read_csv(keywords_path)
-        data_all = pd.merge(
-            data.query_engine.query_resolutions(), keywords_df, on="undl_id", how="left"
+        base_keywords_path = os.path.join(app_dir, "assets", "undlid_keywords.csv")
+        three_d_keywords_path = os.path.join(
+            app_dir, "assets", "undlid_keywords_3d_noun_fixed.csv"
         )
-
+        resolutions_df = data.query_engine.query_resolutions()
         ignore_words = ["resolution", "general assembly"]
+        split_pattern_general = re.compile(r"[;,]")
+        # Subject/category values may be delimited by "|", "--", or ";".
+        split_pattern_subject = re.compile(r"\||--|;")
 
-        resolution_wc_data = {}
-        wc_word_undlid_map = {}
+        def build_indices(
+            data_all: pd.DataFrame,
+            keyword_col: str,
+            split_pattern: re.Pattern,
+            ignore_terms: list[str] | None = None,
+        ):
+            resolution_wc_data = {}
+            wc_word_undlid_map = {}
+            ignore_set = set(ignore_terms or [])
 
-        for undl_id, keywords in data_all[["undl_id", "keywords"]].values:
-            if pd.isna(keywords):
-                continue
-
-            word_in_resolution = Counter()
-            tokens_set = set()
-
-            for keyword in str(keywords).split(","):
-                keyword_clean = keyword.strip().lower()
-                if keyword_clean in ignore_words:
+            for undl_id, keywords in data_all[["undl_id", keyword_col]].values:
+                if pd.isna(keywords):
                     continue
-                if keyword_clean:
-                    tokens_set.add(keyword_clean)
 
-            for token in tokens_set:
-                word_in_resolution[token] += 1
-                if token not in wc_word_undlid_map:
-                    wc_word_undlid_map[token] = []
-                wc_word_undlid_map[token].append(undl_id)
+                word_in_resolution = Counter()
+                tokens_set = set()
 
-            resolution_wc_data[undl_id] = {"word_freq": dict(word_in_resolution)}
+                for keyword in split_pattern.split(str(keywords)):
+                    keyword_clean = re.sub(r"\s+", " ", keyword.strip().lower())
+                    if keyword_clean in ignore_set:
+                        continue
+                    if keyword_clean:
+                        tokens_set.add(keyword_clean)
 
-        _resolution_wc_data = resolution_wc_data
-        _wc_word_undlid_map = wc_word_undlid_map
+                for token in tokens_set:
+                    word_in_resolution[token] += 1
+                    if token not in wc_word_undlid_map:
+                        wc_word_undlid_map[token] = []
+                    wc_word_undlid_map[token].append(undl_id)
+
+                resolution_wc_data[undl_id] = {"word_freq": dict(word_in_resolution)}
+
+            return resolution_wc_data, wc_word_undlid_map
+
+        resolution_wc_data_by_mode = {}
+        wc_word_undlid_map_by_mode = {}
+        category_term_to_subject_ids = {}
+
+        if os.path.exists(base_keywords_path):
+            base_keywords_df = pd.read_csv(base_keywords_path)
+            base_data_all = pd.merge(
+                resolutions_df, base_keywords_df, on="undl_id", how="left"
+            )
+            (
+                resolution_wc_data_by_mode["default"],
+                wc_word_undlid_map_by_mode["default"],
+            ) = build_indices(
+                base_data_all,
+                "keywords",
+                split_pattern_general,
+                ignore_words,
+            )
+        else:
+            print(f"Warning: Keywords file not found at {base_keywords_path}")
+            resolution_wc_data_by_mode["default"] = {}
+            wc_word_undlid_map_by_mode["default"] = {}
+
+        if os.path.exists(three_d_keywords_path):
+            three_d_df = pd.read_csv(three_d_keywords_path)
+            three_d_df = three_d_df.rename(columns={"Original_ID": "undl_id"})
+            three_d_data_all = pd.merge(
+                resolutions_df, three_d_df, on="undl_id", how="left"
+            )
+            for mode_key, column_name in [
+                ("geopolitical", "Geopolitical"),
+                ("thematic", "Thematic"),
+                ("action", "Action"),
+            ]:
+                if column_name not in three_d_data_all.columns:
+                    print(f"Warning: Column '{column_name}' not found in 3D keywords CSV.")
+                    resolution_wc_data_by_mode[mode_key] = {}
+                    wc_word_undlid_map_by_mode[mode_key] = {}
+                    continue
+                (
+                    resolution_wc_data_by_mode[mode_key],
+                    wc_word_undlid_map_by_mode[mode_key],
+                ) = build_indices(
+                    three_d_data_all,
+                    column_name,
+                    split_pattern_general,
+                    ignore_words,
+                )
+        else:
+            print(f"Warning: 3D keywords file not found at {three_d_keywords_path}")
+            for mode_key in ["geopolitical", "thematic", "action"]:
+                resolution_wc_data_by_mode[mode_key] = {}
+                wc_word_undlid_map_by_mode[mode_key] = {}
+
+        resolution_subject_df = getattr(
+            data.query_engine, "resolution_subject_table", pd.DataFrame()
+        ).copy()
+        subject_df = getattr(data.query_engine, "subject_table", pd.DataFrame()).copy()
+        if (
+            not resolution_subject_df.empty
+            and "undl_id" in resolution_subject_df.columns
+            and "subject_id" in resolution_subject_df.columns
+            and not subject_df.empty
+            and "subject_id" in subject_df.columns
+        ):
+            subject_label_col = (
+                "label_en" if "label_en" in subject_df.columns else None
+            )
+            if subject_label_col is None:
+                print("Warning: subject_table has no 'label_en' column; using subject_id.")
+                subject_df["label_en"] = subject_df["subject_id"]
+                subject_label_col = "label_en"
+
+            subject_lookup = (
+                subject_df[["subject_id", subject_label_col]]
+                .dropna(subset=["subject_id"])
+                .drop_duplicates(subset=["subject_id"])
+                .set_index("subject_id")[subject_label_col]
+                .to_dict()
+            )
+            for subject_id, label in subject_lookup.items():
+                key = re.sub(r"\s+", " ", str(label).strip().lower())
+                if key:
+                    category_term_to_subject_ids.setdefault(key, []).append(subject_id)
+            resolution_subject_df["category_term"] = resolution_subject_df[
+                "subject_id"
+            ].map(subject_lookup)
+            resolution_subject_df["category_term"] = (
+                resolution_subject_df["category_term"]
+                .fillna(resolution_subject_df["subject_id"])
+                .astype(str)
+            )
+
+            category_terms_by_resolution = (
+                resolution_subject_df.groupby("undl_id")["category_term"]
+                .apply(lambda s: "; ".join(sorted(set(s))))
+                .reset_index(name="category_terms")
+            )
+            category_data_all = pd.merge(
+                resolutions_df,
+                category_terms_by_resolution,
+                on="undl_id",
+                how="left",
+            )
+
+            (
+                resolution_wc_data_by_mode["category"],
+                wc_word_undlid_map_by_mode["category"],
+            ) = build_indices(
+                category_data_all,
+                "category_terms",
+                split_pattern_subject,
+                [],
+            )
+        else:
+            print(
+                "Warning: category word cloud data unavailable "
+                "(need resolution_subject_table and subject_table)."
+            )
+            resolution_wc_data_by_mode["category"] = {}
+            wc_word_undlid_map_by_mode["category"] = {}
+
+        _resolution_wc_data_by_mode = resolution_wc_data_by_mode
+        _wc_word_undlid_map_by_mode = wc_word_undlid_map_by_mode
+        _category_term_to_subject_ids = category_term_to_subject_ids
         _initialized = True
 
-        print(
-            f"✅ Word cloud data initialized: {len(resolution_wc_data)} resolutions, {len(wc_word_undlid_map)} unique words"
-        )
+        for mode_key in _WORDCLOUD_MODES:
+            mode_words = len(_wc_word_undlid_map_by_mode.get(mode_key, {}))
+            mode_resolutions = len(_resolution_wc_data_by_mode.get(mode_key, {}))
+            print(
+                f"✅ Word cloud mode '{mode_key}' initialized: {mode_resolutions} resolutions, {mode_words} unique words"
+            )
 
     except Exception as e:
         print(f"❌ Error initializing word cloud data: {e}")
@@ -89,27 +230,31 @@ def _init_wc_data():
         _initialized = True
 
 
-def _aggregate_word_freq(undl_ids: pd.Series) -> dict:
+def _aggregate_word_freq(undl_ids: pd.Series, mode: str = _DEFAULT_MODE) -> dict:
     """Combine word frequencies across given resolution IDs."""
     agg_counter = Counter()
+    wc_data = _resolution_wc_data_by_mode.get(mode, {})
     for undl_id in undl_ids.values:
-        if undl_id in _resolution_wc_data:
-            agg_counter.update(_resolution_wc_data[undl_id]["word_freq"])
+        if undl_id in wc_data:
+            agg_counter.update(wc_data[undl_id]["word_freq"])
     return dict(agg_counter)
 
 
-def _aggregate_word_undlids_map(word_list: list[str], undl_ids: pd.Series) -> dict:
+def _aggregate_word_undlids_map(
+    word_list: list[str], undl_ids: pd.Series, mode: str = _DEFAULT_MODE
+) -> dict:
     """Map words to resolution IDs that contain them."""
     agg_map = {}
+    word_map = _wc_word_undlid_map_by_mode.get(mode, {})
     for word in word_list:
         agg_map[word] = []
-        if word in _wc_word_undlid_map:
-            matching_ids = undl_ids[undl_ids.isin(_wc_word_undlid_map[word])].values
+        if word in word_map:
+            matching_ids = undl_ids[undl_ids.isin(word_map[word])].values
             agg_map[word].extend(matching_ids)
     return agg_map
 
 
-def search_keywords(token: str, score_cutoff: int = 80) -> set:
+def search_keywords(token: str, score_cutoff: int = 80, mode: str = _DEFAULT_MODE) -> set:
     """Return the set of undl_ids whose keywords match token (exact substring + fuzzy).
 
     Requires _init_wc_data() to have been called first.
@@ -122,12 +267,13 @@ def search_keywords(token: str, score_cutoff: int = 80) -> set:
     if not token_lower:
         return matched_ids
 
-    all_keys = list(_wc_word_undlid_map.keys())
+    word_map = _wc_word_undlid_map_by_mode.get(mode, {})
+    all_keys = list(word_map.keys())
 
     # Exact / substring matches first
     exact_matches = [k for k in all_keys if token_lower in k]
     for k in exact_matches:
-        matched_ids.update(_wc_word_undlid_map[k])
+        matched_ids.update(word_map[k])
 
     # Fuzzy matches
     if all_keys:
@@ -135,7 +281,7 @@ def search_keywords(token: str, score_cutoff: int = 80) -> set:
             token_lower, all_keys, score_cutoff=score_cutoff, limit=20
         )
         for match_key, _score, _idx in fuzzy_results:
-            matched_ids.update(_wc_word_undlid_map[match_key])
+            matched_ids.update(word_map[match_key])
 
     return matched_ids
 
@@ -233,7 +379,7 @@ def _get_viridis_colors(frequencies):
     return colors
 
 
-def _build_wordcloud(filtered_data_json: str):
+def _build_wordcloud(filtered_data_json: str, mode: str = _DEFAULT_MODE):
     """Build word cloud figure from filtered data."""
     if not filtered_data_json:
         return go.Figure().add_annotation(
@@ -269,7 +415,7 @@ def _build_wordcloud(filtered_data_json: str):
             )
 
         # Get word frequencies for filtered resolutions
-        word_freq = _aggregate_word_freq(df["undl_id"])
+        word_freq = _aggregate_word_freq(df["undl_id"], mode=mode)
 
         if not word_freq:
             return go.Figure().add_annotation(
@@ -472,8 +618,9 @@ def register_callbacks():
     @callback(
         Output("wordcloud-interactive-chart", "figure"),
         Input("filter-component-data-store", "data"),
+        Input("wordcloud-mode-tabs", "value"),
     )
-    def update_wordcloud_chart(filtered_data):
+    def update_wordcloud_chart(filtered_data, selected_mode):
         """Update word cloud when filter data changes."""
         if not filtered_data:
             return go.Figure().add_annotation(
@@ -485,13 +632,15 @@ def register_callbacks():
                 showarrow=False,
                 font=dict(size=16, color="#7f8c8d"),
             )
-        return _build_wordcloud(filtered_data)
+        mode = selected_mode if selected_mode in _WORDCLOUD_MODES else _DEFAULT_MODE
+        return _build_wordcloud(filtered_data, mode=mode)
 
     @callback(
         Output("wordcloud-interactive-meta", "children"),
         Input("filter-component-data-store", "data"),
+        Input("wordcloud-mode-tabs", "value"),
     )
-    def update_wc_meta(filtered_data):
+    def update_wc_meta(filtered_data, selected_mode):
         """Update meta information about word cloud."""
         if not filtered_data:
             return "No data available."
@@ -502,7 +651,8 @@ def register_callbacks():
                 return "No data available."
             if "undl_id" not in df.columns:
                 return "No data available."
-            word_freq = _aggregate_word_freq(df["undl_id"])
+            mode = selected_mode if selected_mode in _WORDCLOUD_MODES else _DEFAULT_MODE
+            word_freq = _aggregate_word_freq(df["undl_id"], mode=mode)
             return f""  # • Unique words: {len(word_freq)}
             # return f"Total accepted resolutions: {len(df):,}"  # • Unique words: {len(word_freq)}
         except Exception as e:
@@ -510,12 +660,15 @@ def register_callbacks():
 
     @callback(
         Output("filter-component-keyword-search", "value", allow_duplicate=True),
+        Output("filter-component-subject-dropdown", "value", allow_duplicate=True),
         Output("country-view-tabs", "value", allow_duplicate=True),
         Input("wordcloud-interactive-chart", "clickData"),
+        State("wordcloud-mode-tabs", "value"),
         State("filter-component-keyword-search", "value"),
+        State("filter-component-subject-dropdown", "value"),
         prevent_initial_call=True,
     )
-    def click_word_to_search(clickData, current_keyword):
+    def click_word_to_search(clickData, selected_mode, current_keyword, current_subject_ids):
         """Append clicked word cloud word to keyword search and switch to Resolutions tab."""
         if not clickData or "points" not in clickData or not clickData["points"]:
             raise PreventUpdate
@@ -528,18 +681,27 @@ def register_callbacks():
         )
         if not word:
             raise PreventUpdate
+
+        if selected_mode == "category":
+            target_subject_ids = _category_term_to_subject_ids.get(word.lower(), [])
+            if not target_subject_ids:
+                return no_update, no_update, "resolution_list"
+            # In category mode, set subject filter (not keyword search).
+            return "", target_subject_ids, "resolution_list"
+
         existing = (current_keyword or "").strip()
         new_value = f"{existing}, {word}" if existing else word
-        return new_value, "resolution_list"
+        return new_value, current_subject_ids if current_subject_ids is not None else no_update, "resolution_list"
 
     @callback(
         Output("wordcloud-interactive-table", "children"),
         Input("wordcloud-interactive-chart", "hoverData"),
         Input("filter-component-data-store", "data"),
         Input("filter-component-filter-store", "data"),
+        Input("wordcloud-mode-tabs", "value"),
         prevent_initial_call=True,
     )
-    def update_resolution_table(hoverData, filtered_data, filter_params):
+    def update_resolution_table(hoverData, filtered_data, filter_params, selected_mode):
         """Update resolution list (cards) when hovering over a word."""
         if (
             hoverData is None
@@ -574,13 +736,15 @@ def register_callbacks():
             if "undl_id" not in df.columns:
                 return html.Div("No data available.", style={"color": "#7f8c8d"})
 
-            if word not in _wc_word_undlid_map:
+            mode = selected_mode if selected_mode in _WORDCLOUD_MODES else _DEFAULT_MODE
+            mode_word_map = _wc_word_undlid_map_by_mode.get(mode, {})
+            if word not in mode_word_map:
                 return html.Div(
                     f"No resolutions found for word '{word}'.",
                     style={"color": "#7f8c8d"},
                 )
 
-            matching = df[df["undl_id"].isin(_wc_word_undlid_map[word])].copy()
+            matching = df[df["undl_id"].isin(mode_word_map[word])].copy()
             if matching.empty:
                 return html.Div(
                     f"No resolutions found for word '{word}' in current filter.",
@@ -699,6 +863,17 @@ layout = (
                     "fontWeight": "bold",
                     "marginBottom": "8px",
                 },
+            ),
+            dcc.Tabs(
+                id="wordcloud-mode-tabs",
+                value=_DEFAULT_MODE,
+                children=[
+                    dcc.Tab(label="Default", value="default"),
+                    dcc.Tab(label="Geopolitical", value="geopolitical"),
+                    dcc.Tab(label="Thematic", value="thematic"),
+                    dcc.Tab(label="Action", value="action"),
+                    dcc.Tab(label="Category", value="category"),
+                ],
             ),
             # html.Div(
             #     "Use the camera icon (top-right) to download PNG",
