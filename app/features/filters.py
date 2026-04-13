@@ -19,6 +19,7 @@ ids = {
     "data_store": f"{prefix}-data-store",
     "location": f"{prefix}-location",
     "keyword_search": f"{prefix}-keyword-search",
+    "clear_country2_btn": f"{prefix}-clear-country2-btn",
 }
 
 # Country group presets for quick comparison selection
@@ -163,6 +164,16 @@ def register_callbacks():
         if not preset_key or preset_key not in COUNTRY_PRESETS:
             return []
         return COUNTRY_PRESETS[preset_key]["countries"]
+
+    # Callback: Clear comparison countries
+    @callback(
+        Output(ids["country2"], "value", allow_duplicate=True),
+        Output(ids["preset"], "value", allow_duplicate=True),
+        Input(ids["clear_country2_btn"], "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def clear_comparison(n_clicks):
+        return [], None
 
     # Callback: Reset all filters except main country
     @callback(
@@ -521,11 +532,34 @@ def layout(page_query_params: dict[str, str] | None = None):
                                                     "fontWeight": "600",
                                                     "color": "#495057",
                                                     "fontSize": "15px",
-                                                    "marginBottom": "8px",
-                                                    "display": "block",
+                                                    "marginBottom": "0",
+                                                    "display": "inline-block",
                                                 },
                                             ),
-                                        ]
+                                            html.Button(
+                                                "↺ Clear All",
+                                                id=ids["clear_country2_btn"],
+                                                n_clicks=0,
+                                                style={
+                                                    "marginLeft": "12px",
+                                                    "padding": "4px 12px",
+                                                    "fontSize": "13px",
+                                                    "fontWeight": "400",
+                                                    "color": "#495057",
+                                                    "backgroundColor": "transparent",
+                                                    "border": "1px solid #adb5bd",
+                                                    "borderRadius": "4px",
+                                                    "cursor": "pointer",
+                                                    "fontFamily": "inherit",
+                                                    "verticalAlign": "middle",
+                                                },
+                                            ),
+                                        ],
+                                        style={
+                                            "marginBottom": "8px",
+                                            "display": "flex",
+                                            "alignItems": "center",
+                                        },
                                     ),
                                     fac.AntdTreeSelect(
                                         id=ids["country2"],
@@ -545,29 +579,9 @@ def layout(page_query_params: dict[str, str] | None = None):
                                 ],
                                 style={"flex": "1"},
                             ),
-                            # Preset dropdown
+                            # Preset dropdown (hidden, kept for callback compatibility)
                             html.Div(
                                 [
-                                    html.Div(
-                                        [
-                                            html.Label(
-                                                [
-                                                    html.Span(
-                                                        "⚡",
-                                                        style={"marginRight": "5px"},
-                                                    ),
-                                                    "Quick Select",
-                                                ],
-                                                style={
-                                                    "fontWeight": "600",
-                                                    "color": "#495057",
-                                                    "fontSize": "15px",
-                                                    "marginBottom": "8px",
-                                                    "display": "block",
-                                                },
-                                            ),
-                                        ]
-                                    ),
                                     dcc.Dropdown(
                                         id=ids["preset"],
                                         options=[
@@ -575,15 +589,10 @@ def layout(page_query_params: dict[str, str] | None = None):
                                             for k, p in COUNTRY_PRESETS.items()
                                         ],
                                         value=initial_filters["preset"],
-                                        placeholder="Choose a group...",
                                         clearable=True,
-                                        style={
-                                            "width": "100%",
-                                            "fontSize": "14px",
-                                        },
                                     ),
                                 ],
-                                style={"flex": "0 0 220px"},
+                                style={"display": "none"},
                             ),
                         ],
                         style={
