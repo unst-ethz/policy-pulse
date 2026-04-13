@@ -129,7 +129,7 @@ def get_region_tree_data() -> list[dict]:
 
         # Country leaf
         if iso3 not in countries:
-            countries[iso3] = {"key": iso3, "title": get_country_name(iso3), "value": iso3}
+            countries[iso3] = {"key": iso3, "title": get_country_display_name(iso3), "value": iso3}
             country_to_parent[iso3] = parent_code
 
     # Build tree bottom-up: attach countries to their parents
