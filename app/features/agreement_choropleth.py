@@ -65,6 +65,7 @@ def register_callbacks(query_engine):
         )
         agreement_data["Agreement"] = agreement_data["agreement_raw"].apply(
             lambda x: f"{x:.2f} with {data.get_country_display_name(country1)}"
+            if pd.notna(x) else "No shared vote"
         )
 
         if agreement_data.empty:
@@ -82,6 +83,10 @@ def register_callbacks(query_engine):
         agreement_data[["agreement_raw"]] = agreement_data[["agreement_raw"]].apply(
             pd.to_numeric
         )
+
+        # Separate countries with no shared votes (NaN agreement)
+        no_shared_votes = agreement_data[agreement_data["agreement_raw"].isna()].copy()
+        agreement_data = agreement_data[agreement_data["agreement_raw"].notna()]
 
         fig = px.choropleth(
             agreement_data,
@@ -105,6 +110,27 @@ def register_callbacks(query_engine):
         fig.update_geos(
             landcolor="#e1e1e1"  # light grey
         )
+
+        # Add grey trace for countries with no shared votes
+        if not no_shared_votes.empty:
+            country1_name_hover = data.get_country_display_name(country1)
+            no_vote_codes = no_shared_votes["three_letter_country"].tolist()
+            no_vote_names = no_shared_votes["Country"].tolist()
+            hover_texts = [
+                f"<b>{name}</b><br><br>No shared vote with {country1_name_hover}<extra></extra>"
+                for name in no_vote_names
+            ]
+            fig.add_trace(
+                go.Choropleth(
+                    locations=no_vote_codes,
+                    z=[0] * len(no_vote_codes),
+                    colorscale=[[0, "#e1e1e1"], [1, "#e1e1e1"]],
+                    showscale=False,
+                    hovertemplate=hover_texts,
+                    marker_line_color="#999999",
+                    marker_line_width=0.5,
+                )
+            )
 
         fig.add_trace(
             go.Choropleth(
