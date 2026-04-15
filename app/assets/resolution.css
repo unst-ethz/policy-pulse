@@ -35,8 +35,10 @@
 }
 
 .voting-list-row {
-  height: 24px;
+  min-height: 24px;
   display: flex;
   align-items: center;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
