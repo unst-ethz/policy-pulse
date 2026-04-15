@@ -229,14 +229,30 @@ def register_callbacks():
         if isinstance(subject_ids, list):
             subject_ids = [s for s in subject_ids if s != "__all_subjects__"] or None
 
+        # Normalize country2 to a list
+        if isinstance(country2, str) and country2:
+            country2_list = [country2]
+        elif isinstance(country2, list):
+            country2_list = country2
+        else:
+            country2_list = []
+
+        effective_country1 = country_iso3
+        effective_country2 = country2_list
+
+        # If no main country is selected, promote the first comparison country
+        if not effective_country1 and effective_country2:
+            effective_country1 = effective_country2[0]
+            effective_country2 = effective_country2[1:]
+
         filter_data = {
             "start_date": f"{start_year}-01-01" if start_year else None,
             "end_date": f"{end_year}-12-31" if end_year else None,
             "start_year": start_year,
             "end_year": end_year,
             "subject_ids": subject_ids,
-            "country1_alpha3": country_iso3,
-            "country2": country2,
+            "country1_alpha3": effective_country1,
+            "country2": effective_country2 or None,
             "keyword": keyword.strip() if keyword and keyword.strip() else None,
         }
 
