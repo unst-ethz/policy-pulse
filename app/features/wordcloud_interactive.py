@@ -24,6 +24,9 @@ _initialized = False
 _DEFAULT_MODE = "default"
 _MAX_WORDS_RENDER = 20
 _MAX_WORD_CANDIDATES_FOR_SEARCH_COUNT = 30
+_EXCLUDED_TERMS_BY_MODE = {
+    "geopolitical": {"peoples", "states", "united nations"},
+}
 _WORDCLOUD_MODES = {
     "default": {"label": "Default", "source": "undlid_keywords.csv:keywords"},
     "geopolitical": {"label": "Geopolitical", "source": "undlid_keywords_3d_noun_fixed.csv:Geopolitical"},
@@ -629,6 +632,16 @@ def _build_wordcloud(
             )
         # Sort and limit to top words by searchable count.
         weighted_items = sorted(weighted_items, key=lambda x: (-x[1], x[0]))
+        excluded_terms = _EXCLUDED_TERMS_BY_MODE.get(mode, set())
+        if excluded_terms:
+            weighted_items = [
+                (w, c)
+                for w, c in weighted_items
+                if w.strip().lower() not in excluded_terms
+            ]
+
+        # Taking the first N after exclusions automatically promotes later-ranked
+        # phrases to replace removed generic terms.
         word_freq = dict(weighted_items[:_MAX_WORDS_RENDER])
 
         words = list(word_freq.keys())
