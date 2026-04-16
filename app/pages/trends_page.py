@@ -127,12 +127,49 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                                 [
                                     html.H2("Resolution Title Word Cloud"),
                                     html.P(
-                                        "Display the most frequently occurring words or phrases in UN accepted resolution titles based on the selected filters. More frequent terms appear in larger sizes and darker colors. Hover over a term and click it to see how many resolutions include it, along with the corresponding resolutions. This provides users with a high-level overview of the domains the resolutions focus on.",
-                                        # "Larger words appear more often. Hover over a word and click on it to see how many resolutions contain it and corresponding resolutions.",
+                                        "Explore the most searchable terms in the currently filtered resolutions. "
+                                        "Word size and hover counts are computed from the active filters.",
                                         style={
                                             "color": "#7f8c8d",
-                                            "marginBottom": "20px",
+                                            "marginBottom": "12px",
                                         },
+                                    ),
+                                    html.Div(
+                                        [
+                                            html.P(
+                                                "How to use this panel:",
+                                                style={
+                                                    "color": "#374151",
+                                                    "marginBottom": "8px",
+                                                    "fontWeight": "600",
+                                                },
+                                            ),
+                                            html.Ul(
+                                                [
+                                                    html.Li(
+                                                        "Choose a tab by term source: Subjects uses the thesaurus subject system (same basis as the Subjects filter); "
+                                                        "Default uses Hugging Face Voicelab/vlt5-base-keywords; "
+                                                        "Geopolitical/Thematic/Action use OpenAI gpt-4.1-mini extraction."
+                                                    ),
+                                                    html.Li(
+                                                        "Hover a phrase to see how many currently filtered resolutions can be found with it."
+                                                    ),
+                                                    html.Li(
+                                                        "Click a phrase to jump to Accepted Resolutions. In Subjects, click updates the Subjects filter; "
+                                                        "in other tabs, click updates Keyword Search."
+                                                    ),
+                                                    html.Li(
+                                                        "Word-cloud-added keywords are exact phrases (quoted) and are appended with '&' (AND)."
+                                                    ),
+                                                ],
+                                                style={
+                                                    "color": "#6b7280",
+                                                    "marginTop": "0",
+                                                    "paddingLeft": "20px",
+                                                    "marginBottom": "20px",
+                                                },
+                                            ),
+                                        ]
                                     ),
                                     *wordcloud_interactive.layout,
                                 ],
@@ -390,16 +427,7 @@ def download_resolutions_csv(n_clicks, filter_store):
     # Apply keyword filter: OR logic across comma-separated phrases
     keyword = filter_store.get("keyword")
     if keyword and keyword.strip() and not df.empty:
-        tokens = [t.strip() for t in keyword.split(",") if t.strip()]
-        matched_ids: set = set()
-        for token in tokens:
-            title_match = (
-                df["title"]
-                .str.lower()
-                .str.contains(token.lower(), regex=False, na=False)
-            )
-            matched_ids |= set(df.loc[title_match, "undl_id"].tolist())
-            matched_ids |= wordcloud_interactive.search_keywords(token)
+        matched_ids = wordcloud_interactive.get_keyword_matched_ids(df, keyword)
         df = df[df["undl_id"].isin(matched_ids)]
 
     base_cols = [
