@@ -27,11 +27,21 @@
 .voting-list {
   flex: 0 0 200px;
   max-height: calc(5 * 24px);
-  overflow-y: auto;
+  overflow-y: scroll;
   border-left: 1px solid #eee;
   margin-left: 15px;
   padding-left: 15px;
   align-self: stretch;
+}
+
+.voting-list::-webkit-scrollbar {
+  width: 6px;
+  background-color: #f1f1f1;
+}
+
+.voting-list::-webkit-scrollbar-thumb {
+  background-color: #c1c1c1;
+  border-radius: 3px;
 }
 
 .voting-list-row {

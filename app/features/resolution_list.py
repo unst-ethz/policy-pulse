@@ -21,15 +21,17 @@ def create_vote_indicator(country_name, vote):
     }
     if pd.isna(vote) or vote not in VOTE_MAP:
         return html.Span(
-            f"{country_name}: N/A",
-            style={"color": "#999", "fontSize": "0.85em", "marginRight": "10px"},
+            [
+            html.Span("●", style={"marginRight": "4px"}),
+            html.Span(f"{country_name}"),
+        ],
+            style={"color": "#999", "marginRight": "15px", "fontSize": "0.9em"},
         )
-
     config = VOTE_MAP[vote]
     return html.Span(
         [
             html.Span("●", style={"color": config["color"], "marginRight": "4px"}),
-            html.Span(f"{country_name}: {config['label']}"),
+            html.Span(f"{country_name}"),
         ],
         style={"fontWeight": "500", "marginRight": "15px", "fontSize": "0.9em"},
     )
@@ -156,6 +158,35 @@ layout = [
                 ],
                 style={"marginBottom": "20px", "minHeight": "5px"},
             ),  # Keep some space
+            # --- Vote Legend ---
+            html.Div(
+                [
+                    html.Span("Vote key:", style={"fontWeight": "bold", "marginRight": "12px", "fontSize": "0.85em", "color": "#555"}),
+                    *[
+                        html.Span(
+                            [html.Span("●", style={"color": color, "marginRight": "4px"}), label],
+                            style={"fontSize": "0.85em", "marginRight": "14px"},
+                        )
+                        for color, label in [
+                            ("green", "Yes"),
+                            ("red", "No"),
+                            ("orange", "Abstain"),
+                            ("blue", "Not Voting"),
+                            ("#999", "N/A"),
+                        ]
+                    ],
+                ],
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "flexWrap": "wrap",
+                    "padding": "8px 12px",
+                    "backgroundColor": "#f8f9fa",
+                    "borderRadius": "6px",
+                    "border": "1px solid #e0e0e0",
+                    "marginBottom": "14px",
+                },
+            ),
             # --- Results Area ---
             dcc.Loading(
                 id="rl-loading",
