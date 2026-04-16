@@ -341,12 +341,7 @@ def register_callbacks():
         keyword = filter_params.get("keyword")
         if keyword and keyword.strip():
             from . import wordcloud_interactive  # lazy import to avoid circular dependency
-            tokens = [t.strip() for t in keyword.split(",") if t.strip()]
-            matched_ids: set = set()
-            for token in tokens:
-                title_match = df["title"].str.lower().str.contains(token.lower(), regex=False, na=False)
-                matched_ids |= set(df.loc[title_match, "undl_id"].tolist())
-                matched_ids |= wordcloud_interactive.search_keywords(token)
+            matched_ids = wordcloud_interactive.get_keyword_matched_ids(df, keyword)
             df = df[df["undl_id"].isin(matched_ids)]
 
         # 2. Filter Logic
