@@ -20,6 +20,7 @@ ids = {
     "location": f"{prefix}-location",
     "keyword_search": f"{prefix}-keyword-search",
     "clear_country2_btn": f"{prefix}-clear-country2-btn",
+    "clear_subjects_btn": f"{prefix}-clear-subjects-btn",
 }
 
 # Country group presets for quick comparison selection
@@ -174,6 +175,15 @@ def register_callbacks():
     )
     def clear_comparison(n_clicks):
         return [], None
+
+    # Callback: Clear subjects
+    @callback(
+        Output(ids["subject_dropdown"], "value", allow_duplicate=True),
+        Input(ids["clear_subjects_btn"], "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def clear_subjects(n_clicks):
+        return None
 
     # Callback: Reset all filters except main country
     @callback(
@@ -595,20 +605,68 @@ def layout(page_query_params: dict[str, str] | None = None):
                                 ],
                                 style={"flex": "1"},
                             ),
-                            # Preset dropdown (hidden, kept for callback compatibility)
+                            # Preset dropdown
                             html.Div(
                                 [
-                                    dcc.Dropdown(
+                                    html.Div(
+                                        [
+                                            html.Label(
+                                                [
+                                                    html.Span(
+                                                        "⚡",
+                                                        style={"marginRight": "5px"},
+                                                    ),
+                                                    "Quick Select",
+                                                ],
+                                                style={
+                                                    "fontWeight": "600",
+                                                    "color": "#495057",
+                                                    "fontSize": "15px",
+                                                    "marginBottom": "0",
+                                                    "display": "inline-block",
+                                                },
+                                            ),
+                                            # Invisible spacer matching Clear All button
+                                            # to keep this label row the same height as
+                                            # the Compare with row (which has the button).
+                                            html.Button(
+                                                "↺ Clear All",
+                                                n_clicks=0,
+                                                tabIndex=-1,
+                                                style={
+                                                    "marginLeft": "12px",
+                                                    "padding": "4px 12px",
+                                                    "fontSize": "13px",
+                                                    "fontWeight": "400",
+                                                    "border": "1px solid transparent",
+                                                    "borderRadius": "4px",
+                                                    "fontFamily": "inherit",
+                                                    "verticalAlign": "middle",
+                                                    "visibility": "hidden",
+                                                    "pointerEvents": "none",
+                                                },
+                                            ),
+                                        ],
+                                        style={
+                                            "marginBottom": "8px",
+                                            "display": "flex",
+                                            "alignItems": "center",
+                                        },
+                                    ),
+                                    fac.AntdSelect(
                                         id=ids["preset"],
                                         options=[
                                             {"label": p["label"], "value": k}
                                             for k, p in COUNTRY_PRESETS.items()
                                         ],
                                         value=initial_filters["preset"],
-                                        clearable=True,
+                                        placeholder="Choose a group...",
+                                        allowClear=True,
+                                        style={"width": "100%"},
+                                        locale="en-us",
                                     ),
                                 ],
-                                style={"display": "none"},
+                                style={"flex": "0 0 220px"},
                             ),
                         ],
                         style={
@@ -742,11 +800,34 @@ def layout(page_query_params: dict[str, str] | None = None):
                                                     "fontWeight": "600",
                                                     "color": "#495057",
                                                     "fontSize": "15px",
-                                                    "marginBottom": "8px",
-                                                    "display": "block",
+                                                    "marginBottom": "0",
+                                                    "display": "inline-block",
                                                 },
                                             ),
-                                        ]
+                                            html.Button(
+                                                "↺ Clear All",
+                                                id=ids["clear_subjects_btn"],
+                                                n_clicks=0,
+                                                style={
+                                                    "marginLeft": "12px",
+                                                    "padding": "4px 12px",
+                                                    "fontSize": "13px",
+                                                    "fontWeight": "400",
+                                                    "color": "#495057",
+                                                    "backgroundColor": "transparent",
+                                                    "border": "1px solid #adb5bd",
+                                                    "borderRadius": "4px",
+                                                    "cursor": "pointer",
+                                                    "fontFamily": "inherit",
+                                                    "verticalAlign": "middle",
+                                                },
+                                            ),
+                                        ],
+                                        style={
+                                            "marginBottom": "8px",
+                                            "display": "flex",
+                                            "alignItems": "center",
+                                        },
                                     ),
                                     fac.AntdTreeSelect(
                                         id=ids["subject_dropdown"],
