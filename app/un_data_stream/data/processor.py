@@ -147,11 +147,16 @@ class DataProcessor:
       self.logger.info(f"Calculated {len(agreement_matrices)} agreement matrices in {elapsed_time:.2f}s")
       
       return agreement_matrices, country_columns
-    
-    def _calculate_single_resolution_matrix(self, resolution_row: pd.Series, 
-                                        country_columns: List[str]) -> np.ndarray:
+
+    @staticmethod
+    def _calculate_single_resolution_matrix(
+            resolution_row: pd.Series,
+            country_columns: List[str]
+    ) -> np.ndarray:
       """
-      Calculate agreement matrix for a single resolution.
+      Quickly calculate the agreement matrix for a single resolution.
+
+      Uses vectorized calculation via NumPy broadcasting.
       
       Args:
           resolution_row: Series containing votes for all countries
@@ -160,26 +165,20 @@ class DataProcessor:
       Returns:
           np.ndarray: 2D agreement matrix (n_countries x n_countries)
       """
-      n_countries = len(country_columns)
-      agreement_matrix = np.full((n_countries, n_countries), np.nan)
-      
-      # Vote mapping: Y=1, A=0, N=-1, others=NaN
-      vote_mapping = {"Y": 1, "A": 0, "N": -1}
-      
-      # Convert votes to numeric values
-      votes = np.array([vote_mapping.get(resolution_row[country], np.nan) 
-                      for country in country_columns])
-      
-      # Calculate pairwise agreements
-      for i in range(n_countries):
-          for j in range(i, n_countries):
-            if i == j:
-              agreement_matrix[i, j] = 1.0
-            elif not (np.isnan(votes[i]) or np.isnan(votes[j])):
-              diff = abs(votes[i] - votes[j])
-              score = 1.0 - (diff / 2.0)
-              agreement_matrix[i, j] = score
-              agreement_matrix[j, i] = score  # Ensure symmetry
-            # else: leave as NaN for missing votes
+      # 1. Map votes to numeric values
+      vote_mapping = {"Y": 1.0, "A": 0.0, "N": -1.0}
+
+      # Extract the country votes as a NumPy array (floats to accommodate NaN)
+      # Using .get() for safety, defaulting to np.nan
+      votes = np.array([vote_mapping.get(resolution_row[c], np.nan) for c in country_columns])
+
+      # 2. Use broadcasting to compute all pairwise absolute differences
+      # votes[:, np.newaxis] creates a column vector (N, 1)
+      # votes[np.newaxis, :] creates a row vector (1, N)
+      # The subtraction results in an (N, N) matrix of all combinations
+      abs_diff_mat = np.abs(votes[:, np.newaxis] - votes[np.newaxis, :])
+
+      # 3. Apply the agreement-score formula to the entire matrix at once
+      agreement_matrix = 1.0 - (abs_diff_mat / 2.0)
 
       return agreement_matrix
