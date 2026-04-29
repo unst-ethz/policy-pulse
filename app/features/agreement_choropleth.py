@@ -88,10 +88,15 @@ def register_callbacks(query_engine):
         no_shared_votes = agreement_data[agreement_data["agreement_raw"].isna()].copy()
         agreement_data = agreement_data[agreement_data["agreement_raw"].notna()]
 
+        # Plot the choropleth world map
+        # Note: Recent `plotly` versions actually seem to use an official
+        # UN data source to generate simplified geometries for the world map.
+        # See the description of this plotly PR:
+        # https://github.com/plotly/plotly.js/pull/7393
         fig = px.choropleth(
             agreement_data,
             color="agreement_raw",
-            color_continuous_scale=px.colors.sequential.RdBu,
+            color_continuous_scale=px.colors.diverging.RdYlBu,  # Red-Yellow-Blue
             range_color=[0, 1],
             locations="three_letter_country",
             projection="robinson",
