@@ -102,9 +102,12 @@ class DataProcessor:
         
         return resolutions_normalized_df, resolution_subjects_df
     
-    def calculate_agreement_matrix(self, resolutions_df: pd.DataFrame) -> Tuple[Dict[str, np.ndarray], List[str]]:
+    def calculate_agreement_data(
+            self,
+            resolutions_df: pd.DataFrame
+    ) -> Tuple[Dict[str, np.ndarray], Dict[str, float], List[str]]:
       """
-      Calculate agreement matrices for all resolutions.
+      Calculate agreement matrices and consensus scores for all resolutions.
       
       Args:
           resolutions_df : pd.DataFrame
@@ -112,9 +115,10 @@ class DataProcessor:
               for each member state and metadata columns
       
       Returns:
-          Dict[str, np.ndarray]
-              Dictionary mapping undl_id to 2D agreement matrix where
-              matrix[i,j] represents agreement score between country i and country j
+          Tuple[Dict[str, np.ndarray], Dict[str, float], List[str]]:
+              - agreement_matrices: Dict mapping undl_id to its agreement matrix.
+              - consensus_scores: Dict mapping undl_id to its score.
+              - country_columns: List of country columns used in the matrices.
       """
       self.logger.info("Starting agreement matrix calculation")
       start_time = time.time()
@@ -134,19 +138,26 @@ class DataProcessor:
       self.logger.info(f"Found {len(country_columns)} country columns")
       self.logger.info(f"Processing {len(resolutions_df)} resolutions")
       
-      # Step 2: Calculate agreement matrix for each resolution
+      # Step 2: Calculate agreement matrix and consensus score for each resolution
       agreement_matrices = {}
-      
+      consensus_scores = {}
+
       for idx, row in progressbar(resolutions_df.iterrows(), total=len(resolutions_df)):
           undl_id = row['undl_id']
           agreement_matrix = self._calculate_single_resolution_matrix(row, country_columns)
+          c_score = self._calculate_single_consensus_score(agreement_matrix)
           agreement_matrices[undl_id] = agreement_matrix
-          
-      
+          consensus_scores[undl_id] = c_score
+
+
       elapsed_time = time.time() - start_time
-      self.logger.info(f"Calculated {len(agreement_matrices)} agreement matrices in {elapsed_time:.2f}s")
+      n_res = len(agreement_matrices)
+      assert n_res == len(resolutions_df)
+      self.logger.info(
+          f"Calculated {n_res} agreement matrices and consensus scores in {elapsed_time:.2f}s"
+      )
       
-      return agreement_matrices, country_columns
+      return agreement_matrices, consensus_scores, country_columns
 
     @staticmethod
     def _calculate_single_resolution_matrix(
@@ -182,3 +193,31 @@ class DataProcessor:
       agreement_matrix = 1.0 - (abs_diff_mat / 2.0)
 
       return agreement_matrix
+
+    @staticmethod
+    def _calculate_single_consensus_score(agreement_matrix: np.ndarray) -> float:
+        """
+        Calculate the 'consensus' score for a given resolution, based on
+        the resolution's agreement matrix.
+
+        The consensus score is simply the average vote-agreement score
+        across all country pairs for which both members voted on the resolution
+        at hand.
+
+        Args:
+            agreement_matrix: np.ndarray: 2D agreement matrix (n_countries x n_countries)
+
+        Returns:
+            float
+        """
+
+        # We take the mean of the lower triangle of the matrix (excluding the diagonal)
+        # to get the average of all unique pairwise scores, ignoring NaNs.
+        n_countries = agreement_matrix.shape[0]
+        tril_indices = np.tril_indices(n_countries, k=-1)  # k=-1 to exclude diagonal
+        lower_triangle_values = agreement_matrix[tril_indices]
+
+        with np.errstate(invalid='ignore'):  # Suppress warning for all-NaN slice
+            consensus_score = np.nanmean(lower_triangle_values)
+
+        return float(consensus_score)

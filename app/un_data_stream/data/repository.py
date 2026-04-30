@@ -286,8 +286,11 @@ class DataRepository:
         # Normalize ga_resolutions
         self.resolution_table, self.resolution_subject_table = processor.normalize_resolutions(ga_resolutions)
 
-        # Calculate the agreement matrix
-        self.agreement_matrices, self.country_columns = processor.calculate_agreement_matrix(self.resolution_table)
+        # Calculate agreement data for all resolutions
+        self.agreement_matrices, c_score, self.country_columns = processor.calculate_agreement_data(self.resolution_table)
+
+        # Add consensus scores to the resolution table
+        self.resolution_table['consensus_score'] = self.resolution_table['undl_id'].map(c_score)
 
         
         expanded_subjects = set()
