@@ -56,23 +56,25 @@ layout = [
                             "borderRadius": "8px",
                         },
                         children=[
-                            # Sort by date (always visible)
+                            # Sort by dropdown
                             html.Div(
                                 [
                                     html.Label(
-                                        "Sort by Date:",
+                                        "Sort by:",
                                         style={"fontWeight": "bold", "marginRight": "10px"},
                                     ),
                                     dcc.Dropdown(
                                         id="rl-sort-dropdown",
                                         options=[
-                                            {"label": "Newest First", "value": "desc"},
-                                            {"label": "Oldest First", "value": "asc"},
+                                            {"label": "Date (Newest First)", "value": "date_desc"},
+                                            {"label": "Date (Oldest First)", "value": "date_asc"},
+                                            {"label": "Consensus Score (Highest First)", "value": "consensus_desc"},
+                                            {"label": "Consensus Score (Lowest First)", "value": "consensus_asc"},
                                         ],
-                                        value="desc",
+                                        value="date_desc",
                                         clearable=False,
                                         style={
-                                            "width": "180px",
+                                            "width": "300px",
                                             "display": "inline-block",
                                             "verticalAlign": "middle",
                                         },
@@ -157,7 +159,7 @@ layout = [
                     ),
                 ],
                 style={"marginBottom": "20px", "minHeight": "5px"},
-            ),  # Keep some space
+            ),
             # --- Vote Legend ---
             html.Div(
                 [
@@ -232,12 +234,12 @@ def register_callbacks():
         Output("rl-multi-country-msg", "style"),
         Input(
             "filter-component-filter-store", "data"
-        ),  # Global Filter PARAMETERS (Start, End, Subject, Country1, Country2)
-        Input("rl-agreement-dropdown", "value"),  # Local Filter (Conditional)
-        Input("rl-vote-filter", "value"),  # Vote filter (main country only)
-        Input("rl-load-more-btn", "n_clicks"),  # Pagination
-        Input("rl-sort-dropdown", "value"),  # Date sort order
-        State("country1-iso-alpha3", "data"),  # Current Main Country (fallback)
+        ),
+        Input("rl-agreement-dropdown", "value"),
+        Input("rl-vote-filter", "value"),
+        Input("rl-load-more-btn", "n_clicks"),
+        Input("rl-sort-dropdown", "value"),
+        State("country1-iso-alpha3", "data"),
     )
     def update_resolution_list(
         filter_params, agreement_filter, vote_filter, n_clicks, sort_order, country1_backup
@@ -315,7 +317,9 @@ def register_callbacks():
                     include_descendants=True,
                 )
             else:
-                min_starting_date = min_starting_date = joining_dates[joining_dates['country'] == underlying_countries[0]]['min_date'].to_list()[0]
+                # TODO: Possible bug in date range calculation. Could it be that max_ending_date
+                #  is only checked against the *last* country in the list (instead of all of them?)
+                min_starting_date = joining_dates[joining_dates['country'] == underlying_countries[0]]['min_date'].to_list()[0]
                 max_ending_date = joining_dates[joining_dates['country'] == underlying_countries[0]]['max_date'].to_list()[0]
                 for c in underlying_countries:
                     if (
@@ -368,15 +372,24 @@ def register_callbacks():
                 multi_msg_style,
             )
 
-        # Keyword search: OR logic across comma-separated phrases
+        # Keyword search
         keyword = filter_params.get("keyword")
         if keyword and keyword.strip():
-            from . import wordcloud_interactive  # lazy import to avoid circular dependency
+            from . import wordcloud_interactive
             matched_ids = wordcloud_interactive.get_keyword_matched_ids(df, keyword)
             df = df[df["undl_id"].isin(matched_ids)]
 
-        # 2. Filter Logic
-        filtered_df = df.copy().sort_values("date", ascending=(sort_order == "asc"), na_position="last")
+        # 2. Filter & Sort Logic
+        if sort_order == "date_asc":
+            sort_by, ascending = "date", True
+        elif sort_order == "consensus_desc":
+            sort_by, ascending = "consensus_score", False
+        elif sort_order == "consensus_asc":
+            sort_by, ascending = "consensus_score", True
+        else:  # Default to date_desc
+            sort_by, ascending = "date", False
+        
+        filtered_df = df.copy().sort_values(sort_by, ascending=ascending, na_position="last")
 
         if country1 and show_agreement_filter and agreement_filter != "NO_FILTER":
             c2 = comparison_countries[0]
@@ -411,7 +424,6 @@ def register_callbacks():
 
         cards = []
         for _, row in display_df.iterrows():
-            # Basic Info
             res_id = row.get("resolution", "N/A")
             link = row.get("undl_link", "#")
             date_val = row.get("date")
@@ -419,8 +431,10 @@ def register_callbacks():
                 date_val.strftime("%Y-%m-%d") if pd.notnull(date_val) else "Unknown"
             )
             title = row.get("title", "Untitled")
+            consensus_score = row.get("consensus_score")
 
-            # Vote Indicators
+            consensus_display = f"{consensus_score:.3f}" if pd.notnull(consensus_score) else "N/A"
+
             indicators = []
 
             # Main Country (only if selected)
@@ -460,8 +474,17 @@ def register_callbacks():
                                             "marginLeft": "12px",
                                         },
                                     ),
+                                    html.Span(
+                                        f"Consensus: {consensus_display}",
+                                        style={
+                                            "color": "#333" if pd.notnull(consensus_score) else "#999",
+                                            "fontSize": "0.9em",
+                                            "marginLeft": "12px",
+                                            "fontWeight": "500"
+                                        },
+                                    ),
                                 ],
-                                style={"marginBottom": "0.5rem"},
+                                style={"marginBottom": "0.5rem", "display": "flex", "alignItems": "center", "flexWrap": "wrap"},
                             ),
                             html.Div(title),
                         ],
