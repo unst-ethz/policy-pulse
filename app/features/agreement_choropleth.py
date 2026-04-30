@@ -182,7 +182,9 @@ def register_callbacks(query_engine):
                 'always voted in opposite ways ("yes" vs. "no"). The data only covers GA resolutions '
                 "that were successfully passed. The map provides a simplified, static overview of "
                 "political geography. Some smaller nations and territories are not shown and the  "
-                "map does not reflect historical border changes over time."
+                "map does not reflect historical border changes over time. The boundaries and names "
+                "shown and the designations used on this map do not imply official endorsement or "
+                "acceptance by the United Nations."
             ],
             style={
                 "maxWidth": "100%",
