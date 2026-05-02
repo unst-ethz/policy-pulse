@@ -31,6 +31,7 @@ class DataRepository:
         self.resolution_subject_table: pd.DataFrame
         self.subject_table: pd.DataFrame
         self.closure_table: pd.DataFrame
+        self.member_states_table: pd.DataFrame
 
         # Load configuration
         self._load_config()
@@ -72,7 +73,8 @@ class DataRepository:
             'closure': self.closure_table,
             'broader': self.broader_table,
             'agreement_matrices': self.agreement_matrices,
-            'country_columns': self.country_columns
+            'country_columns': self.country_columns,
+            'member_states': self.member_states_table
         }
     
     def _load_config(self):
@@ -159,6 +161,16 @@ class DataRepository:
                 self.logger.error(f"Failed to resolve/check URL for thesaurus: {e}")
                 all_valid = False
 
+        # 3. Check Member States
+        member_states_config = self.config['data_sources'].get('member_states')
+        if member_states_config:
+            try:
+                url = fetcher_orchestrator.member_states_fetcher.resolve_url(member_states_config)
+                self.logger.info(f"Successfully resolved URL for member_states: {url}")
+            except Exception as e:
+                self.logger.error(f"Failed to resolve/check URL for member_states: {e}")
+                all_valid = False
+
         return all_valid
     
     def _has_cached_data(self) -> bool:
@@ -170,7 +182,8 @@ class DataRepository:
             'subject_table.csv',
             'closure_table.csv',
             'broader_table.csv',
-            'agreement_matrices.pkl'
+            'agreement_matrices.pkl',
+            'member_states_table.csv'
         ]
         all_exist = all((data_path / file).exists() for file in required_files)
         if all_exist:
@@ -221,6 +234,7 @@ class DataRepository:
         self.subject_table = pd.read_csv(data_path / 'subject_table.csv')
         self.closure_table = pd.read_csv(data_path / 'closure_table.csv')
         self.broader_table = pd.read_csv(data_path / 'broader_table.csv')
+        self.member_states_table = pd.read_csv(data_path / 'member_states_table.csv')
         self.logger.info("Cached data loaded successfully.")
 
         # Load agreement matrices
@@ -241,6 +255,7 @@ class DataRepository:
         self.subject_table.to_csv(data_path / 'subject_table.csv', index=False)
         self.closure_table.to_csv(data_path / 'closure_table.csv', index=False)
         self.broader_table.to_csv(data_path / 'broader_table.csv', index=False)
+        self.member_states_table.to_csv(data_path / 'member_states_table.csv', index=False)
 
         with open(data_path / 'agreement_matrices.pkl', 'wb') as f:
             agreement_data = {
@@ -265,6 +280,7 @@ class DataRepository:
         fetcher = DataFetcher(self.config, self.logger)
         resolutions_raw = fetcher.fetch_resolutions()
         thesaurus_graph = fetcher.fetch_thesaurus()
+        self.member_states_table = fetcher.fetch_member_states()
 
         # Process data
         processor = DataProcessor(self.config, self.logger)
