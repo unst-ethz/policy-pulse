@@ -1,3 +1,4 @@
+import functools
 import os
 import re
 from collections import Counter
@@ -34,6 +35,7 @@ _WORDCLOUD_MODES = {
     "action": {"label": "Action", "source": "undlid_keywords_3d_noun_fixed.csv:Action"},
     "category": {"label": "Subjects", "source": "query_resolutions():subjects"},
 }
+_CONSENSUS_CMAP_COLORS = ("#ff66cc", "#e6b24b", "#33cc33")
 
 
 def _init_wc_data():
@@ -449,6 +451,45 @@ def _get_viridis_colors(frequencies):
     return colors
 
 
+@functools.lru_cache(maxsize=1)
+def _get_consensus_score_percentiles() -> tuple[float, float]:
+    """Return (p2.5, p97.5) of consensus scores across all resolutions. Cached."""
+    df = data.query_engine.query_resolutions()
+    scores = df["consensus_score"].dropna()
+    return float(scores.quantile(0.025)), float(scores.quantile(0.975))
+
+
+def _get_consensus_colors(consensus_scores: list) -> list:
+    """
+    Map average consensus scores to a purple-green colormap normalised to
+    the dataset range.
+
+    Uses a custom colour scale instead of the RdYlBu used by the choropleth map
+    so identical colours never carry different meanings across feature views.
+    Scores are normalised to the 2.5–97.5 percentile range of the full
+    dataset so the colour scale reflects actual variation.
+    """
+    cmap = mpl_colors.LinearSegmentedColormap.from_list("consensus", _CONSENSUS_CMAP_COLORS)
+
+    p_low, p_high = _get_consensus_score_percentiles()
+    span = p_high - p_low if p_high > p_low else 1.0
+    result = []
+    for score in consensus_scores:
+        if score is None or (isinstance(score, float) and np.isnan(score)):
+            result.append("#aaaaaa")
+        else:
+            normed = float(np.clip((score - p_low) / span, 0.0, 1.0))
+            result.append(mpl_colors.rgb2hex(cmap(normed)))
+    return result
+
+
+def _consensus_plotly_colorscale(n: int = 10) -> list:
+    """Sample the consensus colormap into Plotly colorscale format."""
+    cmap = mpl_colors.LinearSegmentedColormap.from_list("consensus", _CONSENSUS_CMAP_COLORS)
+
+    return [[i / (n - 1), mpl_colors.rgb2hex(cmap(i / (n - 1)))] for i in range(n)]
+
+
 def _apply_country_filter(df: pd.DataFrame, filter_store: dict | None) -> pd.DataFrame:
     """Apply main-country voted filter, matching filter-component data-store logic."""
     if df.empty:
@@ -550,6 +591,7 @@ def _build_wordcloud(
     filtered_data_json: str,
     mode: str = _DEFAULT_MODE,
     filter_store: dict | None = None,
+    color_mode: str = "frequency",
 ):
     """Build word cloud figure from filtered data."""
     mode_label = _get_mode_label(mode)
@@ -716,14 +758,28 @@ def _build_wordcloud(
         # print(f"y_positions: {y_positions}")
         # print(f"sizes: {sizes}")
 
-        # Colors based on frequency
-        colors = _get_viridis_colors(freqs)
-
         click_result_counts = [search_count_by_word.get(word, 0) for word in words]
-        hover_text = [
-            f"Click to search <b>{word}</b><br>{count} resolutions"
-            for word, count in zip(words, click_result_counts)
-        ]
+
+        if color_mode == "consensus" and "consensus_score" in df.columns:
+            mode_word_map = _wc_word_undlid_map_by_mode.get(mode, {})
+            c_score_map = df.set_index(df["undl_id"].astype(str))["consensus_score"].dropna().to_dict()
+            word_consensus = []
+            for word in words:
+                res_scores = [c_score_map[rid] for x in mode_word_map.get(word, []) if (rid := str(x)) in c_score_map]
+                avg_score = float(np.mean(res_scores)) if res_scores else None
+                word_consensus.append(avg_score)
+            colors = _get_consensus_colors(word_consensus)
+            hover_text = [
+                f"Click to search <b>{word}</b><br>{count} resolutions"
+                + (f"<br>Avg. consensus: {score:.2f}" if score is not None else "")
+                for word, count, score in zip(words, click_result_counts, word_consensus)
+            ]
+        else:
+            colors = _get_viridis_colors(freqs)
+            hover_text = [
+                f"Click to search <b>{word}</b><br>{count} resolutions"
+                for word, count in zip(words, click_result_counts)
+            ]
 
         # Calculate hover marker positions centered on words
         # Since textposition="bottom right", the anchor is at bottom-right corner
@@ -774,6 +830,7 @@ def _build_wordcloud(
             ),
             hovertemplate="%{customdata[0]}<extra></extra>",
             customdata=hover_customdata,
+            hoverlabel=dict(bgcolor="white", font=dict(color="black")),
             showlegend=False,
         )
 
@@ -789,7 +846,49 @@ def _build_wordcloud(
             showlegend=False,
         )
 
-        fig = go.Figure(data=[hover_trace, text_trace])
+        traces = [hover_trace, text_trace]
+        if color_mode == "consensus":
+            p_low, p_high = _get_consensus_score_percentiles()
+            traces.insert(0, go.Scatter(
+                x=[None], y=[None],
+                mode="markers",
+                marker=dict(
+                    colorscale=_consensus_plotly_colorscale(),
+                    cmin=p_low, cmax=p_high,
+                    color=[p_low],
+                    showscale=True,
+                    colorbar=dict(thickness=20, len=0.5, x=1.01),
+                ),
+                hoverinfo="none",
+                showlegend=False,
+            ))
+        fig = go.Figure(data=traces)
+        if color_mode == "consensus":
+            fig.add_annotation(
+                xref="paper", yref="paper",
+                x=1.04, y=0.76,
+                text="ⓘ",
+                showarrow=False,
+                font=dict(size=14, color="rgba(42, 63, 95, 1.0)"),
+                xanchor="left", yanchor="middle",
+                captureevents=True,
+                hovertext=(
+                    "<b>Avg. consensus score</b><br><br>"
+                    "Each word is coloured by the average consensus score of the resolutions<br>"
+                    "associated with it. The consensus score of a resolution measures how broadly<br>"
+                    "it was agreed upon: it is the average pairwise vote agreement across all country<br>" 
+                    "pairs that both cast a vote. A score of 1 means all countries voted identically;<br>"
+                    "lower values indicate more divided votes.<br><br>"
+                    "Technical note: The colour scale runs from the 2.5th to the 97.5th percentile of<br> "
+                    "consensus scores across all resolutions in the dataset, so the colour range<br>"
+                    "reflects the actual spread of the data instead of the full theoretical range."
+                ),
+                hoverlabel=dict(
+                    bgcolor="white",
+                    font=dict(color="black", size=12),
+                    bordercolor="rgba(42, 63, 95, 0.5)",
+                ),
+            )
         fig.update_layout(
             showlegend=False,
             xaxis=dict(
@@ -829,8 +928,9 @@ def register_callbacks():
         Input("filter-component-data-store", "data"),
         Input("wordcloud-mode-tabs", "value"),
         Input("filter-component-filter-store", "data"),
+        Input("wordcloud-color-mode", "value"),
     )
-    def update_wordcloud_chart(filtered_data, selected_mode, filter_store):
+    def update_wordcloud_chart(filtered_data, selected_mode, filter_store, color_mode):
         """Update word cloud when filter data changes."""
         if not filtered_data:
             return go.Figure().add_annotation(
@@ -843,7 +943,12 @@ def register_callbacks():
                 font=dict(size=16, color="#7f8c8d"),
             )
         mode = selected_mode if selected_mode in _WORDCLOUD_MODES else _DEFAULT_MODE
-        return _build_wordcloud(filtered_data, mode=mode, filter_store=filter_store)
+        return _build_wordcloud(
+            filtered_data,
+            mode=mode,
+            filter_store=filter_store,
+            color_mode=color_mode or "frequency",
+        )
 
     @callback(
         Output("wordcloud-interactive-meta", "children"),
@@ -1100,6 +1205,30 @@ layout = (
                     dcc.Tab(label="Action", value="action"),
                     dcc.Tab(label="Subjects", value="category"),
                 ],
+            ),
+            html.Div(
+                [
+                    html.Span(
+                        "Colour by:",
+                        style={"fontSize": "14px", "color": "#555", "marginRight": "10px"},
+                    ),
+                    dcc.RadioItems(
+                        id="wordcloud-color-mode",
+                        options=[
+                            {"label": "Frequency", "value": "frequency"},
+                            {"label": "Avg. consensus score", "value": "consensus"},
+                        ],
+                        value="frequency",
+                        inline=True,
+                        labelStyle={"marginRight": "16px", "fontSize": "14px"},
+                    ),
+                ],
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "padding": "8px 4px",
+                    "marginTop": "6px",
+                },
             ),
             # html.Div(
             #     "Use the camera icon (top-right) to download PNG",
