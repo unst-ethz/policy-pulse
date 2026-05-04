@@ -19,9 +19,12 @@ def register_callbacks(query_engine):
         [
             Input("filter-component-data-store", "data"),
             Input("filter-component-filter-store", "data"),
+            Input("choropleth-color-mode", "value"),
         ],
     )
-    def generate_chart(filtered_data, filter_store):
+    def generate_chart(filtered_data, filter_store, color_mode):
+        color_mode = color_mode or "absolute"
+
         if not filtered_data or not filter_store:
             return go.Figure(), "", ""
         all_resolutions = pd.read_json(filtered_data, orient="split")
@@ -68,10 +71,35 @@ def register_callbacks(query_engine):
         agreement_data["Country"] = agreement_data["three_letter_country"].apply(
             data.get_country_display_name
         )
-        agreement_data["Agreement"] = agreement_data["agreement_raw"].apply(
-            lambda x: f"{x:.2f} with {data.get_country_display_name(country1)}"
-            if pd.notna(x) else "No shared vote"
-        )
+
+        use_demeaned = color_mode == "demeaned" and pd.notna(global_consensus_avg)
+
+        if use_demeaned:
+            agreement_data["agreement_plot"] = agreement_data["agreement_raw"] - global_consensus_avg
+            agreement_data["Agreement"] = agreement_data["agreement_raw"].apply(
+                lambda x: f"{x - global_consensus_avg:+.2f} vs. average ({global_consensus_avg:.2f})"
+                if pd.notna(x) else "No shared vote"
+            )
+            colorscale = px.colors.diverging.RdYlGn
+            range_color = [-0.25, 0.25]
+            colorbar_settings = dict(
+                len=0.9,
+                tickvals=[-0.25, 0, 0.25],
+                ticktext=["−0.25", "0 (average)", "+0.25"],
+            )
+        else:
+            agreement_data["agreement_plot"] = agreement_data["agreement_raw"]
+            agreement_data["Agreement"] = agreement_data["agreement_raw"].apply(
+                lambda x: f"{x:.2f} with {data.get_country_display_name(country1)}"
+                if pd.notna(x) else "No shared vote"
+            )
+            colorscale = px.colors.diverging.RdYlBu
+            range_color = [0, 1]
+            colorbar_settings = dict(
+                len=0.9,
+                tickvals=[0, 0.25, 0.5, 0.75, 1.0],
+                ticktext=["0", "0.25", "0.5", "0.75", "1"],
+            )
 
         if agreement_data.empty:
             # Simulate neutral 0.5 value for all countries
@@ -79,14 +107,14 @@ def register_callbacks(query_engine):
                 {
                     "three_letter_country": ["NAN"],
                     "Country": ["No data for selected filters"],
-                    "agreement_raw": [0.5],
+                    "agreement_raw": [None],
+                    "agreement_plot": [0.0 if use_demeaned else 0.5],
+                    "Agreement": [""],
                 }
             )
 
-        # Make sure the agreement column is numeric, so we can apply the
-        # continuous color scale
-        agreement_data[["agreement_raw"]] = agreement_data[["agreement_raw"]].apply(
-            pd.to_numeric
+        agreement_data["agreement_plot"] = pd.to_numeric(
+            agreement_data["agreement_plot"], errors="coerce"
         )
 
         # Separate countries with no shared votes (NaN agreement)
@@ -96,20 +124,19 @@ def register_callbacks(query_engine):
         # Plot the choropleth world map
         fig = px.choropleth(
             agreement_data,
-            color="agreement_raw",
-            color_continuous_scale=px.colors.diverging.RdYlBu,  # Red-Yellow-Blue
-            range_color=[0, 1],
+            color="agreement_plot",
+            color_continuous_scale=colorscale,
+            range_color=range_color,
             locations="three_letter_country",
             projection="robinson",
             hover_name="Country",
             hover_data={
                 "Agreement": True,
                 "three_letter_country": False,
+                "agreement_plot": False,
                 "agreement_raw": False,
             },
-            labels={
-                "agreement_raw": ""
-            },  # For consistency with legend in the subject tab
+            labels={"agreement_plot": ""},
         )
 
         # Change default colour for missing-data countries
@@ -142,7 +169,7 @@ def register_callbacks(query_engine):
             go.Choropleth(
                 locations=[country1],
                 z=[1],  # dummy value
-                colorscale=[[0, "green"], [1, "green"]],  # solid green color
+                colorscale=[[0, "#a078d3"], [1, "#a078d3"]],
                 showscale=False,
                 hovertemplate=f"<b>{data.get_country_display_name(country1)}</b> (Selected)<extra></extra>",
                 marker_line_color="black",
@@ -158,68 +185,37 @@ def register_callbacks(query_engine):
         # Change internal padding
         fig.update_layout(
             margin=dict(l=10, r=10, t=0, b=0),
-            coloraxis_colorbar=dict(
-                len=0.9,  # Reduce legend height
-                tickvals=[0, 0.25, 0.5, 0.75, 1.0],
-                ticktext=[
-                    "0 (Always opposed)",
-                    "0.25",
-                    "0.5",
-                    "0.75",
-                    "1 (Always agreeing)",
-                ],
-            ),
+            coloraxis_colorbar=colorbar_settings,
         )
 
-        # Add marker for average global consensus
-        if pd.notna(global_consensus_avg):
-            # The colour bar has len=0.9 and is vertically centered, so it spans
-            # from y=0.05 to y=0.95 in paper coordinates.
-            y_position = 0.05 + (global_consensus_avg * 0.9)
+        # Note message
+        shared_disclaimer = (
+            "The data only covers GA resolutions that were successfully passed. "
+            "The map provides a simplified, static overview of political geography. Some smaller nations "
+            "and territories are not shown and the map does not reflect historical border changes over time. "
+            "The boundaries and names shown and the designations used on this map do not imply official "
+            "endorsement or acceptance by the United Nations."
+        )
 
-            # Add a unicode triangle marker
-            fig.add_annotation(
-                xref="paper", yref="paper",
-                x=1.0575, y=y_position,
-                text="◀",
-                showarrow=False,
-                font=dict(size=14, color="rgba(42, 63, 95, 1.0)"),
-                xanchor="left", yanchor="middle",
-
-                # --- Hover Functionality ---
-                # TODO Write a better tooltip => explain how to interpret pairwise deviations
-                #  from the global average (i.e., the given country pair agrees / disagrees
-                #  more than the average country pair for the selected resolutions)
-                captureevents=True,  # Makes the annotation "listen" for mouse events
-                hovertext=(
-                    f'<b>Global Average ({global_consensus_avg:.2f})</b><br><br>'
-                    'This is the mean "consensus score" for all resolutions currently<br>'
-                    'displayed on the map. It provides a reference for comparison.<br>'
-                    'Note that the consensus score of a resolution is simply the<br>'
-                    'average agreement score over all voting country-pairs.'
-                ),
-                hoverlabel=dict(
-                    bgcolor="white",
-                    font=dict(color="black", size=12),
-                    bordercolor="rgba(42, 63, 95, 0.5)"
-                )
+        country1_name = data.get_country_display_name(country1)
+        if use_demeaned:
+            note_text = (
+                f"The map shows how much more (green) or less (red) each country agreed with {country1_name} "
+                f"compared to the average consensus score across all selected resolutions ({global_consensus_avg:.2f}). " 
+                "Each resolution's consensus score is the average pairwise agreement among all voting country pairs. "
+                f"A value of 0 (yellow) means that a given country agreed with {country1_name} at exactly the "
+                f"average rate. {shared_disclaimer}"
+            )
+        else:
+            note_text = (
+                f"The map shows the pairwise vote agreement between {country1_name} and other countries. "
+                "An agreement score of 1 (dark blue) means that two countries voted the same on all selected "
+                "General Assembly (GA) resolutions. A score of 0 (dark red) means that two countries "
+                f"always voted in opposite ways (Yes vs. No). {shared_disclaimer}"
             )
 
-        # Status message
-        country1_name = data.get_country_display_name(country1)
         note_msg = html.P(
-            [
-                html.Strong("Details: "),
-                f"The map shows the pairwise vote agreement between {country1_name} and other countries. "
-                "An agreement score of 1 (dark blue) means that two countries voted the same on all "
-                "General Assembly (GA) resolutions. A score of 0 (dark red) means that two countries "
-                'always voted in opposite ways (Yes vs. No). The data only covers GA resolutions '
-                "that were successfully passed. The map provides a simplified, static overview of "
-                "political geography. Some smaller nations and territories are not shown and the  "
-                "map does not reflect historical border changes over time. The boundaries and names "
-                "shown and the designations used on this map do not imply official endorsement or "
-                "acceptance by the United Nations."
-            ],
+            [html.Strong("Details: "), note_text],
             style={
                 "maxWidth": "100%",
                 "margin": "0 0 0 0",
@@ -240,6 +236,16 @@ layout = [
     html.Div(
         [
             html.Div(id="agreement-choropleth-status"),
+            dcc.RadioItems(
+                id="choropleth-color-mode",
+                options=[
+                    {"label": "Absolute (0–1)", "value": "absolute"},
+                    {"label": "Relative to average", "value": "demeaned"},
+                ],
+                value="absolute",
+                inline=True,
+                style={"fontSize": "16px", "marginBottom": "8px", "paddingLeft": "2%"},
+            ),
             dcc.Loading(
                 children=[
                     dcc.Graph(
