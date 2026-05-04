@@ -98,7 +98,7 @@ def register_callbacks(query_engine):
             colorbar_settings = dict(
                 len=0.9,
                 tickvals=[0, 0.25, 0.5, 0.75, 1.0],
-                ticktext=["0", "0.25", "0.5", "0.75", "1"],
+                ticktext=["0 (Always opposed)", "0.25", "0.5", "0.75", "1 (Always agreeing)"]
             )
 
         if agreement_data.empty:

@@ -214,7 +214,7 @@ def register_callbacks(query_engine):
             coloraxis_colorbar=dict(
                 title="",  # Label is already shown on the x-axis; perhaps we don't need it again in the colourbar
                 tickvals=[0, 0.25, 0.5, 0.75, 1.0],
-                ticktext=["0 (Always voting opposed)", "0.25", "0.5", "0.75", "1 (Always voting the same)"]
+                ticktext=["0 (Always opposed)", "0.25", "0.5", "0.75", "1 (Always agreeing)"]
             )
         )
         
