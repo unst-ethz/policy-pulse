@@ -47,6 +47,11 @@ def register_callbacks(query_engine):
             if end_year:
                 resolutions_in_year = resolutions_in_year[dates <= int(end_year)]
 
+        # Calculate the average "consensus score" for the filtered resolutions
+        global_consensus_avg = None
+        if 'consensus_score' in resolutions_in_year.columns:
+            global_consensus_avg = resolutions_in_year['consensus_score'].mean()
+
         agreement_data = query_engine.query_agreement_between_countries(
             country1,
             resolution_ids=(resolutions_in_year["undl_id"].tolist()),
@@ -89,10 +94,6 @@ def register_callbacks(query_engine):
         agreement_data = agreement_data[agreement_data["agreement_raw"].notna()]
 
         # Plot the choropleth world map
-        # Note: Recent `plotly` versions actually seem to use an official
-        # UN data source to generate simplified geometries for the world map.
-        # See the description of this plotly PR:
-        # https://github.com/plotly/plotly.js/pull/7393
         fig = px.choropleth(
             agreement_data,
             color="agreement_raw",
@@ -161,25 +162,58 @@ def register_callbacks(query_engine):
                 len=0.9,  # Reduce legend height
                 tickvals=[0, 0.25, 0.5, 0.75, 1.0],
                 ticktext=[
-                    "0 (Always voting opposed)",
+                    "0 (Always opposed)",
                     "0.25",
                     "0.5",
                     "0.75",
-                    "1 (Always voting the same)",
+                    "1 (Always agreeing)",
                 ],
             ),
         )
 
+        # Add marker for average global consensus
+        if pd.notna(global_consensus_avg):
+            # The colour bar has len=0.9 and is vertically centered, so it spans
+            # from y=0.05 to y=0.95 in paper coordinates.
+            y_position = 0.05 + (global_consensus_avg * 0.9)
+
+            # Add a unicode triangle marker
+            fig.add_annotation(
+                xref="paper", yref="paper",
+                x=1.0575, y=y_position,
+                text="◀",
+                showarrow=False,
+                font=dict(size=14, color="rgba(42, 63, 95, 1.0)"),
+                xanchor="left", yanchor="middle",
+
+                # --- Hover Functionality ---
+                # TODO Write a better tooltip => explain how to interpret pairwise deviations
+                #  from the global average (i.e., the given country pair agrees / disagrees
+                #  more than the average country pair for the selected resolutions)
+                captureevents=True,  # Makes the annotation "listen" for mouse events
+                hovertext=(
+                    f'<b>Global Average ({global_consensus_avg:.2f})</b><br><br>'
+                    'This is the mean "consensus score" for all resolutions currently<br>'
+                    'displayed on the map. It provides a reference for comparison.<br>'
+                    'Note that the consensus score of a resolution is simply the<br>'
+                    'average agreement score over all voting country-pairs.'
+                ),
+                hoverlabel=dict(
+                    bgcolor="white",
+                    font=dict(color="black", size=12),
+                    bordercolor="rgba(42, 63, 95, 0.5)"
+                )
+            )
+
         # Status message
         country1_name = data.get_country_display_name(country1)
-        # f"{country1_name} is highlighted in green.
         note_msg = html.P(
             [
                 html.Strong("Details: "),
                 f"The map shows the pairwise vote agreement between {country1_name} and other countries. "
                 "An agreement score of 1 (dark blue) means that two countries voted the same on all "
                 "General Assembly (GA) resolutions. A score of 0 (dark red) means that two countries "
-                'always voted in opposite ways ("yes" vs. "no"). The data only covers GA resolutions '
+                'always voted in opposite ways (Yes vs. No). The data only covers GA resolutions '
                 "that were successfully passed. The map provides a simplified, static overview of "
                 "political geography. Some smaller nations and territories are not shown and the  "
                 "map does not reflect historical border changes over time. The boundaries and names "
