@@ -428,12 +428,12 @@ def register_callbacks():
             link = row.get("undl_link", "#")
             date_val = row.get("date")
             date_str = (
-                date_val.strftime("%Y-%m-%d") if pd.notnull(date_val) else "Unknown"
+                date_val.strftime("%d %b %Y") if pd.notnull(date_val) else "Unknown"
             )
             title = row.get("title", "Untitled")
             consensus_score = row.get("consensus_score")
 
-            consensus_display = f"{consensus_score:.3f}" if pd.notnull(consensus_score) else "N/A"
+            consensus_display = f"{consensus_score:.2f}" if pd.notnull(consensus_score) else "N/A"
 
             indicators = []
 
@@ -477,10 +477,9 @@ def register_callbacks():
                                     html.Span(
                                         f"Consensus: {consensus_display}",
                                         style={
-                                            "color": "#333" if pd.notnull(consensus_score) else "#999",
+                                            "color": "#666" if pd.notnull(consensus_score) else "#999",
                                             "fontSize": "0.9em",
                                             "marginLeft": "12px",
-                                            "fontWeight": "500"
                                         },
                                     ),
                                 ],
