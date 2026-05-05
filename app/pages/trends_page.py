@@ -296,7 +296,7 @@ def update_tab_states(filter_store):
     placeholder_no_country1 = html.Div(
         [
             html.P(
-                "Please select a main country from the filters above to view this analysis.",
+                "Please select a Main Country from the filters above to view this analysis.",
                 style={
                     "color": "#7f8c8d",
                     "fontSize": "16px",

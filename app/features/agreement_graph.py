@@ -101,7 +101,7 @@ def register_callbacks():
             '0 means complete disagreement ("yes" vs. "no"). '
             "Only sessions with at least 3 shared votes are shown. "
             "Red dots indicate special or emergency sessions. "
-            "The data only covers GA resolutions that were passed (accepted)."
+            "The data only covers GA resolutions that were passed."
         ], style={
             "maxWidth": "100%",
             "margin": "0 0 0 0",

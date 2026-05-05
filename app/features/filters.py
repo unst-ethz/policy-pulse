@@ -51,33 +51,43 @@ COUNTRY_PRESETS = {
 # Periods are anchored to UN institutional milestones, not geopolitical blocs
 ERA_PRESETS = {
     "un_founding": {
-        "label": "UN Founding Era (1945–1954)",
+        "label": "1945 to 1954 (UN Founding Era)",
         "start": 1945,
         "end": 1954,
     },
     "decolonization": {
-        "label": "Decolonization Era (1955–1974)",
+        "label": "1955 to 1974 (Decolonization Era)",
         "start": 1955,
         "end": 1974,
     },
     "nieo_period": {
-        "label": "North–South Dialogue (1974–1991)",
+        "label": "1974 to 1991 (North–South Dialogue)",
         "start": 1974,
         "end": 1991,
     },
     "post_bipolarity": {
-        "label": "Post-Bipolarity Era (1992–2000)",
+        "label": "1992 to 2000 (Post-Bipolarity Era)",
         "start": 1992,
         "end": 2000,
     },
     "mdg_era": {
-        "label": "Millennium Development Goals (2001–2015)",
+        "label": "2001 to 2015 (Millennium Development Goals)",
         "start": 2001,
         "end": 2015,
     },
     "sdg_era": {
-        "label": "Sustainable Development Goals (2016–present)",
+        "label": "2016 to present (Sustainable Development Goals)",
         "start": 2016,
+        "end": None,  # will use latest year
+    },
+    "until_1991": {
+        "label": "All years until 1991",
+        "start": 1945,
+        "end": 1991,
+    },
+    "since_1992": {
+        "label": "All years since 1992",
+        "start": 1992,
         "end": None,  # will use latest year
     },
 }

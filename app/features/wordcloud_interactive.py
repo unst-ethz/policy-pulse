@@ -880,7 +880,7 @@ def _build_wordcloud(
                     "pairs that both cast a vote. A score of 1 means all countries voted identically;<br>"
                     "lower values indicate more divided votes.<br><br>"
                     "Technical note: The colour scale runs from the 2.5th to the 97.5th percentile of<br> "
-                    "consensus scores across all resolutions in the dataset, so the colour range<br>"
+                    "consensus scores across all resolutions in the dataset. The colour range thus<br>"
                     "reflects the actual spread of the data instead of the full theoretical range."
                 ),
                 hoverlabel=dict(
