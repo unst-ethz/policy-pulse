@@ -1,4 +1,3 @@
-import functools
 import os
 import re
 from collections import Counter
@@ -451,27 +450,25 @@ def _get_viridis_colors(frequencies):
     return colors
 
 
-@functools.lru_cache(maxsize=1)
-def _get_consensus_score_percentiles() -> tuple[float, float]:
-    """Return (p2.5, p97.5) of consensus scores across all resolutions. Cached."""
-    df = data.query_engine.query_resolutions()
-    scores = df["consensus_score"].dropna()
-    return float(scores.quantile(0.025)), float(scores.quantile(0.975))
+def _get_consensus_score_percentiles(scores: pd.Series) -> tuple[float, float]:
+    """Return (p1, p99) of consensus scores for the given score series."""
+    scores = scores.dropna()
+    q_lo, q_hi = scores.quantile(0.01), scores.quantile(0.99)
+    return float(q_lo), float(q_hi)
 
 
-def _get_consensus_colors(consensus_scores: list) -> list:
+def _get_consensus_colors(consensus_scores: list, p_low: float, p_high: float) -> list:
     """
     Map average consensus scores to a purple-green colormap normalised to
-    the dataset range.
+    the filtered-data range.
 
     Uses a custom colour scale instead of the RdYlBu used by the choropleth map
     so identical colours never carry different meanings across feature views.
-    Scores are normalised to the 2.5–97.5 percentile range of the full
-    dataset so the colour scale reflects actual variation.
+    Scores are normalised to the 1–99 percentile range of the selected
+    resolutions so the colour scale reflects the actual spread of the data.
     """
     cmap = mpl_colors.LinearSegmentedColormap.from_list("consensus", _CONSENSUS_CMAP_COLORS)
 
-    p_low, p_high = _get_consensus_score_percentiles()
     span = p_high - p_low if p_high > p_low else 1.0
     result = []
     for score in consensus_scores:
@@ -760,7 +757,9 @@ def _build_wordcloud(
 
         click_result_counts = [search_count_by_word.get(word, 0) for word in words]
 
+        p_low, p_high = None, None
         if color_mode == "consensus" and "consensus_score" in df.columns:
+            p_low, p_high = _get_consensus_score_percentiles(df["consensus_score"])
             mode_word_map = _wc_word_undlid_map_by_mode.get(mode, {})
             c_score_map = df.set_index(df["undl_id"].astype(str))["consensus_score"].dropna().to_dict()
             word_consensus = []
@@ -768,7 +767,7 @@ def _build_wordcloud(
                 res_scores = [c_score_map[rid] for x in mode_word_map.get(word, []) if (rid := str(x)) in c_score_map]
                 avg_score = float(np.mean(res_scores)) if res_scores else None
                 word_consensus.append(avg_score)
-            colors = _get_consensus_colors(word_consensus)
+            colors = _get_consensus_colors(word_consensus, p_low, p_high)
             hover_text = [
                 f"Click to search <b>{word}</b><br>{count} resolutions"
                 + (f"<br>Avg. consensus: {score:.2f}" if score is not None else "")
@@ -847,8 +846,7 @@ def _build_wordcloud(
         )
 
         traces = [hover_trace, text_trace]
-        if color_mode == "consensus":
-            p_low, p_high = _get_consensus_score_percentiles()
+        if color_mode == "consensus" and p_low is not None:
             traces.insert(0, go.Scatter(
                 x=[None], y=[None],
                 mode="markers",
@@ -863,7 +861,7 @@ def _build_wordcloud(
                 showlegend=False,
             ))
         fig = go.Figure(data=traces)
-        if color_mode == "consensus":
+        if color_mode == "consensus" and p_low is not None:
             fig.add_annotation(
                 xref="paper", yref="paper",
                 x=1.04, y=0.76,
@@ -879,9 +877,9 @@ def _build_wordcloud(
                     "it was agreed upon: it is the average pairwise vote agreement across all country<br>" 
                     "pairs that both cast a vote. A score of 1 means all countries voted identically;<br>"
                     "lower values indicate more divided votes.<br><br>"
-                    "Technical note: The colour scale runs from the 2.5th to the 97.5th percentile of<br> "
-                    "consensus scores across all resolutions in the dataset. The colour range thus<br>"
-                    "reflects the actual spread of the data instead of the full theoretical range."
+                    "Technical note: The colour scale runs from the 1st to the 99th percentile of<br>"
+                    "consensus scores across all selected resolutions. The colour range thus<br>"
+                    "reflects the actual spread of the selected data instead of the full theoretical range."
                 ),
                 hoverlabel=dict(
                     bgcolor="white",
