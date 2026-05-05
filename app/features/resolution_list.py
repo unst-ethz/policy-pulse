@@ -21,15 +21,17 @@ def create_vote_indicator(country_name, vote):
     }
     if pd.isna(vote) or vote not in VOTE_MAP:
         return html.Span(
-            f"{country_name}: N/A",
-            style={"color": "#999", "fontSize": "0.85em", "marginRight": "10px"},
+            [
+            html.Span("●", style={"marginRight": "4px"}),
+            html.Span(f"{country_name}"),
+        ],
+            style={"color": "#999", "marginRight": "15px", "fontSize": "0.9em"},
         )
-
     config = VOTE_MAP[vote]
     return html.Span(
         [
             html.Span("●", style={"color": config["color"], "marginRight": "4px"}),
-            html.Span(f"{country_name}: {config['label']}"),
+            html.Span(f"{country_name}"),
         ],
         style={"fontWeight": "500", "marginRight": "15px", "fontSize": "0.9em"},
     )
@@ -156,6 +158,35 @@ layout = [
                 ],
                 style={"marginBottom": "20px", "minHeight": "5px"},
             ),  # Keep some space
+            # --- Vote Legend ---
+            html.Div(
+                [
+                    html.Span("Vote key:", style={"fontWeight": "bold", "marginRight": "12px", "fontSize": "0.85em", "color": "#555"}),
+                    *[
+                        html.Span(
+                            [html.Span("●", style={"color": color, "marginRight": "4px"}), label],
+                            style={"fontSize": "0.85em", "marginRight": "14px"},
+                        )
+                        for color, label in [
+                            ("green", "Yes"),
+                            ("red", "No"),
+                            ("orange", "Abstain"),
+                            ("blue", "Not Voting"),
+                            ("#999", "N/A"),
+                        ]
+                    ],
+                ],
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "flexWrap": "wrap",
+                    "padding": "8px 12px",
+                    "backgroundColor": "#f8f9fa",
+                    "borderRadius": "6px",
+                    "border": "1px solid #e0e0e0",
+                    "marginBottom": "14px",
+                },
+            ),
             # --- Results Area ---
             dcc.Loading(
                 id="rl-loading",
@@ -263,7 +294,7 @@ def register_callbacks():
                     "alignItems": "center",
                 }
         elif len(comparison_countries) > 1:
-            multi_msg = f"Comparing against top 5 of {len(comparison_countries)} selected countries. Agreement filter disabled for multi-select."
+            multi_msg = f"Comparing against {len(comparison_countries)} selected countries. Agreement filter disabled for multi-select."
             multi_msg_style = {"display": "block", "marginBottom": "10px"}
         elif country1:
             # Show vote filter only when main country is selected with no comparison countries
@@ -399,8 +430,8 @@ def register_callbacks():
                     create_vote_indicator(data.get_country_name(country1), c1_vote)
                 )
 
-            # Comparators (Force limit to 5 to avoid UI clutter)
-            for c2 in comparison_countries[:5]:
+            # Comparators (all selected countries)
+            for c2 in comparison_countries:
                 if c2 in row:
                     indicators.append(
                         create_vote_indicator(data.get_country_name(c2), row.get(c2))
@@ -410,37 +441,35 @@ def register_callbacks():
                 [
                     html.Div(
                         [
-                            html.A(
-                                html.Span(
-                                    f"{res_id}",
-                                    style={"color": "#007bff", "fontWeight": "bold"},
-                                ),
-                                href=link,
-                                target="_blank",
-                                style={"textDecoration": "none"},
+                            html.Div(
+                                [
+                                    html.A(
+                                        html.Span(
+                                            f"{res_id}",
+                                            style={"color": "#007bff", "fontWeight": "bold"},
+                                        ),
+                                        href=link,
+                                        target="_blank",
+                                        style={"textDecoration": "none"},
+                                    ),
+                                    html.Span(
+                                        date_str,
+                                        style={
+                                            "color": "#666",
+                                            "fontSize": "0.9em",
+                                            "marginLeft": "12px",
+                                        },
+                                    ),
+                                ],
+                                style={"marginBottom": "0.5rem"},
                             ),
-                            html.Span(
-                                date_str,
-                                style={
-                                    "float": "right",
-                                    "color": "#666",
-                                    "fontSize": "0.9em",
-                                },
-                            ),
+                            html.Div(title),
                         ],
-                        style={"marginBottom": "0.5rem"},
+                        className="resolution-card-main",
                     ),
-                    html.Div(title),
                     html.Div(
-                        indicators,
-                        style={
-                            "marginTop": "10px",
-                            "paddingTop": "10px",
-                            "borderTop": "1px solid #eee",
-                            "display": "flex",
-                            "flexWrap": "wrap",
-                            "gap": "5px",
-                        },
+                        [html.Div(ind, className="voting-list-row") for ind in indicators],
+                        className="voting-list",
                     )
                     if indicators
                     else None,

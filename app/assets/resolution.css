@@ -1,4 +1,7 @@
 .resolution-card {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
   background-color: white;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
@@ -14,4 +17,38 @@
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     transform: translateY(-1px);
   }
+}
+
+.resolution-card-main {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.voting-list {
+  flex: 0 0 200px;
+  max-height: calc(5 * 24px);
+  overflow-y: scroll;
+  border-left: 1px solid #eee;
+  margin-left: 15px;
+  padding-left: 15px;
+  align-self: stretch;
+}
+
+.voting-list::-webkit-scrollbar {
+  width: 6px;
+  background-color: #f1f1f1;
+}
+
+.voting-list::-webkit-scrollbar-thumb {
+  background-color: #c1c1c1;
+  border-radius: 3px;
+}
+
+.voting-list-row {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }

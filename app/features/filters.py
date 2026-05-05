@@ -7,8 +7,7 @@ from .. import data
 
 prefix = "filter-component"
 ids = {
-    "start_year": f"{prefix}-start-year",
-    "end_year": f"{prefix}-end-year",
+    "year_range": f"{prefix}-year-range",
     "era_preset": f"{prefix}-era-preset",
     "subject_dropdown": f"{prefix}-subject-dropdown",
     "country": f"{prefix}-country-dropdown",
@@ -20,6 +19,7 @@ ids = {
     "location": f"{prefix}-location",
     "keyword_search": f"{prefix}-keyword-search",
     "clear_country2_btn": f"{prefix}-clear-country2-btn",
+    "clear_subjects_btn": f"{prefix}-clear-subjects-btn",
 }
 
 # Country group presets for quick comparison selection
@@ -139,10 +139,9 @@ def parse_page_query_params(page_query_params):
 
 def register_callbacks():
 
-    # Callback: Apply era preset to year dropdowns
+    # Callback: Apply era preset to year range slider
     @callback(
-        Output(ids["start_year"], "value", allow_duplicate=True),
-        Output(ids["end_year"], "value", allow_duplicate=True),
+        Output(ids["year_range"], "value", allow_duplicate=True),
         Input(ids["era_preset"], "value"),
         prevent_initial_call=True,
     )
@@ -150,9 +149,10 @@ def register_callbacks():
         if not preset_key or preset_key not in ERA_PRESETS:
             from dash import no_update
 
-            return no_update, no_update
+            return no_update
         era = ERA_PRESETS[preset_key]
-        return era["start"], era["end"] or get_default_filter_values()["end_year"]
+        end_year = era["end"] or get_default_filter_values()["end_year"]
+        return [era["start"], end_year]
 
     # Callback: Apply preset to comparison countries
     @callback(
@@ -175,10 +175,18 @@ def register_callbacks():
     def clear_comparison(n_clicks):
         return [], None
 
+    # Callback: Clear subjects
+    @callback(
+        Output(ids["subject_dropdown"], "value", allow_duplicate=True),
+        Input(ids["clear_subjects_btn"], "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def clear_subjects(n_clicks):
+        return None
+
     # Callback: Reset all filters except main country
     @callback(
-        Output(ids["start_year"], "value"),
-        Output(ids["end_year"], "value"),
+        Output(ids["year_range"], "value"),
         Output(ids["era_preset"], "value"),
         Output(ids["subject_dropdown"], "value"),
         Output(ids["country"], "value"),
@@ -191,8 +199,7 @@ def register_callbacks():
     def reset_filters(n_clicks):
         default_filters = get_default_filter_values()
         return (
-            default_filters["start_year"],
-            default_filters["end_year"],
+            [default_filters["start_year"], default_filters["end_year"]],
             default_filters["era_preset"],
             default_filters["subject_ids"],
             default_filters["country1_alpha3"],
@@ -205,8 +212,7 @@ def register_callbacks():
     @callback(
         Output(ids["filter_store"], "data"),
         Output(ids["location"], "search"),
-        Input(ids["start_year"], "value"),
-        Input(ids["end_year"], "value"),
+        Input(ids["year_range"], "value"),
         Input(ids["subject_dropdown"], "value"),
         Input(ids["country"], "value"),
         Input(ids["country2"], "value"),
@@ -214,7 +220,7 @@ def register_callbacks():
         prevent_initial_call=False,
     )
     def update_filter_store(
-        start_year, end_year, subject_ids, country_iso3, country2, keyword
+        year_range, subject_ids, country_iso3, country2, keyword
     ):
         """
         Register callbacks for the filter component.
@@ -222,6 +228,10 @@ def register_callbacks():
         - Print current selections when filters change
         - Query data when filters change
         """
+        if isinstance(year_range, (list, tuple)) and len(year_range) == 2:
+            start_year, end_year = year_range
+        else:
+            start_year, end_year = None, None
         start_year = data.get_earliest_year() if start_year is None else start_year
         end_year = data.get_latest_year() if end_year is None else end_year
 
@@ -595,20 +605,68 @@ def layout(page_query_params: dict[str, str] | None = None):
                                 ],
                                 style={"flex": "1"},
                             ),
-                            # Preset dropdown (hidden, kept for callback compatibility)
+                            # Preset dropdown
                             html.Div(
                                 [
-                                    dcc.Dropdown(
+                                    html.Div(
+                                        [
+                                            html.Label(
+                                                [
+                                                    html.Span(
+                                                        "⚡",
+                                                        style={"marginRight": "5px"},
+                                                    ),
+                                                    "Quick Select",
+                                                ],
+                                                style={
+                                                    "fontWeight": "600",
+                                                    "color": "#495057",
+                                                    "fontSize": "15px",
+                                                    "marginBottom": "0",
+                                                    "display": "inline-block",
+                                                },
+                                            ),
+                                            # Invisible spacer matching Clear All button
+                                            # to keep this label row the same height as
+                                            # the Compare with row (which has the button).
+                                            html.Button(
+                                                "↺ Clear All",
+                                                n_clicks=0,
+                                                tabIndex=-1,
+                                                style={
+                                                    "marginLeft": "12px",
+                                                    "padding": "4px 12px",
+                                                    "fontSize": "13px",
+                                                    "fontWeight": "400",
+                                                    "border": "1px solid transparent",
+                                                    "borderRadius": "4px",
+                                                    "fontFamily": "inherit",
+                                                    "verticalAlign": "middle",
+                                                    "visibility": "hidden",
+                                                    "pointerEvents": "none",
+                                                },
+                                            ),
+                                        ],
+                                        style={
+                                            "marginBottom": "8px",
+                                            "display": "flex",
+                                            "alignItems": "center",
+                                        },
+                                    ),
+                                    fac.AntdSelect(
                                         id=ids["preset"],
                                         options=[
                                             {"label": p["label"], "value": k}
                                             for k, p in COUNTRY_PRESETS.items()
                                         ],
                                         value=initial_filters["preset"],
-                                        clearable=True,
+                                        placeholder="Choose a group...",
+                                        allowClear=True,
+                                        style={"width": "100%"},
+                                        locale="en-us",
                                     ),
                                 ],
-                                style={"display": "none"},
+                                style={"flex": "0 0 220px"},
                             ),
                         ],
                         style={
@@ -649,57 +707,23 @@ def layout(page_query_params: dict[str, str] | None = None):
                                         ]
                                     ),
                                     html.Div(
-                                        [
-                                            dcc.Dropdown(
-                                                id=ids["start_year"],
-                                                options=[
-                                                    {"label": str(y), "value": y}
-                                                    for y in range(
-                                                        earliest_year,
-                                                        latest_year + 1,
-                                                    )
-                                                ],
-                                                value=initial_filters["start_year"],
-                                                clearable=False,
-                                                searchable=True,
-                                                style={
-                                                    "flex": "1",
-                                                    "fontSize": "14px",
-                                                },
-                                            ),
-                                            html.Span(
-                                                "–",
-                                                style={
-                                                    "padding": "0 8px",
-                                                    "color": "#6c757d",
-                                                    "fontWeight": "600",
-                                                    "alignSelf": "center",
-                                                },
-                                            ),
-                                            dcc.Dropdown(
-                                                id=ids["end_year"],
-                                                options=[
-                                                    {"label": str(y), "value": y}
-                                                    for y in range(
-                                                        earliest_year,
-                                                        latest_year + 1,
-                                                    )
-                                                ],
-                                                value=initial_filters["end_year"],
-                                                clearable=False,
-                                                searchable=True,
-                                                style={
-                                                    "flex": "1",
-                                                    "fontSize": "14px",
-                                                },
-                                            ),
-                                        ],
-                                        style={
-                                            "display": "flex",
-                                            "flexDirection": "row",
-                                            "alignItems": "center",
-                                            "gap": "4px",
-                                        },
+                                        dcc.RangeSlider(
+                                            id=ids["year_range"],
+                                            min=earliest_year,
+                                            max=latest_year,
+                                            step=1,
+                                            value=[
+                                                initial_filters["start_year"],
+                                                initial_filters["end_year"],
+                                            ],
+                                            marks=None,
+                                            tooltip={
+                                                "placement": "bottom",
+                                                "always_visible": True,
+                                            },
+                                            allowCross=False,
+                                        ),
+                                        style={"padding": "0 6px"},
                                     ),
                                     dcc.Dropdown(
                                         id=ids["era_preset"],
@@ -713,7 +737,7 @@ def layout(page_query_params: dict[str, str] | None = None):
                                         style={
                                             "width": "100%",
                                             "fontSize": "13px",
-                                            "marginTop": "8px",
+                                            "marginTop": "32px",
                                         },
                                     ),
                                 ],
@@ -742,11 +766,34 @@ def layout(page_query_params: dict[str, str] | None = None):
                                                     "fontWeight": "600",
                                                     "color": "#495057",
                                                     "fontSize": "15px",
-                                                    "marginBottom": "8px",
-                                                    "display": "block",
+                                                    "marginBottom": "0",
+                                                    "display": "inline-block",
                                                 },
                                             ),
-                                        ]
+                                            html.Button(
+                                                "↺ Clear All",
+                                                id=ids["clear_subjects_btn"],
+                                                n_clicks=0,
+                                                style={
+                                                    "marginLeft": "12px",
+                                                    "padding": "4px 12px",
+                                                    "fontSize": "13px",
+                                                    "fontWeight": "400",
+                                                    "color": "#495057",
+                                                    "backgroundColor": "transparent",
+                                                    "border": "1px solid #adb5bd",
+                                                    "borderRadius": "4px",
+                                                    "cursor": "pointer",
+                                                    "fontFamily": "inherit",
+                                                    "verticalAlign": "middle",
+                                                },
+                                            ),
+                                        ],
+                                        style={
+                                            "marginBottom": "8px",
+                                            "display": "flex",
+                                            "alignItems": "center",
+                                        },
                                     ),
                                     fac.AntdTreeSelect(
                                         id=ids["subject_dropdown"],
