@@ -20,6 +20,7 @@ from ..features import agreement_choropleth
 from ..features import agreement_graph
 from ..features import agreement_by_subject
 from ..features import wordcloud_interactive
+from ..features import multilateral_scatter
 from ..features import filters
 from .. import data
 
@@ -118,7 +119,29 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                             )
                         ],
                     ),
-                    # TAB 5: Word Cloud
+                    # TAB 5: Multilateral Alignment
+                    dcc.Tab(
+                        label="Multilateral Overview",
+                        value="multilateral",
+                        children=[
+                            html.Div(
+                                [
+                                    html.H2("Multilateral Agreement Overview"),
+                                    html.P(
+                                        "Explore how closely each country's voting aligns with the broader UN membership "
+                                        "across the selected resolutions, and how often countries abstain.",
+                                        style={
+                                            "color": "#7f8c8d",
+                                            "marginBottom": "20px",
+                                        },
+                                    ),
+                                    *multilateral_scatter.layout,
+                                ],
+                                className="tab-content",
+                            )
+                        ],
+                    ),
+                    # TAB 6: Word Cloud
                     dcc.Tab(
                         label="Word Cloud",
                         value="wordcloud",
@@ -221,6 +244,7 @@ agreement_graph.register_callbacks()
 agreement_by_subject.register_callbacks(data.query_engine)
 
 
+multilateral_scatter.register_callbacks(data.query_engine)
 wordcloud_interactive.register_callbacks()
 
 
@@ -481,6 +505,7 @@ def disable_filters_based_on_tab(selected_tab):
     """
     is_map_tab = selected_tab == "map"
     is_wordcloud_tab = selected_tab == "wordcloud"
+    is_multilateral_tab = selected_tab == "multilateral"
     is_timeline_or_subject_tab = selected_tab in ["timeline", "subject"]
 
     # Base styles
@@ -505,6 +530,19 @@ def disable_filters_based_on_tab(selected_tab):
             True,
             False,
             disabled_style,
+            disabled_style,
+            disabled_style,
+            base_style,
+        )
+    elif is_multilateral_tab:
+        # Alignment Overview: keep main country enabled (used for highlight),
+        # disable comparison dropdowns
+        return (
+            False,
+            True,
+            True,
+            False,
+            base_style,
             disabled_style,
             disabled_style,
             base_style,

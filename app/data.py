@@ -210,6 +210,18 @@ def get_region_tree_data() -> list[dict]:
 
 REGION_TREE_DATA = get_region_tree_data()
 
+# Country → M49 top-level region lookup
+_m49_df = pd.read_csv(_M49_PATH, sep=";")
+_COUNTRY_TO_REGION: dict[str, str] = {
+    row["ISO-alpha3 Code"].strip(): row["Region Name"].strip()
+    for _, row in _m49_df.iterrows()
+    if isinstance(row.get("ISO-alpha3 Code"), str) and isinstance(row.get("Region Name"), str)
+}
+
+
+def get_country_region(iso3: str) -> str:
+    return _COUNTRY_TO_REGION.get(iso3, "Other")
+
 # Top level subjects (level 0 in the hierarchy)
 TOP_LEVEL_SUBJECTS = {
     'http://metadata.un.org/thesaurus/10', 

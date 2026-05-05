@@ -276,7 +276,7 @@ data/
 ├── resolution_subject_table.csv
 ├── subject_table.csv
 ├── closure_table.csv
-└── agreement_matrices.pkl  # Binary format for fast loading
+└── precomputed_agreement_data.pkl  # Binary format for fast loading
 ```
 
 **Cache Behavior:**
@@ -359,7 +359,7 @@ class HRCProcessor(DatasetProcessor):
 ## Troubleshooting
 
 **Issue: "Agreement matrices not available"**
-- Ensure data is processed: Check if `agreement_matrices.pkl` exists in data folder
+- Ensure data is processed: Check if `precomputed_agreement_data.pkl` exists in data folder
 - Force recalculation: `repo.force_recalculate_agreement_matrices()`
 
 **Issue: "Country not found in country columns"**

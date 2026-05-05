@@ -1,14 +1,15 @@
 """
 Query engine for resolution data analysis.
 
-This module provides advanced querying capabilities for UN resolution data,
-including subject-based filtering, trend analysis, and temporal queries.
+This module provides querying capabilities for UN resolution data,
+including subject-based and date filtering, bilateral vote agreement,
+lookups and multilateral alignment statistics.
 """
 
-import pandas as pd
+from typing import Dict, Optional, List
+
 import numpy as np
-from typing import Dict, Optional, List, Tuple, Any
-from pathlib import Path
+import pandas as pd
 
 from ..data import DataRepository
 
@@ -19,9 +20,9 @@ class ResolutionQueryEngine:
     def __init__(self, repo: DataRepository):
         """
         Initialize query engine with processed data.
-        
+
         Args:
-            data: Dictionary containing processed DataFrames
+            repo: DataRepository instance providing all precomputed tables and matrices.
         """
         data = repo.get_data()
         self.logger = repo.logger
@@ -30,10 +31,39 @@ class ResolutionQueryEngine:
         self.resolution_subject_table = data.get('resolution_subject', pd.DataFrame())
         self.subject_table = data.get('subject', pd.DataFrame())
         self.closure_table = data.get('closure', pd.DataFrame())
-        self.agreement_matrices = data.get('agreement_matrices', pd.DataFrame())
+        self.agreement_matrices = data.get('agreement_matrices', {})
         self.country_columns = data.get('country_columns', [])
 
-    def query_resolutions(self, start_date: Optional[str] = None, end_date: Optional[str] = None, subject_ids: Optional[List[str]] = None, language: str = "en", include_descendants: bool = True) -> pd.DataFrame:
+        self._multilateral_scores = data.get('multilateral_scores')
+
+        # Precompute voted/abstained bool arrays (R x C) from resolution_table once at startup.
+        # multilateral_scores rows, _voted rows and _abstained rows all share resolution_table's
+        # row order (calculate_agreement_data iterates resolutions_df in order), so one index
+        # dict covers all three arrays.
+        if not self.resolution_table.empty and self.country_columns:
+            votes = (
+                self.resolution_table[self.country_columns]
+                .astype(str)
+                .apply(lambda s: s.str.strip().str.upper())
+                .replace({"NAN": pd.NA, "NONE": pd.NA, "<NA>": pd.NA, "": pd.NA})
+            )
+            self._voted: np.ndarray = votes.notna().to_numpy()
+            self._abstained: np.ndarray = (votes == "A").to_numpy()
+            self._row_index: dict[str, int] = {
+                rid: i for i, rid in enumerate(self.resolution_table["undl_id"].tolist())
+            }
+        else:
+            self._voted = np.empty((0, 0), dtype=bool)
+            self._abstained = np.empty((0, 0), dtype=bool)
+            self._row_index = {}
+
+    def query_resolutions(
+            self, start_date: Optional[str] = None,
+            end_date: Optional[str] = None,
+            subject_ids: Optional[List[str]] = None,
+            language: str = "en",
+            include_descendants: bool = True
+    ) -> pd.DataFrame:
         """
         Query resolutions based on date range and subject filters.
         
@@ -97,31 +127,36 @@ class ResolutionQueryEngine:
         self.logger.info(f"Final result: {len(filtered_df)} resolutions")
         return filtered_df
 
-    def query_agreement_matrix(self, resolution_ids: Optional[List[str]]) -> Dict[str, Any]:
+    def query_agreement_matrix(self, resolution_ids: Optional[List[str]]) -> Dict[str, np.ndarray]:
         """
-        Retrieve agreement matrices for specified resolutions.
-        
+        Retrieve bilateral vote-agreement matrices for specified resolutions.
+
         Args:
-            resolution_ids: List of undl_id strings for which to retrieve matrices
+            resolution_ids: List of undl_id strings to retrieve. If None or empty,
+                returns the full dict of all bilateral matrices.
         Returns:
-            Dict[str, Any]: Mapping of undl_id to its agreement matrix (as numpy array)
+            Dict[str, np.ndarray]: Mapping of undl_id to its (C x C) bilateral matrix.
         """
         if resolution_ids is None or len(resolution_ids) == 0:
-            # Return all matrices
             return self.agreement_matrices
-        
+
         matrices = {}
         for res_id in resolution_ids:
             matrix = self.agreement_matrices.get(res_id)
             if matrix is not None:
                 matrices[res_id] = matrix
             else:
-                self.logger.warning(f"No agreement matrix found for resolution ID: {res_id}")
+                self.logger.warning(f"No bilateral matrix found for resolution ID: {res_id}")
         return matrices
     
-    def query_agreement_between_countries(self, country_code: str, resolution_ids: Optional[List[str]] = None, average: bool = False) -> pd.DataFrame:
+    def query_agreement_between_countries(
+            self,
+            country_code: str,
+            resolution_ids: Optional[List[str]] = None,
+            average: bool = False
+    ) -> pd.DataFrame:
         """
-        Get agreement scores between a selected country and all other countries.
+        Get bilateral agreement scores between a selected country and all other countries.
         
         Args:
             country_code: Country code (column name) to analyze
@@ -130,12 +165,17 @@ class ResolutionQueryEngine:
                     if False, return scores for each resolution separately
         
         Returns:
-            pd.DataFrame: Agreement scores with columns:
-                - If average=False: ['undl_id', 'target_country', 'agreement_score']
-                - If average=True: ['target_country', 'average_agreement_score']
+            pd.DataFrame in wide format — one column per country (ISO3 code), excluding
+            country_code itself:
+                - If average=False: one row per resolution; columns ['undl_id', <iso3>, ...]
+                  where each cell is the bilateral agreement score between country_code and
+                  that country on that resolution.
+                - If average=True: a single row; columns ['source_country',
+                  'resolution_count', <iso3>, ...] where each cell is the mean bilateral
+                  agreement score across all selected resolutions.
         """
         if not self.agreement_matrices:
-            self.logger.error("No agreement matrices available")
+            self.logger.error("No bilateral matrices available")
             return pd.DataFrame()
         
         if country_code not in self.country_columns:
@@ -157,7 +197,7 @@ class ResolutionQueryEngine:
             
             missing_ids = set(resolution_ids or []) - set(target_resolutions)
             if missing_ids:
-                self.logger.warning(f"Missing agreement matrices for {len(missing_ids)} resolutions")
+                self.logger.warning(f"Missing bilateral matrices for {len(missing_ids)} resolutions")
         
         if not target_resolutions:
             self.logger.warning("No valid resolutions found for agreement analysis")
@@ -169,33 +209,33 @@ class ResolutionQueryEngine:
         all_resolution_data = []
         
         for resolution_id in target_resolutions:
-            matrix = self.agreement_matrices[resolution_id]
-            
+            matrix = self.agreement_matrices[resolution_id]  # (C, C)
+
             # Extract row for target country (agreement with all others)
-            country_agreements = matrix[country_index, :]
-            
+            country_agreements = matrix[country_index, :]    # (C,)
+
             # Create record for this resolution
             resolution_data = {'undl_id': resolution_id}
-            
+
             # Add agreement score with each other country
             for other_idx, other_country in enumerate(self.country_columns):
                 if other_idx != country_index:  # Skip self-agreement
                     agreement_score = country_agreements[other_idx]
                     resolution_data[other_country] = agreement_score if not np.isnan(agreement_score) else np.nan
-            
+
             all_resolution_data.append(resolution_data)
-        
+
         if not all_resolution_data:
             self.logger.warning("No valid agreement scores found")
             return pd.DataFrame()
-        
+
         # Convert to DataFrame
-        scores_df = pd.DataFrame(all_resolution_data)
-        
+        scores_df = pd.DataFrame(all_resolution_data)        # (R', C-1) + undl_id column
+
         if average:
             # Calculate average agreement per country (excluding undl_id column)
             country_cols = [col for col in scores_df.columns if col != 'undl_id']
-            avg_scores = scores_df[country_cols].mean(skipna=True)
+            avg_scores = scores_df[country_cols].mean(skipna=True)  # (C-1,)
             
             # Create single-row DataFrame with averages
             avg_df = pd.DataFrame([avg_scores.values], columns=avg_scores.index)
@@ -213,6 +253,50 @@ class ResolutionQueryEngine:
             self.logger.info(f"Retrieved agreement scores for {len(scores_df)} resolutions")
             return scores_df
         
+    def query_multilateral_stats(self, resolution_ids: Optional[List[str]] = None) -> pd.DataFrame:
+        """
+        For each country, compute the average multilateral alignment and abstention rate
+        across the given resolutions, based on the full precomputed (R x C) arrays.
+
+        Args:
+            resolution_ids: List of undl_ids to include. If None or empty, uses all
+                resolutions in the dataset.
+
+        Returns:
+            pd.DataFrame with one row per country and columns:
+                - country: ISO3 country code
+                - multilateral_alignment: mean pairwise agreement with all other voting
+                  countries, averaged across selected resolutions (NaN if no participation)
+                - abstention_rate: fraction of votes cast as abstentions (NaN if no votes)
+                - participation_count: number of selected resolutions the country voted on
+        """
+        if self._multilateral_scores is None or not self.country_columns:
+            return pd.DataFrame()
+
+        if resolution_ids is None or len(resolution_ids) == 0:
+            rows = list(self._row_index.values())
+        else:
+            rows = [self._row_index[r] for r in resolution_ids if r in self._row_index]
+
+        if not rows:
+            return pd.DataFrame()
+
+        align_slice = self._multilateral_scores[rows]              # (R', C) float32
+        avg_alignment = np.nanmean(align_slice, axis=0)            # (C,) float64
+
+        voted_slice = self._voted[rows]                            # (R', C) bool
+        abstained_slice = self._abstained[rows]                    # (R', C) bool
+        participation = voted_slice.sum(axis=0)                    # (C,) int
+        abstentions = abstained_slice.sum(axis=0)                  # (C,) int
+        abstention_rate = np.where(participation > 0, abstentions / participation, np.nan)
+
+        return pd.DataFrame({
+            "country": self.country_columns,
+            "multilateral_alignment": avg_alignment,
+            "abstention_rate": abstention_rate,
+            "participation_count": participation,
+        })
+
     def get_available_countries(self) -> List[str]:
         """Get list of available country codes in the dataset."""
         return self.country_columns

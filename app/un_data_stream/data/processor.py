@@ -105,107 +105,133 @@ class DataProcessor:
     def calculate_agreement_data(
             self,
             resolutions_df: pd.DataFrame
-    ) -> Tuple[Dict[str, np.ndarray], Dict[str, float], List[str]]:
-      """
-      Calculate agreement matrices and consensus scores for all resolutions.
-      
-      Args:
-          resolutions_df : pd.DataFrame
-              DataFrame with one row per resolution, containing voting columns
-              for each member state and metadata columns
-      
-      Returns:
-          Tuple[Dict[str, np.ndarray], Dict[str, float], List[str]]:
-              - agreement_matrices: Dict mapping undl_id to its agreement matrix.
-              - consensus_scores: Dict mapping undl_id to its score.
-              - country_columns: List of country columns used in the matrices.
-      """
-      self.logger.info("Starting agreement matrix calculation")
-      start_time = time.time()
-      
-      # Step 1: Identify country columns (exclude metadata)
-      metadata_columns = {
-          'undl_id', 'date', 'session', 'resolution', 'draft', 
-          'committee_report', 'meeting', 'title', 'agenda_title', 
-          'subjects', 'total_yes', 'total_no', 'total_abstentions', 
-          'total_non_voting', 'total_ms', 'undl_link', 'subject_id',
-          'description', 'agenda', 'modality', 'source_dataset'
-      }
-      
-      country_columns = [col for col in resolutions_df.columns 
-                        if col not in metadata_columns]
-      
-      self.logger.info(f"Found {len(country_columns)} country columns")
-      self.logger.info(f"Processing {len(resolutions_df)} resolutions")
-      
-      # Step 2: Calculate agreement matrix and consensus score for each resolution
-      agreement_matrices = {}
-      consensus_scores = {}
+    ) -> Tuple[Dict[str, np.ndarray], Dict[str, float], List[str], np.ndarray]:
+        """
+        For each resolution, calculate one full vote-agreement matrix (C x C) as well as the
+        resolution's aggregate "consensus score" (scalar).
 
-      for idx, row in progressbar(resolutions_df.iterrows(), total=len(resolutions_df)):
-          undl_id = row['undl_id']
-          agreement_matrix = self._calculate_single_resolution_matrix(row, country_columns)
-          c_score = self._calculate_single_consensus_score(agreement_matrix)
-          agreement_matrices[undl_id] = agreement_matrix
-          consensus_scores[undl_id] = c_score
+        Also compute the compact (R x C) multilateral_scores array, which summarises for each
+        resolution each country's mean pairwise agreement with all other countries that voted.
 
+        Row i of multilateral_scores corresponds to row i of resolutions_df — the same ordering
+        that resolution_table preserves — so no separate index list is needed.
 
-      elapsed_time = time.time() - start_time
-      n_res = len(agreement_matrices)
-      assert n_res == len(resolutions_df)
-      self.logger.info(
-          f"Calculated {n_res} agreement matrices and consensus scores in {elapsed_time:.2f}s"
-      )
-      
-      return agreement_matrices, consensus_scores, country_columns
+        Args:
+            resolutions_df : pd.DataFrame
+                DataFrame with one row per resolution, containing voting columns
+                for each member state and metadata columns
+
+        Returns:
+            Tuple of:
+                - agreement_matrices: Dict mapping undl_id to its (C x C) agreement matrix.
+                - consensus_scores: Dict mapping undl_id to its score.
+                - country_columns: List of country columns used in the matrices.
+                - multilateral_scores: (R x C) float32 array — per-resolution per-country
+                  row-mean alignment score (NaN where country did not vote).
+        """
+        self.logger.info("Starting bilateral agreement matrix and multilateral scores calculation")
+        start_time = time.time()
+
+        # Step 1: Identify country columns (exclude metadata)
+        metadata_columns = {
+            'undl_id', 'date', 'session', 'resolution', 'draft',
+            'committee_report', 'meeting', 'title', 'agenda_title',
+            'subjects', 'total_yes', 'total_no', 'total_abstentions',
+            'total_non_voting', 'total_ms', 'undl_link', 'subject_id',
+            'description', 'agenda', 'modality', 'source_dataset'
+        }
+
+        country_columns = [col for col in resolutions_df.columns
+                          if col not in metadata_columns]
+
+        self.logger.info(f"Found {len(country_columns)} country columns")
+        self.logger.info(f"Processing {len(resolutions_df)} resolutions")
+
+        n = len(country_columns)
+        off_diag_mask = ~np.eye(n, dtype=bool)
+
+        # Step 2: Calculate the full agreement matrix and consensus score for each resolution.
+        # Also build the compact (R x C) multilateral scores array in the same pass.
+        agreement_matrices = {}
+        consensus_scores = {}
+        multilateral_rows = []
+
+        for idx, row in progressbar(resolutions_df.iterrows(), total=len(resolutions_df)):
+            undl_id = row['undl_id']
+            agreement_matrix = self._calculate_single_resolution_matrix(row, country_columns)
+            c_score = self._calculate_single_consensus_score(agreement_matrix)
+            agreement_matrices[undl_id] = agreement_matrix
+            consensus_scores[undl_id] = c_score
+
+            # Per-country row-mean (off-diagonal only) for the multilateral scores array
+            mat_no_diag = np.where(off_diag_mask, agreement_matrix, np.nan)
+            num_valid = np.sum(~np.isnan(mat_no_diag), axis=1)
+            row_means = np.full(n, np.nan)
+            row_agreement_sums = np.nansum(mat_no_diag, axis=1)
+            np.divide(row_agreement_sums, num_valid, out=row_means, where=num_valid > 0)
+            multilateral_rows.append(row_means)
+
+        multilateral_scores = np.array(multilateral_rows, dtype=np.float32)  # Float32 saves disk space when pickling
+
+        elapsed_time = time.time() - start_time
+        n_res = len(agreement_matrices)
+        assert n_res == len(resolutions_df)
+        self.logger.info(
+            f"Calculated {n_res} bilateral matrices, consensus scores, "
+            f"and multilateral_scores ({multilateral_scores.shape}) in {elapsed_time:.2f}s"
+        )
+
+        return agreement_matrices, consensus_scores, country_columns, multilateral_scores
 
     @staticmethod
     def _calculate_single_resolution_matrix(
             resolution_row: pd.Series,
             country_columns: List[str]
     ) -> np.ndarray:
-      """
-      Quickly calculate the agreement matrix for a single resolution.
+        """
+        Quickly calculate the full vote-agreement matrix for a single resolution.
 
-      Uses vectorized calculation via NumPy broadcasting.
-      
-      Args:
-          resolution_row: Series containing votes for all countries
-          country_columns: List of country column names
-      
-      Returns:
-          np.ndarray: 2D agreement matrix (n_countries x n_countries)
-      """
-      # 1. Map votes to numeric values
-      vote_mapping = {"Y": 1.0, "A": 0.0, "N": -1.0}
+        Uses vectorized calculation via NumPy broadcasting.
 
-      # Extract the country votes as a NumPy array (floats to accommodate NaN)
-      # Using .get() for safety, defaulting to np.nan
-      votes = np.array([vote_mapping.get(resolution_row[c], np.nan) for c in country_columns])
+        Args:
+            resolution_row: Series containing votes for all countries
+            country_columns: List of country column names
 
-      # 2. Use broadcasting to compute all pairwise absolute differences
-      # votes[:, np.newaxis] creates a column vector (N, 1)
-      # votes[np.newaxis, :] creates a row vector (1, N)
-      # The subtraction results in an (N, N) matrix of all combinations
-      abs_diff_mat = np.abs(votes[:, np.newaxis] - votes[np.newaxis, :])
+        Returns:
+            np.ndarray: 2D agreement matrix (C x C)
+        """
+        # 1. Map votes to numeric values
+        vote_mapping = {"Y": 1.0, "A": 0.0, "N": -1.0}
 
-      # 3. Apply the agreement-score formula to the entire matrix at once
-      agreement_matrix = 1.0 - (abs_diff_mat / 2.0)
+        # Extract the country votes as a NumPy array (floats to accommodate NaN)
+        # Using .get() for safety, defaulting to np.nan
+        votes = np.array([vote_mapping.get(resolution_row[c], np.nan) for c in country_columns])
 
-      return agreement_matrix
+        # 2. Use broadcasting to compute all pairwise absolute differences
+        # votes[:, np.newaxis] creates a column vector (C, 1)
+        # votes[np.newaxis, :] creates a row vector (1, C)
+        # The subtraction results in an (C, C) matrix of all combinations
+        abs_diff_mat = np.abs(votes[:, np.newaxis] - votes[np.newaxis, :])
+
+        # 3. Apply the agreement-score formula to the entire matrix at once
+        agreement_matrix = (1.0 - (abs_diff_mat / 2.0))
+
+        # 4. Downcast to save disk space when pickling later
+        agreement_matrix = agreement_matrix.astype(np.float32)
+
+        return agreement_matrix
 
     @staticmethod
     def _calculate_single_consensus_score(agreement_matrix: np.ndarray) -> float:
         """
-        Calculate the 'consensus' score for a given resolution, based on
-        the resolution's agreement matrix.
+        Calculate the consensus score for a given resolution, based on the
+        resolution's full vote-agreement matrix.
 
-        The consensus score is simply the average vote-agreement score
-        across all country pairs for which both members voted on the resolution
-        at hand.
+        The consensus score is simply the average vote-agreement score across
+        all country pairs where both sides voted on the resolution at hand.
 
         Args:
-            agreement_matrix: np.ndarray: 2D agreement matrix (n_countries x n_countries)
+            agreement_matrix: np.ndarray: 2D agreement matrix (C x C)
 
         Returns:
             float

@@ -72,7 +72,8 @@ class DataRepository:
             'closure': self.closure_table,
             'broader': self.broader_table,
             'agreement_matrices': self.agreement_matrices,
-            'country_columns': self.country_columns
+            'country_columns': self.country_columns,
+            'multilateral_scores': self.multilateral_scores,
         }
     
     def _load_config(self):
@@ -170,7 +171,7 @@ class DataRepository:
             'subject_table.csv',
             'closure_table.csv',
             'broader_table.csv',
-            'agreement_matrices.pkl'
+            'precomputed_agreement_data.pkl'
         ]
         all_exist = all((data_path / file).exists() for file in required_files)
         if all_exist:
@@ -221,14 +222,20 @@ class DataRepository:
         self.subject_table = pd.read_csv(data_path / 'subject_table.csv')
         self.closure_table = pd.read_csv(data_path / 'closure_table.csv')
         self.broader_table = pd.read_csv(data_path / 'broader_table.csv')
-        self.logger.info("Cached data loaded successfully.")
 
-        # Load agreement matrices
-        with open(data_path / 'agreement_matrices.pkl', 'rb') as f:
+        # Load full vote-agreement matrices
+        with open(data_path / 'precomputed_agreement_data.pkl', 'rb') as f:
             agreement_data = pickle.load(f)
+
+        if 'multilateral_scores' not in agreement_data:
+            raise KeyError("Cached pkl missing multilateral_scores — stale cache, rebuild required.")
+
+        # One full vote-agreement matrix (C x C) for each resolution
+
 
         self.agreement_matrices = agreement_data['agreement_matrices']
         self.country_columns = agreement_data['country_columns']
+        self.multilateral_scores = agreement_data['multilateral_scores']
     
     def _save_cached_data(self):
         """Save data files into DataFrames."""
@@ -242,13 +249,13 @@ class DataRepository:
         self.closure_table.to_csv(data_path / 'closure_table.csv', index=False)
         self.broader_table.to_csv(data_path / 'broader_table.csv', index=False)
 
-        with open(data_path / 'agreement_matrices.pkl', 'wb') as f:
-            agreement_data = {
+        with open(data_path / 'precomputed_agreement_data.pkl', 'wb') as f:
+            pickle.dump({
                 'agreement_matrices': self.agreement_matrices,
-                'country_columns': self.country_columns
-            }
-            pickle.dump(agreement_data, f)
-            
+                'country_columns': self.country_columns,
+                'multilateral_scores': self.multilateral_scores,
+            }, f)
+
         # Save Metadata (Version)
         metadata = {
             'version': self.config.get('version', 'unknown'),
@@ -287,10 +294,15 @@ class DataRepository:
         self.resolution_table, self.resolution_subject_table = processor.normalize_resolutions(ga_resolutions)
 
         # Calculate agreement data for all resolutions
-        self.agreement_matrices, c_score, self.country_columns = processor.calculate_agreement_data(self.resolution_table)
+        (
+            self.agreement_matrices,
+            consensus_scores,
+            self.country_columns,
+            self.multilateral_scores,
+        ) = processor.calculate_agreement_data(self.resolution_table)
 
         # Add consensus scores to the resolution table
-        self.resolution_table['consensus_score'] = self.resolution_table['undl_id'].map(c_score)
+        self.resolution_table['consensus_score'] = self.resolution_table['undl_id'].map(consensus_scores)
 
         
         expanded_subjects = set()
@@ -306,7 +318,6 @@ class DataRepository:
         self.subject_table = self.subject_table[self.subject_table['subject_id'].isin(expanded_subjects)]
         self.closure_table = self.closure_table[self.closure_table['ancestor_id'].isin(expanded_subjects)]
         self.broader_table = self.broader_table[self.broader_table['parent_id'].isin(expanded_subjects)]
-
 
         # Save processed data
         self._save_cached_data()
