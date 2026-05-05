@@ -1,4 +1,4 @@
-from dash import Input, Output, State, callback, clientside_callback, html, dcc
+from dash import Input, Output, State, callback, clientside_callback, html, dcc, ctx, no_update
 import feffery_antd_components as fac
 import pandas as pd
 import urllib.parse
@@ -9,6 +9,8 @@ prefix = "filter-component"
 ids = {
     "year_range": f"{prefix}-year-range",
     "era_preset": f"{prefix}-era-preset",
+    "era_prev_btn": f"{prefix}-era-prev-btn",
+    "era_next_btn": f"{prefix}-era-next-btn",
     "subject_dropdown": f"{prefix}-subject-dropdown",
     "country": f"{prefix}-country-dropdown",
     "country2": f"{prefix}-country2-dropdown",
@@ -92,6 +94,13 @@ ERA_PRESETS = {
     },
 }
 
+# Ordered sequence of the six institutional eras for ◀ ▶ navigation
+# Excludes the two cross-cutting presets (until_1991, since_1992)
+ERA_SEQUENCE = [
+    "un_founding", "decolonization", "nieo_period",
+    "post_bipolarity", "mdg_era", "sdg_era",
+]
+
 
 def get_default_filter_values():
     return {
@@ -149,6 +158,34 @@ def parse_page_query_params(page_query_params):
 
 def register_callbacks():
 
+    # Callback: Step through eras with ◀ ▶ buttons
+    @callback(
+        Output(ids["era_preset"], "value", allow_duplicate=True),
+        Input(ids["era_prev_btn"], "n_clicks"),
+        Input(ids["era_next_btn"], "n_clicks"),
+        State(ids["era_preset"], "value"),
+        prevent_initial_call=True,
+    )
+    def step_era(prev_clicks, next_clicks, current_era):
+        if current_era in ERA_SEQUENCE:
+            idx = ERA_SEQUENCE.index(current_era)
+            new_idx = max(0, idx - 1) if ctx.triggered_id == ids["era_prev_btn"] else min(len(ERA_SEQUENCE) - 1, idx + 1)
+        else:
+            new_idx = 0 if ctx.triggered_id == ids["era_next_btn"] else len(ERA_SEQUENCE) - 1
+        return ERA_SEQUENCE[new_idx]
+
+    # Callback: Disable ◀ / ▶ at the ends of ERA_SEQUENCE
+    @callback(
+        Output(ids["era_prev_btn"], "disabled"),
+        Output(ids["era_next_btn"], "disabled"),
+        Input(ids["era_preset"], "value"),
+    )
+    def update_era_nav_state(current_era):
+        if current_era not in ERA_SEQUENCE:
+            return False, False
+        idx = ERA_SEQUENCE.index(current_era)
+        return idx == 0, idx == len(ERA_SEQUENCE) - 1
+
     # Callback: Apply era preset to year range slider
     @callback(
         Output(ids["year_range"], "value", allow_duplicate=True),
@@ -157,8 +194,6 @@ def register_callbacks():
     )
     def apply_era_preset(preset_key):
         if not preset_key or preset_key not in ERA_PRESETS:
-            from dash import no_update
-
             return no_update
         era = ERA_PRESETS[preset_key]
         end_year = era["end"] or get_default_filter_values()["end_year"]
@@ -727,32 +762,65 @@ def layout(page_query_params: dict[str, str] | None = None):
                                                 initial_filters["end_year"],
                                             ],
                                             marks=None,
-                                            tooltip={
-                                                "placement": "bottom",
-                                                "always_visible": True,
-                                            },
+                                            tooltip=None,
                                             allowCross=False,
                                         ),
-                                        style={"padding": "0 6px"},
+                                        style={},
                                     ),
-                                    dcc.Dropdown(
-                                        id=ids["era_preset"],
-                                        options=[
-                                            {"label": e["label"], "value": k}
-                                            for k, e in ERA_PRESETS.items()
+                                    html.Div(
+                                        [
+                                            html.Button(
+                                                "◀",
+                                                id=ids["era_prev_btn"],
+                                                n_clicks=0,
+                                                style={
+                                                    "fontSize": "14px",
+                                                    "color": "#495057",
+                                                    "backgroundColor": "transparent",
+                                                    "border": "1px solid #adb5bd",
+                                                    "borderRadius": "4px",
+                                                    "cursor": "pointer",
+                                                    "fontFamily": "inherit",
+                                                },
+                                            ),
+                                            dcc.Dropdown(
+                                                id=ids["era_preset"],
+                                                options=[
+                                                    {"label": e["label"], "value": k}
+                                                    for k, e in ERA_PRESETS.items()
+                                                ],
+                                                value=initial_filters["era_preset"],
+                                                placeholder="Quick select era...",
+                                                clearable=True,
+                                                style={
+                                                    "fontSize": "14px",
+                                                },
+                                            ),
+                                            html.Button(
+                                                "▶",
+                                                id=ids["era_next_btn"],
+                                                n_clicks=0,
+                                                style={
+                                                    "fontSize": "14px",
+                                                    "color": "#495057",
+                                                    "backgroundColor": "transparent",
+                                                    "border": "1px solid #adb5bd",
+                                                    "borderRadius": "4px",
+                                                    "cursor": "pointer",
+                                                    "fontFamily": "inherit",
+                                                },
+                                            ),
                                         ],
-                                        value=initial_filters["era_preset"],
-                                        placeholder="Quick select era...",
-                                        clearable=True,
                                         style={
-                                            "width": "100%",
-                                            "fontSize": "13px",
-                                            "marginTop": "32px",
+                                            "display": "grid",
+                                            "gridTemplateColumns": "28px 1fr 28px",
+                                            "gap": "6px",
+                                            "marginTop": "12px",
                                         },
                                     ),
                                 ],
                                 style={
-                                    "flex": "0 0 23%",
+                                    "flex": "0 0 30%",
                                     "padding": "15px",
                                     "backgroundColor": "#f8f9fa",
                                     "borderRadius": "8px",
