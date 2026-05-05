@@ -921,31 +921,70 @@ def register_callbacks():
     # Initialize data on first callback registration
     _init_wc_data()
 
+    _DETAILS_FREQUENCY = (
+        "Each word represents a unique keyword or phrase found in the titles of selected resolutions. "
+        "Word size and colour both reflect the number of resolutions in whose title the word appears. "
+        "The data only covers GA resolutions that were successfully passed."
+    )
+    _DETAILS_CONSENSUS = (
+        "Each word represents a unique keyword or phrase found in the titles of selected resolutions. "
+        "Word size reflects the number of resolutions in whose title the word appears. "
+        "By contrast, word colour reflects the average consensus score of resolutions associated "
+        "with each word: green words appear in the titles of resolutions with broad consensus, "
+        "pink words in the titles of divisive resolutions. "
+        "The colour scale runs from the 1st to the 99th percentile of consensus scores "
+        "across the selected resolutions, so the full colour range always reflects the actual "
+        "spread of the data. "
+        "The data only covers GA resolutions that were successfully passed."
+    )
+    _DETAILS_STYLE = {
+        "maxWidth": "100%",
+        "margin": "0 0 0 0",
+        "paddingLeft": "2%",
+        "paddingTop": "10px",
+        "color": "#7f8c8d",
+        "fontSize": "16px",
+        "lineHeight": "1.6",
+        "textAlign": "left",
+        "borderTop": "1px solid #eee",
+    }
+
     @callback(
-        Output("wordcloud-interactive-chart", "figure"),
+        [
+            Output("wordcloud-interactive-chart", "figure"),
+            Output("wordcloud-details", "children"),
+        ],
         Input("filter-component-data-store", "data"),
         Input("wordcloud-mode-tabs", "value"),
         Input("filter-component-filter-store", "data"),
         Input("wordcloud-color-mode", "value"),
     )
     def update_wordcloud_chart(filtered_data, selected_mode, filter_store, color_mode):
-        """Update word cloud when filter data changes."""
+        """Update word cloud and details caption when filters or colour mode change."""
+        resolved_color_mode = color_mode or "frequency"
+        details_text = _DETAILS_CONSENSUS if resolved_color_mode == "consensus" else _DETAILS_FREQUENCY
+        details = html.P([html.Strong("Details: "), details_text], style=_DETAILS_STYLE)
+
         if not filtered_data:
-            return go.Figure().add_annotation(
-                text="Loading data...",
-                x=0.5,
-                y=0.5,
-                xref="paper",
-                yref="paper",
-                showarrow=False,
-                font=dict(size=16, color="#7f8c8d"),
+            return (
+                go.Figure().add_annotation(
+                    text="Loading data...",
+                    x=0.5, y=0.5,
+                    xref="paper", yref="paper",
+                    showarrow=False,
+                    font=dict(size=16, color="#7f8c8d"),
+                ),
+                details,
             )
         mode = selected_mode if selected_mode in _WORDCLOUD_MODES else _DEFAULT_MODE
-        return _build_wordcloud(
-            filtered_data,
-            mode=mode,
-            filter_store=filter_store,
-            color_mode=color_mode or "frequency",
+        return (
+            _build_wordcloud(
+                filtered_data,
+                mode=mode,
+                filter_store=filter_store,
+                color_mode=resolved_color_mode,
+            ),
+            details,
         )
 
     @callback(
@@ -1180,7 +1219,6 @@ def register_callbacks():
             return html.Div(f"Error: {str(e)}", style={"color": "red"})
 
 
-# TODO: Add an annotation (explanatory caption) similar to the map and timeline tabs
 layout = (
     html.Div(
         [
@@ -1258,6 +1296,7 @@ layout = (
                 type="cube",
                 color="#3498db",
             ),
+            html.P(id="wordcloud-details"),
             # Resolution table (hidden — click-to-search now handles this via the Resolutions tab)
             html.Div(
                 [
