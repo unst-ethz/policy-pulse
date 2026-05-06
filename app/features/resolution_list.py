@@ -430,6 +430,8 @@ def register_callbacks():
             date_str = (
                 date_val.strftime("%d %b %Y") if pd.notnull(date_val) else "Unknown"
             )
+            session_val = row.get("session", "")
+            session_str = f"Session {session_val}" if session_val else ""
             title = row.get("title", "Untitled")
             consensus_score = row.get("consensus_score")
 
@@ -474,6 +476,14 @@ def register_callbacks():
                                             "marginLeft": "12px",
                                         },
                                     ),
+                                    html.Span(
+                                        session_str,
+                                        style={
+                                            "color": "#666",
+                                            "fontSize": "0.9em",
+                                            "marginLeft": "12px",
+                                        },
+                                    ) if session_str else None,
                                     html.Span(
                                         f"Consensus: {consensus_display}",
                                         style={
