@@ -2,19 +2,20 @@ import os
 import re
 from collections import Counter
 from io import StringIO
+
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
 from dash import Input, Output, State, callback, html, dcc, no_update
 from dash.exceptions import PreventUpdate
-import plotly.graph_objects as go
-import pandas as pd
-import numpy as np
-import random
 from matplotlib import cm as mpl_cm
 from matplotlib import colors as mpl_colors
-from wordcloud import WordCloud
 from rapidfuzz import process as fuzz_process
+from wordcloud import WordCloud
 
-from .. import data
+from .color_utils import make_adaptive_colorscale_plotly
 from .resolution_list import create_vote_indicator
+from .. import data
 
 # Initialize word cloud data on module load
 _resolution_wc_data_by_mode = {}
@@ -34,7 +35,7 @@ _WORDCLOUD_MODES = {
     "action": {"label": "Action", "source": "undlid_keywords_3d_noun_fixed.csv:Action"},
     "category": {"label": "Subjects", "source": "query_resolutions():subjects"},
 }
-_CONSENSUS_CMAP_COLORS = ("#ff66cc", "#e6b24b", "#33cc33")
+_CONSENSUS_CMAP_COLORS = ["#ff66cc", "#e6b24b", "#33cc33"]
 
 
 def _init_wc_data():
@@ -430,61 +431,59 @@ def _get_wordcloud_layout(word_freq_dict, seed=42):
         return {}, {}, {}
 
 
-def _get_viridis_colors(frequencies):
-    """Get color mapping for word frequencies using blue colormap."""
-    # Use blue color scheme - 'Blues' for light to dark
+def _assign_colors_from_blues_cmap(frequencies):
+    """Map word frequencies to hex colours using the Blues matplotlib colormap.
+
+    Normalises each frequency into [0.3, 1.0] to avoid very light colours at the low end;
+    uniform frequencies get a fixed medium blue.
+    """
     cmap = mpl_cm.get_cmap("Blues")
     freq_arr = np.array(frequencies, dtype=float)
     if len(freq_arr) == 0:
         return []
     if np.max(freq_arr) != np.min(freq_arr):
-        # Normalize to 0.3-1.0 range instead of 0-1 to avoid very light/white colors
-        # This keeps the blue theme but starts from a more visible blue
         normed = 0.3 + 0.7 * (
             (freq_arr - np.min(freq_arr)) / (np.max(freq_arr) - np.min(freq_arr))
         )
     else:
-        # If all frequencies are the same, use a medium blue
         normed = np.full_like(freq_arr, 0.6)
     colors = [mpl_colors.rgb2hex(cmap(v)) for v in normed]
     return colors
 
 
-def _get_consensus_score_percentiles(scores: pd.Series) -> tuple[float, float]:
-    """Return (p1, p99) of consensus scores for the given score series."""
-    scores = scores.dropna()
-    q_lo, q_hi = scores.quantile(0.01), scores.quantile(0.99)
-    return float(q_lo), float(q_hi)
+def _assign_colors_from_custom_cmap(consensus_scores: list, colorscale: list, lo: float, hi: float) -> list:
+    """Map consensus scores to colours using a caller-supplied Plotly colorscale.
 
-
-def _get_consensus_colors(consensus_scores: list, p_low: float, p_high: float) -> list:
+    Normalises each score into [lo, hi], then looks up the nearest colour entry by
+    binary-searching the colorscale's position array. Scores outside the range are
+    clamped to the extremes; missing scores get a neutral grey.
     """
-    Map average consensus scores to a purple-green colormap normalised to
-    the filtered-data range.
-
-    Uses a custom colour scale instead of the RdYlBu used by the choropleth map
-    so identical colours never carry different meanings across feature views.
-    Scores are normalised to the 1–99 percentile range of the selected
-    resolutions so the colour scale reflects the actual spread of the data.
-    """
-    cmap = mpl_colors.LinearSegmentedColormap.from_list("consensus", _CONSENSUS_CMAP_COLORS)
-
-    span = p_high - p_low if p_high > p_low else 1.0
+    span = hi - lo if hi > lo else 1.0
+    positions = np.array([p for p, _ in colorscale])
+    clrs = [c for _, c in colorscale]
     result = []
     for score in consensus_scores:
         if score is None or (isinstance(score, float) and np.isnan(score)):
             result.append("#aaaaaa")
         else:
-            normed = float(np.clip((score - p_low) / span, 0.0, 1.0))
-            result.append(mpl_colors.rgb2hex(cmap(normed)))
+            t = float(np.clip((score - lo) / span, 0.0, 1.0))
+            idx = int(np.clip(np.searchsorted(positions, t), 0, len(clrs) - 1))
+            result.append(clrs[idx])
     return result
 
 
-def _consensus_plotly_colorscale(n: int = 10) -> list:
-    """Sample the consensus colormap into Plotly colorscale format."""
-    cmap = mpl_colors.LinearSegmentedColormap.from_list("consensus", _CONSENSUS_CMAP_COLORS)
+def _map_words_to_consensus_scores(words: list, mode: str, df: pd.DataFrame) -> list:
+    """Return the average consensus score for each word across its associated resolutions.
 
-    return [[i / (n - 1), mpl_colors.rgb2hex(cmap(i / (n - 1)))] for i in range(n)]
+    Words with no matching scored resolutions get None.
+    """
+    mode_word_map = _wc_word_undlid_map_by_mode.get(mode, {})
+    c_score_map = df.set_index(df["undl_id"].astype(str))["consensus_score"].dropna().to_dict()
+    word_scores = []
+    for word in words:
+        res_scores = [c_score_map[rid] for x in mode_word_map.get(word, []) if (rid := str(x)) in c_score_map]
+        word_scores.append(float(np.mean(res_scores)) if res_scores else None)
+    return word_scores
 
 
 def _apply_country_filter(df: pd.DataFrame, filter_store: dict | None) -> pd.DataFrame:
@@ -757,24 +756,18 @@ def _build_wordcloud(
 
         click_result_counts = [search_count_by_word.get(word, 0) for word in words]
 
-        p_low, p_high = None, None
+        lo = hi = avg = None
         if color_mode == "consensus" and "consensus_score" in df.columns:
-            p_low, p_high = _get_consensus_score_percentiles(df["consensus_score"])
-            mode_word_map = _wc_word_undlid_map_by_mode.get(mode, {})
-            c_score_map = df.set_index(df["undl_id"].astype(str))["consensus_score"].dropna().to_dict()
-            word_consensus = []
-            for word in words:
-                res_scores = [c_score_map[rid] for x in mode_word_map.get(word, []) if (rid := str(x)) in c_score_map]
-                avg_score = float(np.mean(res_scores)) if res_scores else None
-                word_consensus.append(avg_score)
-            colors = _get_consensus_colors(word_consensus, p_low, p_high)
+            colorscale, lo, avg, hi = make_adaptive_colorscale_plotly(df["consensus_score"], _CONSENSUS_CMAP_COLORS)
+            word_scores = _map_words_to_consensus_scores(words, mode, df)
+            word_colors = _assign_colors_from_custom_cmap(word_scores, colorscale, lo, hi)
             hover_text = [
                 f"Click to search <b>{word}</b><br>{count} resolutions"
                 + (f"<br>Avg. consensus: {score:.2f}" if score is not None else "")
-                for word, count, score in zip(words, click_result_counts, word_consensus)
+                for word, count, score in zip(words, click_result_counts, word_scores)
             ]
         else:
-            colors = _get_viridis_colors(freqs)
+            word_colors = _assign_colors_from_blues_cmap(freqs)
             hover_text = [
                 f"Click to search <b>{word}</b><br>{count} resolutions"
                 for word, count in zip(words, click_result_counts)
@@ -839,54 +832,32 @@ def _build_wordcloud(
             mode="text",
             text=words,
             textposition="bottom right",
-            textfont=dict(size=sizes, color=colors),
+            textfont=dict(size=sizes, color=word_colors),
             hoverinfo="skip",  # disable hover on text itself
             hovertemplate=None,
             showlegend=False,
         )
 
         traces = [hover_trace, text_trace]
-        if color_mode == "consensus" and p_low is not None:
+        if color_mode == "consensus" and lo is not None:
             traces.insert(0, go.Scatter(
                 x=[None], y=[None],
                 mode="markers",
                 marker=dict(
-                    colorscale=_consensus_plotly_colorscale(),
-                    cmin=p_low, cmax=p_high,
-                    color=[p_low],
+                    colorscale=colorscale,
+                    cmin=lo, cmax=hi,
+                    color=[lo],
                     showscale=True,
-                    colorbar=dict(thickness=20, len=0.5, x=1.01),
+                    colorbar=dict(
+                        thickness=20, len=0.5, x=1.01,
+                        tickvals=[lo, avg, hi],
+                        ticktext=[f"{lo:.2f}", f"{avg:.2f} (avg)", f"{hi:.2f}"],
+                    ),
                 ),
                 hoverinfo="none",
                 showlegend=False,
             ))
         fig = go.Figure(data=traces)
-        if color_mode == "consensus" and p_low is not None:
-            fig.add_annotation(
-                xref="paper", yref="paper",
-                x=1.04, y=0.76,
-                text="ⓘ",
-                showarrow=False,
-                font=dict(size=14, color="rgba(42, 63, 95, 1.0)"),
-                xanchor="left", yanchor="middle",
-                captureevents=True,
-                hovertext=(
-                    "<b>Avg. consensus score</b><br><br>"
-                    "Each word is coloured by the average consensus score of the resolutions<br>"
-                    "associated with it. The consensus score of a resolution measures how broadly<br>"
-                    "it was agreed upon: it is the average pairwise vote agreement across all country<br>" 
-                    "pairs that both cast a vote. A score of 1 means all countries voted identically;<br>"
-                    "lower values indicate more divided votes.<br><br>"
-                    "Technical note: The colour scale runs from the 1st to the 99th percentile of<br>"
-                    "consensus scores across all selected resolutions. The colour range thus<br>"
-                    "reflects the actual spread of the selected data instead of the full theoretical range."
-                ),
-                hoverlabel=dict(
-                    bgcolor="white",
-                    font=dict(color="black", size=12),
-                    bordercolor="rgba(42, 63, 95, 0.5)",
-                ),
-            )
         fig.update_layout(
             showlegend=False,
             xaxis=dict(
@@ -929,12 +900,13 @@ def register_callbacks():
     _DETAILS_CONSENSUS = (
         "Each word represents a unique keyword or phrase found in the titles of selected resolutions. "
         "Word size reflects the number of resolutions in whose title the word appears. "
-        "By contrast, word colour reflects the average consensus score of resolutions associated "
-        "with each word: green words appear in the titles of resolutions with broad consensus, "
-        "pink words in the titles of divisive resolutions. "
-        "The colour scale runs from the 1st to the 99th percentile of consensus scores "
-        "across the selected resolutions, so the full colour range always reflects the actual "
-        "spread of the data. "
+        "Word colour reflects the average consensus score of the resolutions associated with each word — "
+        "the consensus score of a resolution is the average pairwise vote agreement across all country "
+        "pairs that both cast a vote. A score of 1 means all countries voted identically; "
+        "lower values indicate more divided votes. "
+        "Green words thus appear in resolutions with broad consensus; pink words in more divisive resolutions. "
+        "The colour scale runs from the 1st to the 99th percentile of consensus scores across the selected "
+        "resolutions, and its midpoint is anchored at the global consensus average. "
         "The data only covers GA resolutions that were successfully passed."
     )
     _DETAILS_STYLE = {
