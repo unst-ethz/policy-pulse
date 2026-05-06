@@ -47,14 +47,20 @@ class ResolutionQueryEngine:
                 .apply(lambda s: s.str.strip().str.upper())
                 .replace({"NAN": pd.NA, "NONE": pd.NA, "<NA>": pd.NA, "": pd.NA})
             )
-            self._voted: np.ndarray = votes.notna().to_numpy()
-            self._abstained: np.ndarray = (votes == "A").to_numpy()
+
+            self._yes = (votes == "Y").to_numpy()
+            self._no = (votes == "N").to_numpy()
+            self._abstained = (votes == "A").to_numpy()
+            self._voted = self._yes | self._no | self._abstained
+
             self._row_index: dict[str, int] = {
                 rid: i for i, rid in enumerate(self.resolution_table["undl_id"].tolist())
             }
         else:
-            self._voted = np.empty((0, 0), dtype=bool)
+            self._yes = np.empty((0, 0), dtype=bool)
+            self._no = np.empty((0, 0), dtype=bool)
             self._abstained = np.empty((0, 0), dtype=bool)
+            self._voted = np.empty((0, 0), dtype=bool)
             self._row_index = {}
 
     def query_resolutions(
