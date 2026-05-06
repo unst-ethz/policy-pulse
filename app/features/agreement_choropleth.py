@@ -69,13 +69,15 @@ def register_callbacks(query_engine):
         if use_adaptive:
             colorscale, lo, avg, hi = make_adaptive_colorscale_plotly(
                 country1_resolutions["consensus_score"],
-                base_colorscale="RdYlBu"
+                base_colorscale="RdYlBu",
+                lo=0.0,
+                hi=1.0,
             )
-            range_color = [lo, hi]
+            range_color = [0, 1]
             colorbar_settings = dict(
                 len=0.9,
-                tickvals=[lo, avg, hi],
-                ticktext=[f"{lo:.2f}", f"{avg:.2f} (avg)", f"{hi:.2f}"],
+                tickvals=[0, avg, 1],
+                ticktext=["0 (Always opposed)", f"{avg:.2f} (avg)", "1 (Always agreeing)"],
             )
         else:
             colorscale = px.colors.diverging.RdYlBu
@@ -172,26 +174,12 @@ def register_callbacks(query_engine):
 
         # Details annotation
         country1_name = data.get_country_display_name(country1)
-        if use_adaptive:
-            note_text = (
-                f"The map shows the pairwise vote agreement between {country1_name} and other countries. "
-                "A high score means that two countries often voted the same on the selected General Assembly (GA) "
-                "resolutions; a low score means that two countries often voted in opposite ways (Yes vs. No). "
-                "The colour scale runs from the 1st to the 99th percentile of consensus scores across all "
-                f"selected resolutions ({lo:.2f}–{hi:.2f}), and its midpoint (yellow) is anchored at the global "
-                f"consensus average ({avg:.2f}). "
-                "Each resolution's consensus score is the average pairwise agreement among all voting country pairs. "
-                f"Countries appearing blue thus agreed with {country1_name} more than the global average; "
-                "those appearing red agreed less. Agreement values shown on hover remain absolute (0–1). "
-            )
-        else:
-            note_text = (
-                f"The map shows the pairwise vote agreement between {country1_name} and other countries. "
-                "An agreement score of 1 (dark blue) means that two countries voted the same on all selected "
-                "General Assembly (GA) resolutions; a score of 0 (dark red) means that two countries "
-                "always voted in opposite ways (Yes vs. No). "
-            )
-
+        shared_intro = (
+            f"The map shows the pairwise vote agreement between {country1_name} and other countries. "
+            "A score of 1 (dark blue) means that two countries voted the same on all selected "
+            "General Assembly (GA) resolutions; a score of 0 (dark red) means that two countries "
+            "always voted in opposite ways (Yes vs. No). "
+        )
         shared_disclaimer = (
             "The data only covers GA resolutions that were successfully passed. "
             "The map provides a simplified, static overview of political geography. Some smaller nations "
@@ -200,7 +188,17 @@ def register_callbacks(query_engine):
             "endorsement or acceptance by the United Nations."
         )
 
-        note_text += shared_disclaimer
+        middle_part = ""
+        if use_adaptive:
+            middle_part = (
+                "The midpoint of the colour scale (yellow) is anchored at the average consensus score "
+                f"across selected resolutions ({avg:.2f}). The consensus score of a resolution is the "
+                "average pairwise vote agreement across all country pairs that both cast a vote. "
+                f"Countries appearing blue thus agreed with {country1_name} more than the global average; "
+                "those appearing red agreed less. "
+            )
+
+        note_text = shared_intro + middle_part + shared_disclaimer
 
         note_msg = html.P(
             [html.Strong("Details: "), note_text],
@@ -226,7 +224,7 @@ layout = [
             html.Div(id="agreement-choropleth-status"),
             dcc.Checklist(
                 id="choropleth-color-mode",
-                options=[{"label": " Centre colours on global average and scale to range", "value": "adaptive"}],
+                options=[{"label": " Centre colour scale on average consensus score", "value": "adaptive"}],
                 value=[],
                 style={"fontSize": "14px", "color": "#555", "marginBottom": "8px", "paddingLeft": "2%"},
             ),
