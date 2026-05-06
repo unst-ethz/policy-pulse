@@ -95,9 +95,9 @@ def register_callbacks(query_engine):
 
         mean_alignment = stats["multilateral_alignment"].mean()
 
-        x_lo = min(0.30, stats["multilateral_alignment"].min() * 0.95)
+        x_lo = min(0.295, stats["multilateral_alignment"].min() * 0.95)
         x_hi = max(0.95, stats["multilateral_alignment"].max() * 1.05)
-        y_hi = max(0.30, stats["abstention_rate"].max() * 1.05)
+        y_hi = max(0.305, stats["abstention_rate"].max() * 1.05)
 
         fig.update_layout(
             xaxis=dict(title="Multilateral Agreement", range=[x_lo, x_hi]),
@@ -130,18 +130,17 @@ layout = [
             [
                 html.Strong("Details: "),
                 "Each point represents a UN member state, coloured by geographical region. "
-                "Click a region in the legend to hide or show it. "
                 "The x-axis (Multilateral Agreement) is the average pairwise agreement between a country "
                 "and all other countries that voted on the same resolution, averaged across all selected "
                 "resolutions. The y-axis (Abstention Rate) is the fraction of votes cast as abstentions "
                 "(A) rather than Yes (Y) or No (N). "
-                "The dashed vertical line marks the mean alignment across all plotted countries. "
-                "The more a country is located to the left of the mean, the more often it votes against "
-                "the majority; "
+                "The dashed vertical line marks the mean voting agreement across all plotted countries. "
+                "The more a country is located to the left of the mean line, the more often it votes "
+                "against the majority; "
                 "countries with high abstention rates frequently opt out rather than taking a clear position. ",
                 "Countries that did not participate in any of the selected resolutions are excluded. "
-                "The data only covers GA resolutions that were successfully passed."
-
+                "The data only covers GA resolutions that were successfully passed. "
+                "Selecting a Main Country highlights its position in the chart but does not filter the data.",
             ],
             style={
                 "maxWidth": "100%",

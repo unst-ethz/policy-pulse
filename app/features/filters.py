@@ -101,6 +101,8 @@ ERA_SEQUENCE = [
     "post_bipolarity", "mdg_era", "sdg_era",
 ]
 
+_TABS_WITHOUT_COUNTRY_FILTER = {"wordcloud", "multilateral"}
+
 
 def get_default_filter_values():
     return {
@@ -336,12 +338,16 @@ def register_callbacks():
         return filter_data, f"?{urllib.parse.urlencode(url_filters, doseq=True)}"
 
     # Callback: Query data when filters change
+    # Tabs where country1 is disabled or highlight-only — participation filter must not apply
+
+
     @callback(
         Output(ids["data_store"], "data"),
         Input(ids["filter_store"], "data"),
+        Input("country-view-tabs", "value"),
         prevent_initial_call=False,
     )
-    def query_data_on_filter_change(filter_data):
+    def query_data_on_filter_change(filter_data, active_tab):
         """Query data based on current filter selections."""
         try:
             # Convert years to inclusive date range (Jan 1 of start year to Dec 31 of end year)
@@ -358,10 +364,12 @@ def register_callbacks():
                 include_descendants=True,
             )
 
-            # If country filter is selected, filter by country vote
+            # Apply country participation filter only on tabs where it is meaningful.
+            # On wordcloud and multilateral tabs country1 is disabled or highlight-only,
+            # so filtering would silently bias the data.
             if country and country in df.columns:
-                # Only keep rows where the country has a vote (not NaN)
-                df = df.dropna(subset=[country])
+                if active_tab not in _TABS_WITHOUT_COUNTRY_FILTER:
+                    df = df.dropna(subset=[country])
 
             # Build column list: base columns + undl_link + vote columns when countries selected
             base_cols = ["undl_id", "resolution", "date", "title", "consensus_score"]
