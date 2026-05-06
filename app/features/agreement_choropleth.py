@@ -60,11 +60,15 @@ def register_callbacks(query_engine):
         )
 
         # Set up colour scale based on the distribution of consensus scores
-        has_consensus = "consensus_score" in all_resolutions.columns
+        # Crucial: We need to restrict to resolutions where country1 actually voted
+        # since these are the only ones that can contribute to any bilateral agreement
+        # score on the Choropleth map.
+        country1_resolutions = all_resolutions.dropna(subset=[country1]) if country1 in all_resolutions.columns else all_resolutions
+        has_consensus = "consensus_score" in all_resolutions.columns and not country1_resolutions.empty
         use_adaptive = adaptive_colour_scale and has_consensus
         if use_adaptive:
             colorscale, lo, avg, hi = make_adaptive_colorscale_plotly(
-                all_resolutions["consensus_score"],
+                country1_resolutions["consensus_score"],
                 base_colorscale="RdYlBu"
             )
             range_color = [lo, hi]
