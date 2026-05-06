@@ -50,6 +50,14 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
             ),
             filters.layout(other_keyword_arguments),
             html.Div(
+                id="resolution-count-banner",
+                style={
+                    "padding": "5px 4px",
+                    "fontSize": "13px",
+                    "color": "#7f8c8d",
+                },
+            ),
+            html.Div(
                 id="status-display",
             ),
             # Tab Navigation
@@ -388,6 +396,23 @@ def prevent_disabled_tab_switch(selected_tab, filter_store):
 
 
 @callback(
+    Output("resolution-count-banner", "children"),
+    Input("filter-component-data-store", "data"),
+    Input("country-view-tabs", "value"),
+)
+def update_resolution_count(data_store, active_tab):
+    if active_tab == "timeline":
+        return html.Span(
+            "Timeline uses full session history — year range, subject and country filters do not apply.",
+            style={"fontStyle": "italic"},
+        )
+    if not data_store:
+        return ""
+    n = len(pd.read_json(data_store, orient="split"))
+    return [html.Strong(f"{n:,}"), f" resolution{'s' if n != 1 else ''} match current filters"]
+
+
+@callback(
     Output("download-btn", "disabled"),
     Output("download-btn", "style"),
     Input("filter-component-filter-store", "data"),
@@ -490,99 +515,86 @@ def download_resolutions_csv(n_clicks, filter_store):
         Output("filter-component-country2-dropdown", "disabled"),
         Output("filter-component-preset-dropdown", "disabled"),
         Output("filter-component-subject-dropdown", "disabled"),
+        Output("filter-component-keyword-search", "disabled"),
+        Output("filter-component-country-filter-mode", "options"),
+        Output("filter-component-year-range", "disabled"),
+        Output("filter-component-era-preset", "disabled"),
+        Output("filter-component-era-prev-btn", "disabled", allow_duplicate=True),
+        Output("filter-component-era-next-btn", "disabled", allow_duplicate=True),
         Output("filter-component-country-dropdown", "style"),
         Output("filter-component-country2-dropdown", "style"),
         Output("filter-component-preset-dropdown", "style"),
         Output("filter-component-subject-dropdown", "style"),
+        Output("filter-component-keyword-search", "style"),
+        Output("filter-component-era-preset", "style"),
     ],
     Input("country-view-tabs", "value"),
-    prevent_initial_call=False,
+    prevent_initial_call='initial_duplicate',
 )
 def disable_filters_based_on_tab(selected_tab):
-    """Disable filters based on selected tab:
-    - Agreement Map: disable comparison dropdowns
-    - Word Cloud: disable all country dropdowns (main, compare, quick select)
-    """
+    """Disable filters based on selected tab."""
     is_map_tab = selected_tab == "map"
     is_wordcloud_tab = selected_tab == "wordcloud"
     is_multilateral_tab = selected_tab == "multilateral"
-    is_timeline_or_subject_tab = selected_tab in ["timeline", "subject"]
+    is_timeline_tab = selected_tab == "timeline"
+    is_subject_tab = selected_tab == "subject"
+    keyword_active = selected_tab in ("resolution_list", "wordcloud")
 
-    # Base styles
-    base_style = {
-        "width": "100%",
-        "fontSize": "14px",
+    base_style = {"width": "100%", "fontSize": "14px"}
+    disabled_style = {**base_style, "opacity": "0.5", "cursor": "not-allowed", "backgroundColor": "#e9ecef"}
+
+    base_input_style = {
+        "width": "100%", "fontSize": "14px", "padding": "8px 10px",
+        "border": "1px solid #ced4da", "borderRadius": "4px",
+        "fontFamily": "inherit", "boxSizing": "border-box",
+    }
+    disabled_input_style = {
+        **base_input_style, "opacity": "0.5", "cursor": "not-allowed", "backgroundColor": "#e9ecef",
     }
 
-    # Disabled styles (grayed out)
-    disabled_style = {
-        **base_style,
-        "opacity": "0.5",
-        "cursor": "not-allowed",
-        "backgroundColor": "#e9ecef",
-    }
+    kw_disabled = not keyword_active
+    kw_style = base_input_style if keyword_active else disabled_input_style
 
+    # Handle country filter mode (CFM)
+    _cfm_options_base = [
+        {"label": " Voted on resolution", "value": "voted"},
+        {"label": " Was UN member",       "value": "member"},
+        {"label": " No filter",           "value": "none"},
+    ]
+    cfm_enabled  = _cfm_options_base
+    cfm_disabled = [{**o, "disabled": True} for o in _cfm_options_base]
+
+    # Start from "all enabled" defaults ...
+    c1_disabled = c2_disabled = preset_disabled = subj_disabled = yr_era_disabled = False
+    cfm_opts = cfm_enabled
+
+    # ... then override defaults per tab
     if is_wordcloud_tab:
-        # Word Cloud: disable all country dropdowns
-        return (
-            True,
-            True,
-            True,
-            False,
-            disabled_style,
-            disabled_style,
-            disabled_style,
-            base_style,
-        )
-    elif is_multilateral_tab:
-        # Alignment Overview: keep main country enabled (used for highlight),
-        # disable comparison dropdowns
-        return (
-            False,
-            True,
-            True,
-            False,
-            base_style,
-            disabled_style,
-            disabled_style,
-            base_style,
-        )
-    elif is_map_tab:
-        # Agreement Map: disable only comparison dropdowns
-        return (
-            False,
-            True,
-            True,
-            False,
-            base_style,
-            disabled_style,
-            disabled_style,
-            base_style,
-        )
-    elif is_timeline_or_subject_tab:
-        # Agreement Timeline / Agreement by Subject: disable subject dropdown
-        return (
-            False,
-            False,
-            False,
-            True,
-            base_style,
-            base_style,
-            base_style,
-            disabled_style,
-        )
-    else:
-        # Other tabs: enable all
-        return (
-            False,
-            False,
-            False,
-            False,
-            base_style,
-            base_style,
-            base_style,
-            base_style,
-        )
+        c1_disabled = c2_disabled = preset_disabled = True   # no country context needed
+        cfm_opts = cfm_disabled                              # country filter mode irrelevant
+    elif is_multilateral_tab or is_map_tab:
+        c2_disabled = preset_disabled = True                 # comparison country not used
+    elif is_timeline_tab:
+        subj_disabled = yr_era_disabled = True               # timeline ignores subject + date range
+        cfm_opts = cfm_disabled                              # timeline has its own fixed filter logic
+    elif is_subject_tab:
+        subj_disabled = True                                 # subject filter drives its own content
+        cfm_opts = cfm_disabled                              # tab hardwires "both countries voted"
+
+    def _sty(d):
+        return disabled_style if d else base_style
+
+    return (
+        # --- disabled props (10) ---
+        c1_disabled, c2_disabled, preset_disabled, subj_disabled,
+        kw_disabled,  # keyword: only resolution_list + wordcloud
+        cfm_opts,  # country-filter-mode options list
+        yr_era_disabled, yr_era_disabled, yr_era_disabled, yr_era_disabled,  # year-range, era-preset, era-prev, era-next
+        # --- style props (6) ---
+        _sty(c1_disabled), _sty(c2_disabled), _sty(preset_disabled), _sty(subj_disabled),
+        kw_style,  # keyword style
+        _sty(yr_era_disabled),                                # era-preset style
+    )
 
 
 @callback(

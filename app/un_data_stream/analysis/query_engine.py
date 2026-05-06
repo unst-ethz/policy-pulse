@@ -64,7 +64,8 @@ class ResolutionQueryEngine:
             self._row_index = {}
 
     def query_resolutions(
-            self, start_date: Optional[str] = None,
+            self,
+            start_date: Optional[str] = None,
             end_date: Optional[str] = None,
             subject_ids: Optional[List[str]] = None,
             language: str = "en",

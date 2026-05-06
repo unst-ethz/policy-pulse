@@ -1,11 +1,6 @@
 from dash import callback, Input, Output, State, html, dcc
 import pandas as pd
 from .. import data
-from pathlib import Path
-
-cwd = Path(__file__).resolve().parent
-file_path = cwd.parent / "assets" / "joining_dates.csv"
-joining_dates = pd.read_csv(file_path)
 
 
 PAGE_SIZE = 10
@@ -232,9 +227,8 @@ def register_callbacks():
         Output("rl-vote-filter-wrapper", "style"),
         Output("rl-multi-country-msg", "children"),
         Output("rl-multi-country-msg", "style"),
-        Input(
-            "filter-component-filter-store", "data"
-        ),
+        Input("filter-component-data-store", "data"),
+        Input("filter-component-filter-store", "data"),
         Input("rl-agreement-dropdown", "value"),
         Input("rl-vote-filter", "value"),
         Input("rl-load-more-btn", "n_clicks"),
@@ -242,7 +236,7 @@ def register_callbacks():
         State("country1-iso-alpha3", "data"),
     )
     def update_resolution_list(
-        filter_params, agreement_filter, vote_filter, n_clicks, sort_order, country1_backup
+        data_store, filter_params, agreement_filter, vote_filter, n_clicks, sort_order, country1_backup
     ):
         # Default Styles
         btn_style_hidden = {"display": "none"}
@@ -254,7 +248,7 @@ def register_callbacks():
             "cursor": "pointer",
         }
 
-        if not filter_params:
+        if not data_store or not filter_params:
             return (
                 html.Div("Loading...", style={"padding": "20px"}),
                 "",
@@ -266,10 +260,6 @@ def register_callbacks():
             )
 
         # Extract Params
-        start_date = filter_params.get("start_date")
-        end_date = filter_params.get("end_date")
-        subject_ids = filter_params.get("subject_ids")
-        # Try both the params and backup store for country1, but allow it to be None
         country1 = filter_params.get("country1_alpha3") or country1_backup
 
         # Extract comparison countries (can be list, string or None)
@@ -302,55 +292,25 @@ def register_callbacks():
             # Show vote filter only when main country is selected with no comparison countries
             vote_filter_style = {"display": "flex", "alignItems": "center"}
 
-        # 1. Query Data
+        # 1. Load pre-filtered resolutions from the shared data store,
+        #    then join vote columns from the resolution table for display.
         try:
-            underlying_countries = []
-            for i in comparison_countries:
-                underlying_countries.append(i)
-            if country1:
-                underlying_countries.append(country1)
-            if len(underlying_countries) == 0:
-                df = data.query_engine.query_resolutions(
-                    start_date=start_date,
-                    end_date=end_date,
-                    subject_ids=subject_ids,
-                    include_descendants=True,
-                )
-            else:
-                # TODO: Possible bug in date range calculation. Could it be that max_ending_date
-                #  is only checked against the *last* country in the list (instead of all of them?)
-                min_starting_date = joining_dates[joining_dates['country'] == underlying_countries[0]]['min_date'].to_list()[0]
-                max_ending_date = joining_dates[joining_dates['country'] == underlying_countries[0]]['max_date'].to_list()[0]
-                for c in underlying_countries:
-                    if (
-                        joining_dates[joining_dates["country"] == c][
-                            "min_date"
-                        ].to_list()[0]
-                        < min_starting_date
-                    ):
-                        min_starting_date = joining_dates[
-                            joining_dates["country"] == c
-                        ]["min_date"].to_list()[0]
-                if (
-                        joining_dates[joining_dates["country"] == c][
-                            "max_date"
-                        ].to_list()[0]
-                        > max_ending_date
-                    ):
-                        max_ending_date = joining_dates[
-                            joining_dates["country"] == c
-                        ]["max_date"].to_list()[0]
-                df = data.query_engine.query_resolutions(
-                    start_date=start_date
-                    if min_starting_date < start_date
-                    else min_starting_date,
-                    end_date=end_date if max_ending_date > end_date else max_ending_date,
-                    subject_ids=subject_ids,
-                    include_descendants=True,
-                )
+            df = pd.read_json(data_store, orient="split")
+
+            # Join vote columns for country1 + comparison countries
+            vote_cols_needed = [c for c in ([country1] + comparison_countries) if c]
+            if vote_cols_needed and not df.empty:
+                res_table = data.query_engine.resolution_table
+                available = [c for c in vote_cols_needed if c in res_table.columns]
+                if available:
+                    vote_df = res_table.loc[
+                        res_table["undl_id"].isin(df["undl_id"]), ["undl_id"] + available
+                    ]
+                    df = df.merge(vote_df, on="undl_id", how="left")
+
         except Exception as e:
             return (
-                html.Div(f"Error querying data: {e}", style={"color": "red"}),
+                html.Div(f"Error loading data: {e}", style={"color": "red"}),
                 "",
                 btn_style_hidden,
                 agreement_container_style,
@@ -371,13 +331,6 @@ def register_callbacks():
                 multi_msg,
                 multi_msg_style,
             )
-
-        # Keyword search
-        keyword = filter_params.get("keyword")
-        if keyword and keyword.strip():
-            from . import wordcloud_interactive
-            matched_ids = wordcloud_interactive.get_keyword_matched_ids(df, keyword)
-            df = df[df["undl_id"].isin(matched_ids)]
 
         # 2. Filter & Sort Logic
         if sort_order == "date_asc":
@@ -448,7 +401,7 @@ def register_callbacks():
 
             # Comparators (all selected countries)
             for c2 in comparison_countries:
-                if c2 in row:
+                if c2 in df.columns:
                     indicators.append(
                         create_vote_indicator(data.get_country_name(c2), row.get(c2))
                     )
@@ -485,7 +438,7 @@ def register_callbacks():
                                         },
                                     ) if session_str else None,
                                     html.Span(
-                                        f"Consensus: {consensus_display}",
+                                        f"Consensus score: {consensus_display}",
                                         style={
                                             "color": "#666" if pd.notnull(consensus_score) else "#999",
                                             "fontSize": "0.9em",

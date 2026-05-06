@@ -2,8 +2,13 @@ from dash import Input, Output, State, callback, clientside_callback, html, dcc,
 import feffery_antd_components as fac
 import pandas as pd
 import urllib.parse
+from pathlib import Path
 
 from .. import data
+
+_joining_dates = pd.read_csv(
+    Path(__file__).resolve().parent.parent / "assets" / "joining_dates.csv"
+)
 
 prefix = "filter-component"
 ids = {
@@ -22,6 +27,7 @@ ids = {
     "keyword_search": f"{prefix}-keyword-search",
     "clear_country2_btn": f"{prefix}-clear-country2-btn",
     "clear_subjects_btn": f"{prefix}-clear-subjects-btn",
+    "country_filter_mode": f"{prefix}-country-filter-mode",
 }
 
 # Country group presets for quick comparison selection
@@ -101,7 +107,8 @@ ERA_SEQUENCE = [
     "post_bipolarity", "mdg_era", "sdg_era",
 ]
 
-_TABS_WITHOUT_COUNTRY_FILTER = {"wordcloud", "multilateral"}
+_TABS_WITHOUT_COUNTRY_FILTER = {"wordcloud"}
+_TABS_WITH_KEYWORD = {"resolution_list", "wordcloud"}
 
 
 def get_default_filter_values():
@@ -114,6 +121,7 @@ def get_default_filter_values():
         "country2": [],
         "preset": None,
         "keyword": "",
+        "country_filter_mode": "voted",
     }
 
 
@@ -178,9 +186,10 @@ def register_callbacks():
 
     # Callback: Disable ◀ / ▶ at the ends of ERA_SEQUENCE
     @callback(
-        Output(ids["era_prev_btn"], "disabled"),
-        Output(ids["era_next_btn"], "disabled"),
+        Output(ids["era_prev_btn"], "disabled", allow_duplicate=True),
+        Output(ids["era_next_btn"], "disabled", allow_duplicate=True),
         Input(ids["era_preset"], "value"),
+        prevent_initial_call='initial_duplicate',
     )
     def update_era_nav_state(current_era):
         if current_era not in ERA_SEQUENCE:
@@ -240,6 +249,7 @@ def register_callbacks():
         Output(ids["country2"], "value", allow_duplicate=True),
         Output(ids["preset"], "value", allow_duplicate=True),
         Output(ids["keyword_search"], "value", allow_duplicate=True),
+        Output(ids["country_filter_mode"], "value"),
         Input(ids["reset_btn"], "n_clicks"),
         prevent_initial_call=True,
     )
@@ -253,6 +263,7 @@ def register_callbacks():
             default_filters["country2"],
             default_filters["preset"],
             default_filters["keyword"],
+            default_filters["country_filter_mode"],
         )
 
     # Callback: Update filter store and print current selections when any filter changes
@@ -264,10 +275,11 @@ def register_callbacks():
         Input(ids["country"], "value"),
         Input(ids["country2"], "value"),
         Input(ids["keyword_search"], "value"),
+        Input(ids["country_filter_mode"], "value"),
         prevent_initial_call=False,
     )
     def update_filter_store(
-        year_range, subject_ids, country_iso3, country2, keyword
+        year_range, subject_ids, country_iso3, country2, keyword, country_filter_mode
     ):
         """
         Register callbacks for the filter component.
@@ -311,6 +323,7 @@ def register_callbacks():
             "country1_alpha3": effective_country1,
             "country2": effective_country2 or None,
             "keyword": keyword.strip() if keyword and keyword.strip() else None,
+            "country_filter_mode": country_filter_mode or "voted",
         }
 
         # Remove all None values for cleaner URL and easier parsing
@@ -320,6 +333,8 @@ def register_callbacks():
                 continue
             if k in ("start_date", "end_date"):
                 continue
+            if k == "country_filter_mode" and v == "voted":
+                continue  # omit default from URL
             # Strip synthetic UI-only sentinel values from URL
             if k == "subject_ids" and isinstance(v, list):
                 v = [s for s in v if not s.startswith("__")]
@@ -364,17 +379,34 @@ def register_callbacks():
                 include_descendants=True,
             )
 
-            # Apply country participation filter only on tabs where it is meaningful.
-            # On wordcloud and multilateral tabs country1 is disabled or highlight-only,
-            # so filtering would silently bias the data.
-            if country and country in df.columns:
-                if active_tab not in _TABS_WITHOUT_COUNTRY_FILTER:
-                    df = df.dropna(subset=[country])
+            # Apply country filter only on tabs where it is meaningful
+            mode = (filter_data.get("country_filter_mode") or "voted") if filter_data else "voted"
+            if country and country in df.columns and active_tab not in _TABS_WITHOUT_COUNTRY_FILTER:
+                if mode == "voted":
+                    vote_cleaned = df[country].astype(str).str.strip().str.upper()
+                    has_voted = vote_cleaned.isin(["Y", "N", "A"])
+                    df = df[has_voted]
+                elif mode == "member":
+                    rows = _joining_dates[_joining_dates["country"] == country]
+                    if not rows.empty:
+                        min_date = pd.to_datetime(rows["min_date"].min())
+                        max_date = pd.to_datetime(rows["max_date"].max())
+                        df["date"] = pd.to_datetime(df["date"])
+                        df = df[(df["date"] >= min_date) & (df["date"] <= max_date)]
+                    # TODO: multi-period membership (suspended + readmitted countries)
+                # "none": no filter applied
+
+            keyword = filter_data.get("keyword") if filter_data else None
+            if keyword and keyword.strip() and active_tab in _TABS_WITH_KEYWORD and not df.empty:
+                from .wordcloud_interactive import get_keyword_matched_ids
+                matched_ids = get_keyword_matched_ids(df, keyword)
+                df = df[df["undl_id"].isin(matched_ids)]
 
             # Build column list: base columns + undl_link + vote columns when countries selected
-            base_cols = ["undl_id", "resolution", "date", "title", "consensus_score"]
+            base_cols = ["undl_id", "resolution", "session", "date", "title", "consensus_score"]
             if "undl_link" in df.columns:
                 base_cols.append("undl_link")
+
             # country2_raw = filter_data.get("country2")
             # comparison = []
             # if isinstance(country2_raw, list):
@@ -582,6 +614,34 @@ def layout(page_query_params: dict[str, str] | None = None):
                                     "fontSize": "14px",
                                 },
                                 searchable=True,
+                            ),
+                            html.Div(
+                                [
+                                    html.Label(
+                                        "Filter resolutions:",
+                                        style={
+                                            "fontSize": "13px",
+                                            "color": "#6c757d",
+                                            "marginRight": "10px",
+                                        },
+                                    ),
+                                    dcc.RadioItems(
+                                        id=ids["country_filter_mode"],
+                                        options=[
+                                            {"label": " Voted on resolution", "value": "voted"},
+                                            {"label": " Was UN member", "value": "member"},
+                                            {"label": " No filter", "value": "none"},
+                                        ],
+                                        value=initial_filters["country_filter_mode"],
+                                        inline=True,
+                                        style={"fontSize": "13px", "color": "#555"},
+                                    ),
+                                ],
+                                style={
+                                    "display": "flex",
+                                    "alignItems": "center",
+                                    "marginTop": "10px",
+                                },
                             ),
                         ],
                         style={
