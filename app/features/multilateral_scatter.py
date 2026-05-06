@@ -15,6 +15,8 @@ _REGION_COLORS = {
     "Other":    "#7F7F7F",
 }
 
+_MIN_VOTES_THRESHOLD = 10
+
 
 def register_callbacks(query_engine):
 
@@ -43,6 +45,7 @@ def register_callbacks(query_engine):
         stats["country_name"] = stats["country"].apply(data.get_country_display_name)
         stats["region"] = stats["country"].apply(data.get_country_region)
         stats = stats.dropna(subset=["multilateral_alignment", "abstention_rate"])
+        stats = stats[stats["participation_count"] >= _MIN_VOTES_THRESHOLD]
 
         fig = go.Figure()
 
@@ -138,7 +141,7 @@ layout = [
                 "The more a country is located to the left of the mean line, the more often it votes "
                 "against the majority; "
                 "countries with high abstention rates frequently opt out rather than taking a clear position. ",
-                "Countries that did not participate in any of the selected resolutions are excluded. "
+                f"Countries with fewer than {_MIN_VOTES_THRESHOLD} votes cast are excluded. "
                 "The data only covers GA resolutions that were successfully passed. "
                 "Selecting a Main Country highlights its position in the chart but does not filter the data.",
             ],
