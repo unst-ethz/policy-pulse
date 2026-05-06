@@ -1,4 +1,4 @@
-from dash import html, dcc, register_page
+from dash import get_relative_path, html, dcc, register_page
 
 from ..features import (
     feature_description,
@@ -32,7 +32,7 @@ layout = html.Div(
                     [
                         dcc.Link(
                             "Explore Data →",
-                            href="/trends",
+                            href=get_relative_path("/trends"),
                             className="cta-button",
                         ),
                         html.A(
