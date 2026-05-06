@@ -1,7 +1,9 @@
 import functools
 import time
-import numpy as np
 from typing import List
+
+import numpy as np
+import pandas as pd
 from dash import (
     Input,
     Output,
@@ -12,17 +14,15 @@ from dash import (
     dcc,
     register_page,
 )
-import pandas as pd
-import random
 
-from ..features import resolution_list
+from .. import data
+from ..features import agreement_by_subject
 from ..features import agreement_choropleth
 from ..features import agreement_graph
-from ..features import agreement_by_subject
-from ..features import wordcloud_interactive
-from ..features import multilateral_scatter
 from ..features import filters
-from .. import data
+from ..features import multilateral_scatter
+from ..features import resolution_list
+from ..features import wordcloud_interactive
 
 
 def title(countr1_alpha3=None):
@@ -137,7 +137,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                                     html.H2("Multilateral Agreement Overview"),
                                     html.P(
                                         "Explore how closely each country's voting aligns with the broader UN membership "
-                                        "across the selected resolutions, and how often countries abstain.",
+                                        "across the selected resolutions.",
                                         style={
                                             "color": "#7f8c8d",
                                             "marginBottom": "20px",

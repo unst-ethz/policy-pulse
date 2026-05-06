@@ -293,14 +293,26 @@ class ResolutionQueryEngine:
 
         voted_slice = self._voted[rows]                            # (R', C) bool
         abstained_slice = self._abstained[rows]                    # (R', C) bool
+        yes_slice = self._yes[rows]                                # (R', C) bool
+        no_slice = self._no[rows]                                  # (R', C) bool
         participation = voted_slice.sum(axis=0)                    # (C,) int
         abstentions = abstained_slice.sum(axis=0)                  # (C,) int
-        abstention_rate = np.where(participation > 0, abstentions / participation, np.nan)
+        yes_votes = yes_slice.sum(axis=0)                          # (C,) int
+        no_votes = no_slice.sum(axis=0)                            # (C,) int
+
+        voted = participation > 0
+        abstention_rate = np.where(voted, abstentions / participation, np.nan)
+        yes_rate        = np.where(voted, yes_votes   / participation, np.nan)
+        no_rate         = np.where(voted, no_votes    / participation, np.nan)
+        # TODO: Add "Not-Voting Share" (fraction of selected resolutions with no vote cast).
+        #  Crucial: This would need to reflect countries' membership dates in the UN to be meaningful.
 
         return pd.DataFrame({
             "country": self.country_columns,
             "multilateral_alignment": avg_alignment,
             "abstention_rate": abstention_rate,
+            "yes_rate": yes_rate,
+            "no_rate": no_rate,
             "participation_count": participation,
         })
 

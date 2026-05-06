@@ -121,7 +121,7 @@ def get_default_filter_values():
         "country2": [],
         "preset": None,
         "keyword": "",
-        "country_filter_mode": "voted",
+        "country_filter_mode": "none",
     }
 
 
@@ -323,7 +323,7 @@ def register_callbacks():
             "country1_alpha3": effective_country1,
             "country2": effective_country2 or None,
             "keyword": keyword.strip() if keyword and keyword.strip() else None,
-            "country_filter_mode": country_filter_mode or "voted",
+            "country_filter_mode": country_filter_mode or "none",
         }
 
         # Remove all None values for cleaner URL and easier parsing
@@ -333,7 +333,7 @@ def register_callbacks():
                 continue
             if k in ("start_date", "end_date"):
                 continue
-            if k == "country_filter_mode" and v == "voted":
+            if k == "country_filter_mode" and v == "none":
                 continue  # omit default from URL
             # Strip synthetic UI-only sentinel values from URL
             if k == "subject_ids" and isinstance(v, list):
@@ -380,7 +380,7 @@ def register_callbacks():
             )
 
             # Apply country filter only on tabs where it is meaningful
-            mode = (filter_data.get("country_filter_mode") or "voted") if filter_data else "voted"
+            mode = (filter_data.get("country_filter_mode") or "none") if filter_data else "none"
             if country and country in df.columns and active_tab not in _TABS_WITHOUT_COUNTRY_FILTER:
                 if mode == "voted":
                     vote_cleaned = df[country].astype(str).str.strip().str.upper()
@@ -819,6 +819,8 @@ def layout(page_query_params: dict[str, str] | None = None):
                                             ),
                                         ]
                                     ),
+                                    # TODO: Add a button that auto-sets the year range to the UN membership dates
+                                    #  of the selected Main Country (if any).
                                     html.Div(
                                         dcc.RangeSlider(
                                             id=ids["year_range"],
