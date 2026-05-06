@@ -906,7 +906,7 @@ def register_callbacks():
         "lower values indicate more divided votes. "
         "Green words thus appear in resolutions with broad consensus; pink words in more divisive resolutions. "
         "The colour scale runs from the 1st to the 99th percentile of consensus scores across the selected "
-        "resolutions, and its midpoint is anchored at the global consensus average. "
+        "resolutions, and its midpoint (amber) is anchored at the average consensus score. "
         "The data only covers GA resolutions that were successfully passed."
     )
     _DETAILS_STYLE = {
