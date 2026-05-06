@@ -572,8 +572,11 @@ def disable_filters_based_on_tab(selected_tab):
     if is_wordcloud_tab:
         c1_disabled = c2_disabled = preset_disabled = True   # no country context needed
         cfm_opts = cfm_disabled                              # country filter mode irrelevant
-    elif is_multilateral_tab or is_map_tab:
+    elif is_multilateral_tab:
         c2_disabled = preset_disabled = True                 # comparison country not used
+    elif is_map_tab:
+        c2_disabled = preset_disabled = True                 # comparison country not used
+        cfm_opts = cfm_disabled                              # choropleth filters by pair internally
     elif is_timeline_tab:
         subj_disabled = yr_era_disabled = True               # timeline ignores subject + date range
         cfm_opts = cfm_disabled                              # timeline has its own fixed filter logic
