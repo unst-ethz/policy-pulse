@@ -6,9 +6,7 @@ from pathlib import Path
 
 from .. import data
 
-_joining_dates = pd.read_csv(
-    Path(__file__).resolve().parent.parent / "assets" / "joining_dates.csv"
-)
+from .country_utils import joining_dates, get_un_membership_years
 
 prefix = "filter-component"
 ids = {
@@ -28,6 +26,7 @@ ids = {
     "clear_country2_btn": f"{prefix}-clear-country2-btn",
     "clear_subjects_btn": f"{prefix}-clear-subjects-btn",
     "country_filter_mode": f"{prefix}-country-filter-mode",
+    "membership_dates_btn": f"{prefix}-membership-dates-btn",
 }
 
 # Country group presets for quick comparison selection
@@ -266,6 +265,22 @@ def register_callbacks():
             default_filters["country_filter_mode"],
         )
 
+    # Callback: Set year range to UN membership dates of selected main country
+    @callback(
+        Output(ids["year_range"], "value", allow_duplicate=True),
+        Input(ids["membership_dates_btn"], "n_clicks"),
+        State(ids["filter_store"], "data"),
+        prevent_initial_call=True,
+    )
+    def set_membership_year_range(n_clicks, filter_store):
+        country1 = (filter_store or {}).get("country1_alpha3")
+        if not country1:
+            return no_update
+        years = get_un_membership_years(country1)
+        if years is None:
+            return no_update
+        return list(years)
+
     # Callback: Update filter store and print current selections when any filter changes
     @callback(
         Output(ids["filter_store"], "data"),
@@ -387,7 +402,7 @@ def register_callbacks():
                     has_voted = vote_cleaned.isin(["Y", "N", "A"])
                     df = df[has_voted]
                 elif mode == "member":
-                    rows = _joining_dates[_joining_dates["country"] == country]
+                    rows = joining_dates[joining_dates["country"] == country]
                     if not rows.empty:
                         min_date = pd.to_datetime(rows["min_date"].min())
                         max_date = pd.to_datetime(rows["max_date"].max())
@@ -527,129 +542,217 @@ def layout(page_query_params: dict[str, str] | None = None):
             # Filters container
             html.Div(
                 [
-                    # ROW 0: Keyword Search
+                    # ROW 1: Main Country (left) + Year Range (right)
                     html.Div(
                         [
+                            # Main Country panel
                             html.Div(
                                 [
-                                    html.Label(
+                                    html.Div(
                                         [
-                                            html.Span(
-                                                "🔍", style={"marginRight": "5px"}
+                                            html.Label(
+                                                [
+                                                    html.Span(
+                                                        "🌍", style={"marginRight": "5px"}
+                                                    ),
+                                                    "Main Country",
+                                                ],
+                                                style={
+                                                    "fontWeight": "600",
+                                                    "color": "#495057",
+                                                    "fontSize": "15px",
+                                                    "marginBottom": "8px",
+                                                    "display": "block",
+                                                },
                                             ),
-                                            "Keyword Search",
-                                        ],
-                                        style={
-                                            "fontWeight": "600",
-                                            "color": "#495057",
-                                            "fontSize": "15px",
-                                            "marginBottom": "8px",
-                                            "display": "block",
-                                        },
+                                        ]
                                     ),
-                                ]
-                            ),
-                            dcc.Input(
-                                id=ids["keyword_search"],
-                                type="text",
-                                placeholder="e.g. human rights, climate (comma-separated, press Enter)",
-                                debounce=True,
-                                value=initial_filters["keyword"],
-                                style={
-                                    "width": "100%",
-                                    "fontSize": "14px",
-                                    "padding": "8px 10px",
-                                    "border": "1px solid #ced4da",
-                                    "borderRadius": "4px",
-                                    "fontFamily": "inherit",
-                                    "boxSizing": "border-box",
-                                },
-                            ),
-                        ],
-                        style={
-                            "marginBottom": "20px",
-                            "padding": "15px",
-                            "backgroundColor": "#f8f9fa",
-                            "borderRadius": "8px",
-                            "border": "1px solid #e9ecef",
-                        },
-                    ),
-                    # ROW 1: Main Country
-                    html.Div(
-                        [
-                            html.Div(
-                                [
-                                    html.Label(
-                                        [
-                                            html.Span(
-                                                "🌍", style={"marginRight": "5px"}
-                                            ),
-                                            "Main Country",
-                                        ],
-                                        style={
-                                            "fontWeight": "600",
-                                            "color": "#495057",
-                                            "fontSize": "15px",
-                                            "marginBottom": "8px",
-                                            "display": "block",
-                                        },
-                                    ),
-                                ]
-                            ),
-                            dcc.Dropdown(
-                                id=ids["country"],
-                                options=[
-                                    {
-                                        "label": data.get_country_display_name(country),
-                                        "value": country,
-                                        "search": data.get_country_search_terms(country),
-                                    }
-                                    for country in data.available_countries
-                                ],
-                                value=initial_filters["country1_alpha3"],
-                                placeholder="Select a country...",
-                                clearable=True,
-                                style={
-                                    "width": "100%",
-                                    "fontSize": "14px",
-                                },
-                                searchable=True,
-                            ),
-                            html.Div(
-                                [
-                                    html.Label(
-                                        "Filter resolutions:",
-                                        style={
-                                            "fontSize": "13px",
-                                            "color": "#6c757d",
-                                            "marginRight": "10px",
-                                        },
-                                    ),
-                                    dcc.RadioItems(
-                                        id=ids["country_filter_mode"],
+                                    dcc.Dropdown(
+                                        id=ids["country"],
                                         options=[
-                                            {"label": " Voted on resolution", "value": "voted"},
-                                            {"label": " Was UN member", "value": "member"},
-                                            {"label": " No filter", "value": "none"},
+                                            {
+                                                "label": data.get_country_display_name(country),
+                                                "value": country,
+                                                "search": data.get_country_search_terms(country),
+                                            }
+                                            for country in data.available_countries
                                         ],
-                                        value=initial_filters["country_filter_mode"],
-                                        inline=True,
-                                        style={"fontSize": "13px", "color": "#555"},
+                                        value=initial_filters["country1_alpha3"],
+                                        placeholder="Select a country...",
+                                        clearable=True,
+                                        style={
+                                            "width": "100%",
+                                            "fontSize": "14px",
+                                        },
+                                        searchable=True,
+                                    ),
+                                    html.Div(
+                                        [
+                                            html.Label(
+                                                "Filter resolutions:",
+                                                style={
+                                                    "fontSize": "13px",
+                                                    "color": "#6c757d",
+                                                    "marginRight": "10px",
+                                                    "whiteSpace": "nowrap",
+                                                },
+                                            ),
+                                            dcc.RadioItems(
+                                                id=ids["country_filter_mode"],
+                                                options=[
+                                                    {"label": " Voted on resolution", "value": "voted"},
+                                                    {"label": " Was UN member", "value": "member"},
+                                                    {"label": " No filter", "value": "none"},
+                                                ],
+                                                value=initial_filters["country_filter_mode"],
+                                                inline=True,
+                                                style={"fontSize": "13px", "color": "#555"},
+                                            ),
+                                        ],
+                                        style={
+                                            "display": "flex",
+                                            "alignItems": "center",
+                                            "marginTop": "10px",
+                                        },
+                                    ),
+                                    html.Div(
+                                        html.Button(
+                                            "Set years to UN membership ➜",
+                                            id=ids["membership_dates_btn"],
+                                            n_clicks=0,
+                                            disabled=True,
+                                            style={
+                                                "fontSize": "13px",
+                                                "fontFamily": "inherit",
+                                                "border": "1px solid #adb5bd",
+                                                "borderRadius": "4px",
+                                                "padding": "4px 10px",
+                                                "cursor": "not-allowed",
+                                                "whiteSpace": "nowrap",
+                                                "backgroundColor": "#e9ecef",
+                                                "color": "#adb5bd",
+                                            },
+                                        ),
+                                        style={
+                                            "display": "flex",
+                                            "justifyContent": "flex-end",
+                                            "marginTop": "14px",
+                                        },
                                     ),
                                 ],
                                 style={
-                                    "display": "flex",
-                                    "alignItems": "center",
-                                    "marginTop": "10px",
+                                    "flex": "1",
+                                    "padding": "15px",
+                                    "backgroundColor": "#f8f9fa",
+                                    "borderRadius": "8px",
+                                    "border": "1px solid #e9ecef",
+                                },
+                            ),
+                            # Year Range panel
+                            html.Div(
+                                [
+                                    html.Div(
+                                        [
+                                            html.Label(
+                                                [
+                                                    html.Span(
+                                                        "🗓️",
+                                                        style={"marginRight": "5px"},
+                                                    ),
+                                                    "Year Range",
+                                                ],
+                                                style={
+                                                    "fontWeight": "600",
+                                                    "color": "#495057",
+                                                    "fontSize": "15px",
+                                                    "marginBottom": "8px",
+                                                    "display": "block",
+                                                },
+                                            ),
+                                        ]
+                                    ),
+                                    html.Div(
+                                        dcc.RangeSlider(
+                                            id=ids["year_range"],
+                                            min=earliest_year,
+                                            max=latest_year,
+                                            step=1,
+                                            value=[
+                                                initial_filters["start_year"],
+                                                initial_filters["end_year"],
+                                            ],
+                                            marks=None,
+                                            tooltip=None,
+                                            allowCross=False,
+                                        ),
+                                        style={},
+                                    ),
+                                    html.Div(
+                                        [
+                                            html.Button(
+                                                "◀",
+                                                id=ids["era_prev_btn"],
+                                                n_clicks=0,
+                                                style={
+                                                    "fontSize": "14px",
+                                                    "color": "#495057",
+                                                    "backgroundColor": "transparent",
+                                                    "border": "1px solid #adb5bd",
+                                                    "borderRadius": "4px",
+                                                    "cursor": "pointer",
+                                                    "fontFamily": "inherit",
+                                                },
+                                            ),
+                                            dcc.Dropdown(
+                                                id=ids["era_preset"],
+                                                options=[
+                                                    {"label": e["label"], "value": k}
+                                                    for k, e in ERA_PRESETS.items()
+                                                ],
+                                                value=initial_filters["era_preset"],
+                                                placeholder="Quick select era...",
+                                                clearable=True,
+                                                style={
+                                                    "fontSize": "14px",
+                                                },
+                                            ),
+                                            html.Button(
+                                                "▶",
+                                                id=ids["era_next_btn"],
+                                                n_clicks=0,
+                                                style={
+                                                    "fontSize": "14px",
+                                                    "color": "#495057",
+                                                    "backgroundColor": "transparent",
+                                                    "border": "1px solid #adb5bd",
+                                                    "borderRadius": "4px",
+                                                    "cursor": "pointer",
+                                                    "fontFamily": "inherit",
+                                                },
+                                            ),
+                                        ],
+                                        style={
+                                            "display": "grid",
+                                            "gridTemplateColumns": "28px 1fr 28px",
+                                            "gap": "6px",
+                                            "marginTop": "12px",
+                                        },
+                                    ),
+                                ],
+                                style={
+                                    "flex": "0 0 32%",
+                                    "padding": "15px",
+                                    "backgroundColor": "#f8f9fa",
+                                    "borderRadius": "8px",
+                                    "border": "1px solid #e9ecef",
                                 },
                             ),
                         ],
                         style={
+                            "display": "flex",
+                            "flexDirection": "row",
+                            "gap": "20px",
                             "marginBottom": "20px",
-                            "padding": "15px",
-                            "backgroundColor": "#f8f9fa",
-                            "borderRadius": "8px",
-                            "border": "1px solid #e9ecef",
                         },
                     ),
                     # ROW 2: Comparison Countries + Preset
@@ -779,7 +882,7 @@ def layout(page_query_params: dict[str, str] | None = None):
                                         locale="en-us",
                                     ),
                                 ],
-                                style={"flex": "0 0 220px"},
+                                style={"flex": "0 0 34%"},
                             ),
                         ],
                         style={
@@ -793,10 +896,10 @@ def layout(page_query_params: dict[str, str] | None = None):
                             "border": "1px solid #e9ecef",
                         },
                     ),
-                    # ROW 3: Date Range and Subjects side by side
+                    # ROW 3: Keyword Search (left) + Subjects (right)
                     html.Div(
                         [
-                            # Year Range Filter
+                            # Keyword Search panel
                             html.Div(
                                 [
                                     html.Div(
@@ -804,10 +907,9 @@ def layout(page_query_params: dict[str, str] | None = None):
                                             html.Label(
                                                 [
                                                     html.Span(
-                                                        "🗓️",
-                                                        style={"marginRight": "5px"},
+                                                        "🔍", style={"marginRight": "5px"}
                                                     ),
-                                                    "Year Range",
+                                                    "Keyword Search",
                                                 ],
                                                 style={
                                                     "fontWeight": "600",
@@ -819,85 +921,32 @@ def layout(page_query_params: dict[str, str] | None = None):
                                             ),
                                         ]
                                     ),
-                                    # TODO: Add a button that auto-sets the year range to the UN membership dates
-                                    #  of the selected Main Country (if any).
-                                    html.Div(
-                                        dcc.RangeSlider(
-                                            id=ids["year_range"],
-                                            min=earliest_year,
-                                            max=latest_year,
-                                            step=1,
-                                            value=[
-                                                initial_filters["start_year"],
-                                                initial_filters["end_year"],
-                                            ],
-                                            marks=None,
-                                            tooltip=None,
-                                            allowCross=False,
-                                        ),
-                                        style={},
-                                    ),
-                                    html.Div(
-                                        [
-                                            html.Button(
-                                                "◀",
-                                                id=ids["era_prev_btn"],
-                                                n_clicks=0,
-                                                style={
-                                                    "fontSize": "14px",
-                                                    "color": "#495057",
-                                                    "backgroundColor": "transparent",
-                                                    "border": "1px solid #adb5bd",
-                                                    "borderRadius": "4px",
-                                                    "cursor": "pointer",
-                                                    "fontFamily": "inherit",
-                                                },
-                                            ),
-                                            dcc.Dropdown(
-                                                id=ids["era_preset"],
-                                                options=[
-                                                    {"label": e["label"], "value": k}
-                                                    for k, e in ERA_PRESETS.items()
-                                                ],
-                                                value=initial_filters["era_preset"],
-                                                placeholder="Quick select era...",
-                                                clearable=True,
-                                                style={
-                                                    "fontSize": "14px",
-                                                },
-                                            ),
-                                            html.Button(
-                                                "▶",
-                                                id=ids["era_next_btn"],
-                                                n_clicks=0,
-                                                style={
-                                                    "fontSize": "14px",
-                                                    "color": "#495057",
-                                                    "backgroundColor": "transparent",
-                                                    "border": "1px solid #adb5bd",
-                                                    "borderRadius": "4px",
-                                                    "cursor": "pointer",
-                                                    "fontFamily": "inherit",
-                                                },
-                                            ),
-                                        ],
+                                    dcc.Input(
+                                        id=ids["keyword_search"],
+                                        type="text",
+                                        placeholder="e.g. human rights, climate (comma-separated, press Enter)",
+                                        debounce=True,
+                                        value=initial_filters["keyword"],
                                         style={
-                                            "display": "grid",
-                                            "gridTemplateColumns": "28px 1fr 28px",
-                                            "gap": "6px",
-                                            "marginTop": "12px",
+                                            "width": "100%",
+                                            "fontSize": "14px",
+                                            "padding": "8px 10px",
+                                            "border": "1px solid #ced4da",
+                                            "borderRadius": "4px",
+                                            "fontFamily": "inherit",
+                                            "boxSizing": "border-box",
                                         },
                                     ),
                                 ],
                                 style={
-                                    "flex": "0 0 30%",
+                                    "flex": "0 0 45%",
                                     "padding": "15px",
                                     "backgroundColor": "#f8f9fa",
                                     "borderRadius": "8px",
                                     "border": "1px solid #e9ecef",
                                 },
                             ),
-                            # Subjects Filter
+                            # Subjects panel
                             html.Div(
                                 [
                                     html.Div(
@@ -957,6 +1006,17 @@ def layout(page_query_params: dict[str, str] | None = None):
                                         style={"width": "100%"},
                                         locale="en-us",
                                         value=initial_filters["subject_ids"],
+                                    ),
+                                    html.P(
+                                        "Meta-data on subjects is limited before the 1990s. "
+                                        "Using this filter will drop many older resolutions.",
+                                        style={
+                                            "fontSize": "12px",
+                                            "color": "#6c757d",
+                                            "marginTop": "6px",
+                                            "marginBottom": "0",
+                                            "fontStyle": "italic",
+                                        },
                                     ),
                                 ],
                                 style={

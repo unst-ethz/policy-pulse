@@ -521,18 +521,22 @@ def download_resolutions_csv(n_clicks, filter_store):
         Output("filter-component-era-preset", "disabled"),
         Output("filter-component-era-prev-btn", "disabled", allow_duplicate=True),
         Output("filter-component-era-next-btn", "disabled", allow_duplicate=True),
+        Output("filter-component-membership-dates-btn", "disabled"),
         Output("filter-component-country-dropdown", "style"),
         Output("filter-component-country2-dropdown", "style"),
         Output("filter-component-preset-dropdown", "style"),
         Output("filter-component-subject-dropdown", "style"),
         Output("filter-component-keyword-search", "style"),
         Output("filter-component-era-preset", "style"),
+        Output("filter-component-membership-dates-btn", "style"),
     ],
     Input("country-view-tabs", "value"),
+    Input("filter-component-country-dropdown", "value"),
     prevent_initial_call='initial_duplicate',
 )
-def disable_filters_based_on_tab(selected_tab):
-    """Disable filters based on selected tab."""
+def disable_filters_based_on_tab(selected_tab, country1_dropdown):
+    """Disable filters based on selected tab and country selection."""
+    no_country = not country1_dropdown
     is_map_tab = selected_tab == "map"
     is_wordcloud_tab = selected_tab == "wordcloud"
     is_multilateral_tab = selected_tab == "multilateral"
@@ -584,19 +588,35 @@ def disable_filters_based_on_tab(selected_tab):
         subj_disabled = True                                 # subject filter drives its own content
         cfm_opts = cfm_disabled                              # tab hardwires "both countries voted"
 
+    # Disable CFM radio items when no main country is selected
+    if no_country:
+        cfm_opts = cfm_disabled
+
+    # Membership button: disabled when no country selected or year range is irrelevant
+    membership_btn_disabled = no_country or c1_disabled or yr_era_disabled
+    _btn_base = {
+        "fontSize": "13px", "fontFamily": "inherit", "border": "1px solid #adb5bd",
+        "borderRadius": "4px", "padding": "4px 10px", "whiteSpace": "nowrap",
+        "cursor": "pointer", "backgroundColor": "transparent", "color": "#495057",
+    }
+    _btn_off = {**_btn_base, "cursor": "not-allowed", "backgroundColor": "#e9ecef", "color": "#adb5bd"}
+    membership_btn_style = _btn_off if membership_btn_disabled else _btn_base
+
     def _sty(d):
         return disabled_style if d else base_style
 
     return (
-        # --- disabled props (10) ---
+        # --- disabled props ---
         c1_disabled, c2_disabled, preset_disabled, subj_disabled,
         kw_disabled,  # keyword: only resolution_list + wordcloud
         cfm_opts,  # country-filter-mode options list
         yr_era_disabled, yr_era_disabled, yr_era_disabled, yr_era_disabled,  # year-range, era-preset, era-prev, era-next
-        # --- style props (6) ---
+        membership_btn_disabled,
+        # --- style props ---
         _sty(c1_disabled), _sty(c2_disabled), _sty(preset_disabled), _sty(subj_disabled),
         kw_style,  # keyword style
-        _sty(yr_era_disabled),                                # era-preset style
+        _sty(yr_era_disabled),  # era-preset style
+        membership_btn_style,
     )
 
 

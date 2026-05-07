@@ -141,7 +141,12 @@ layout = [
             ),
             html.Div(id="agreement-chart-status"),
             dcc.Loading(
-                children=[dcc.Graph(id="agreement-chart", style={"height": "600px"})],
+                children=[
+                    dcc.Graph(
+                        id="agreement-chart",
+                        style={"height": "600px", "width": "100%"},
+                    )
+                ],
                 type="cube",
                 color="#3498db",
             ),
