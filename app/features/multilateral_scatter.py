@@ -94,7 +94,7 @@ def register_callbacks(query_engine):
                 customdata=group[["multilateral_alignment", y_metric, "participation_count"]].values,
                 hovertemplate=(
                     "<b>%{text}</b><br>"
-                    "Multilateral agreement: %{customdata[0]:.3f}<br>"
+                    "Multilateral vote agreement: %{customdata[0]:.3f}<br>"
                     f"{y_label}: " + "%{customdata[1]:.1%}<br>"
                     "Votes cast: %{customdata[2]:.0f}"
                     "<extra></extra>"
@@ -120,7 +120,7 @@ def register_callbacks(query_engine):
                     textposition="top right",
                     hovertemplate=(
                         f"<b>{row['country_name']}</b> (selected)<br>"
-                        f"Multilateral agreement: {row['multilateral_alignment']:.3f}<br>"
+                        f"Multilateral vote agreement: {row['multilateral_alignment']:.3f}<br>"
                         f"{y_label}: {row[y_metric]:.1%}<br>"
                         f"Votes cast: {int(row['participation_count'])}"
                         "<extra></extra>"
@@ -134,7 +134,7 @@ def register_callbacks(query_engine):
         y_hi = max(0.505, stats[y_metric].max() * 1.05)
 
         fig.update_layout(
-            xaxis=dict(title="Multilateral Agreement", range=[x_lo, x_hi]),
+            xaxis=dict(title="Multilateral Vote Agreement", range=[x_lo, x_hi]),
             yaxis=dict(title=y_label, tickformat=".0%", range=[0, y_hi]),
             legend=dict(title="Region"),
             margin=dict(l=50, r=20, t=40, b=50),
@@ -153,15 +153,14 @@ def register_callbacks(query_engine):
             [
                 html.Strong("Details: "),
                 "Each point represents a UN member state, coloured by geographical region. "
-                "The x-axis (Multilateral Agreement) is the average pairwise agreement between a country "
+                "The x-axis (Multilateral Vote Agreement) is the average pairwise agreement between a country "
                 "and all other countries that voted on the same resolution, averaged across all selected "
                 f"resolutions. {_Y_AXIS_DETAILS[y_metric]} "
                 "The dashed vertical line marks the mean multilateral voting agreement across all plotted countries. "
                 "The more a country is located to the left of the mean line, the more often it votes "
                 f"against the majority. "
                 f"Countries with fewer than {_MIN_VOTES_THRESHOLD} votes cast are excluded. "
-                "The data only covers GA resolutions that were successfully passed. "
-                "Selecting a Main Country highlights its position in the chart but does not filter the data.",
+                "The data only covers GA resolutions that were successfully passed."
             ],
             style={
                 "maxWidth": "100%",

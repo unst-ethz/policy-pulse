@@ -218,9 +218,19 @@ _COUNTRY_TO_REGION: dict[str, str] = {
     if isinstance(row.get("ISO-alpha3 Code"), str) and isinstance(row.get("Region Name"), str)
 }
 
+_COUNTRY_TO_SUBREGION: dict[str, str] = {
+    row["ISO-alpha3 Code"].strip(): row["Sub-region Name"].strip()
+    for _, row in _m49_df.iterrows()
+    if isinstance(row.get("ISO-alpha3 Code"), str) and isinstance(row.get("Sub-region Name"), str)
+}
+
 
 def get_country_region(iso3: str) -> str:
     return _COUNTRY_TO_REGION.get(iso3, "Other")
+
+
+def get_country_subregion(iso3: str) -> str | None:
+    return _COUNTRY_TO_SUBREGION.get(iso3)
 
 # Top level subjects (level 0 in the hierarchy)
 TOP_LEVEL_SUBJECTS = {

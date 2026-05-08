@@ -492,18 +492,37 @@ def layout(page_query_params: dict[str, str] | None = None):
                     ),
                     html.Div(
                         [
-                            html.Button(
-                                "Download CSV",
-                                id="download-btn",
-                                n_clicks=0,
+                            html.A(
+                                "Country Profile ↗",
+                                id="profile-page-link",
+                                href="#",
+                                target="_blank",
                                 style={
-                                    "backgroundColor": "#1a73e8",
+                                    "backgroundColor": "#adb5bd",
                                     "color": "white",
                                     "border": "none",
                                     "borderRadius": "4px",
                                     "padding": "6px 14px",
                                     "fontSize": "13px",
-                                    "cursor": "pointer",
+                                    "cursor": "not-allowed",
+                                    "fontFamily": "inherit",
+                                    "fontWeight": "600",
+                                    "textDecoration": "none",
+                                    "display": "inline-block",
+                                },
+                            ),
+                            html.Button(
+                                "Download CSV",
+                                id="download-btn",
+                                n_clicks=0,
+                                style={
+                                    "backgroundColor": "transparent",
+                                    "color": "#adb5bd",
+                                    "border": "1px solid #adb5bd",
+                                    "borderRadius": "4px",
+                                    "padding": "6px 14px",
+                                    "fontSize": "13px",
+                                    "cursor": "not-allowed",
                                     "fontFamily": "inherit",
                                     "fontWeight": "600",
                                 },

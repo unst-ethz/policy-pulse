@@ -43,7 +43,7 @@ def register_callbacks():
             is_special = is_special[~is_special]
 
         fig = go.Figure()
-        colors = px.colors.qualitative.Plotly
+        colors = px.colors.qualitative.D3
         for i, c in enumerate(selected):
             avg_col = f"avg_agreement_{c}"
             n_col = f"n_votes_{c}"

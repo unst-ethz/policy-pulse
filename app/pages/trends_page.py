@@ -1,6 +1,7 @@
 import functools
 import time
 from typing import List
+from urllib.parse import urlencode
 
 import numpy as np
 import pandas as pd
@@ -245,6 +246,52 @@ clientside_callback(
 #     Input("country1-localised-name", "data"),
 # )
 
+@callback(
+    Output("profile-page-link", "href"),
+    Output("profile-page-link", "style"),
+    Input("filter-component-filter-store", "data"),
+)
+def update_country_profile_link(filter_store):
+    _base = {
+        "border": "none", "borderRadius": "4px", "padding": "6px 14px",
+        "fontSize": "13px", "fontWeight": "600", "textDecoration": "none",
+        "display": "inline-block",
+    }
+    _disabled = {**_base, "backgroundColor": "#adb5bd", "color": "white",
+                 "cursor": "not-allowed", "opacity": "0.6"}
+    _enabled  = {**_base, "backgroundColor": "#1a73e8", "color": "white",
+                 "cursor": "pointer", "opacity": "1"}
+
+    country1 = (filter_store or {}).get("country1_alpha3")
+    if not country1:
+        return "#", _disabled
+
+    params = {"country1": country1}
+    start_date = (filter_store or {}).get("start_date")
+    end_date   = (filter_store or {}).get("end_date")
+    if start_date:
+        params["start_date"] = start_date
+    if end_date:
+        params["end_date"] = end_date
+
+    subject_ids = (filter_store or {}).get("subject_ids")
+    if subject_ids:
+        params["subjects"] = "|".join(subject_ids)
+
+    keyword = (filter_store or {}).get("keyword")
+    if keyword and keyword.strip():
+        params["keyword"] = keyword
+
+    country2 = (filter_store or {}).get("country2")
+    if country2:
+        if isinstance(country2, list):
+            params["country2"] = ",".join(country2)
+        else:
+            params["country2"] = country2
+
+    return "/profile?" + urlencode(params), _enabled
+
+
 filters.register_callbacks()
 resolution_list.register_callbacks()
 agreement_choropleth.register_callbacks(data.query_engine)
@@ -431,14 +478,16 @@ def toggle_download_button(filter_store):
     if not country1:
         return True, {
             **base_style,
-            "backgroundColor": "#adb5bd",
-            "color": "white",
+            "backgroundColor": "transparent",
+            "color": "#adb5bd",
+            "border": "1px solid #adb5bd",
             "cursor": "not-allowed",
         }
     return False, {
         **base_style,
-        "backgroundColor": "#1a73e8",
-        "color": "white",
+        "backgroundColor": "transparent",
+        "color": "#1a73e8",
+        "border": "1px solid #1a73e8",
         "cursor": "pointer",
     }
 
