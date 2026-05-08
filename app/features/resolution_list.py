@@ -6,26 +6,29 @@ from .. import data
 PAGE_SIZE = 10
 LOAD_MORE_SIZE = 50
 
+VOTE_MAP = {
+    "Y": {"symbol": "✓", "color": "#2ecc71", "label": "Yes"},           # green checkmark
+    "N": {"symbol": "✗", "color": "#e74c3c", "label": "No"},            # red 'x'
+    "A": {"symbol": "●", "color": "#f39c12", "label": "Abstain"},       # yellow dot
+    "X": {"symbol": "–", "color": "#999",    "label": "Did not vote"},  # grey hyphen
+}
+_VOTE_NA = {"symbol": "·", "color": "#ccc", "label": "Non-member / no data"}  # tiny grey dot
+
 
 def create_vote_indicator(country_name, vote):
-    VOTE_MAP = {
-        "Y": {"color": "green", "label": "Yes"},
-        "N": {"color": "red", "label": "No"},
-        "A": {"color": "orange", "label": "Abstain"},
-        "X": {"color": "blue", "label": "Not Voting"},
-    }
     if pd.isna(vote) or vote not in VOTE_MAP:
+        config = _VOTE_NA
         return html.Span(
             [
-            html.Span("●", style={"marginRight": "4px"}),
-            html.Span(f"{country_name}"),
-        ],
-            style={"color": "#999", "marginRight": "15px", "fontSize": "0.9em"},
+                html.Span(config["symbol"], style={"marginRight": "4px", "color": config["color"]}),
+                html.Span(f"{country_name}"),
+            ],
+            style={"color": "#bbb", "marginRight": "15px", "fontSize": "0.9em"},
         )
     config = VOTE_MAP[vote]
     return html.Span(
         [
-            html.Span("●", style={"color": config["color"], "marginRight": "4px"}),
+            html.Span(config["symbol"], style={"color": config["color"], "marginRight": "4px", "fontWeight": "bold"}),
             html.Span(f"{country_name}"),
         ],
         style={"fontWeight": "500", "marginRight": "15px", "fontSize": "0.9em"},
@@ -93,7 +96,7 @@ layout = [
                                             {"label": "Yes", "value": "Y"},
                                             {"label": "No", "value": "N"},
                                             {"label": "Abstain", "value": "A"},
-                                            {"label": "Not Voting", "value": "X"},
+                                            {"label": "Did not vote", "value": "X"},
                                         ],
                                         value="NO_FILTER",
                                         clearable=False,
@@ -161,16 +164,10 @@ layout = [
                     html.Span("Vote key:", style={"fontWeight": "bold", "marginRight": "12px", "fontSize": "0.85em", "color": "#555"}),
                     *[
                         html.Span(
-                            [html.Span("●", style={"color": color, "marginRight": "4px"}), label],
+                            [html.Span(v["symbol"], style={"color": v["color"], "marginRight": "4px", "fontWeight": "bold"}), v["label"]],
                             style={"fontSize": "0.85em", "marginRight": "14px"},
                         )
-                        for color, label in [
-                            ("green", "Yes"),
-                            ("red", "No"),
-                            ("orange", "Abstain"),
-                            ("blue", "Not Voting"),
-                            ("#999", "N/A"),
-                        ]
+                        for v in [*VOTE_MAP.values(), _VOTE_NA]
                     ],
                 ],
                 style={
