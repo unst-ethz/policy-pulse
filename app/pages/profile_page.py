@@ -9,11 +9,18 @@ from dash import Input, Output, clientside_callback, dcc, html, register_page
 
 from .. import data
 from ..features.country_utils import get_un_membership_years
+from ..features.resolution_list import VOTE_MAP
 
 P5 = ["USA", "GBR", "FRA", "RUS", "CHN"]
 MIN_JOINT_VOTES = 100
 
 register_page(__name__, path="/profile")
+
+# ── vote colours (sourced from VOTE_MAP so they stay in sync with the rest of the UI) ──
+_COLOR_YES    = VOTE_MAP["Y"]["color"]
+_COLOR_NO     = VOTE_MAP["N"]["color"]
+_COLOR_ABS    = VOTE_MAP["A"]["color"]
+_COLOR_ABSENT = VOTE_MAP["X"]["color"]
 
 # ── shared style constants ────────────────────────────────────────────────────
 _H3 = {"fontSize": "1rem", "fontWeight": "600", "color": "#343a40", "margin": "0 0 10px 0"}
@@ -164,10 +171,10 @@ def layout(
     y_pct, n_pct, a_pct, x_pct = _pct(n_yes), _pct(n_no), _pct(n_abs), _pct(n_absent)
 
     vote_bar = html.Div([
-        html.Div(style={"width": f"{y_pct:.2f}%", "backgroundColor": "#74bb88", "height": "100%"}),
-        html.Div(style={"width": f"{n_pct:.2f}%", "backgroundColor": "#cc575f", "height": "100%"}),
-        html.Div(style={"width": f"{a_pct:.2f}%", "backgroundColor": "#c19f5b", "height": "100%"}),
-        html.Div(style={"width": f"{x_pct:.2f}%", "backgroundColor": "#ced4da", "height": "100%"}),
+        html.Div(style={"width": f"{y_pct:.2f}%", "backgroundColor": _COLOR_YES,    "height": "100%"}),
+        html.Div(style={"width": f"{n_pct:.2f}%", "backgroundColor": _COLOR_NO,     "height": "100%"}),
+        html.Div(style={"width": f"{a_pct:.2f}%", "backgroundColor": _COLOR_ABS,    "height": "100%"}),
+        html.Div(style={"width": f"{x_pct:.2f}%", "backgroundColor": _COLOR_ABSENT, "height": "100%"}),
     ], style={
         "display": "flex",
         "height": "18px",
@@ -177,9 +184,9 @@ def layout(
     })
 
     vote_legend = html.Div([
-        html.Span([html.Span("■ ", style={"color": "#74bb88"}), f"Yes: {y_pct:.1f}%"]),
-        html.Span([html.Span("■ ", style={"color": "#cc575f"}), f"No: {n_pct:.1f}%"]),
-        html.Span([html.Span("■ ", style={"color": "#c19f5b"}), f"Abstain: {a_pct:.1f}%"]),
+        html.Span([html.Span("■ ", style={"color": _COLOR_YES}),    f"Yes: {y_pct:.1f}%"]),
+        html.Span([html.Span("■ ", style={"color": _COLOR_NO}),     f"No: {n_pct:.1f}%"]),
+        html.Span([html.Span("■ ", style={"color": _COLOR_ABS}),    f"Abstain: {a_pct:.1f}%"]),
         html.Span([html.Span("■ ", style={"color": "#adb5bd"}), f"Did not vote: {x_pct:.1f}%"]),
     ], style={
         "display": "flex",

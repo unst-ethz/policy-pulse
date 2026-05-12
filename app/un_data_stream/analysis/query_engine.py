@@ -36,24 +36,13 @@ class ResolutionQueryEngine:
 
         self._multilateral_scores = data.get('multilateral_scores')
 
-        # Precompute voted/abstained bool arrays (R x C) from resolution_table once at startup.
-        # multilateral_scores rows, _voted rows and _abstained rows all share resolution_table's
-        # row order (calculate_agreement_data iterates resolutions_df in order), so one index
-        # dict covers all three arrays.
-        if not self.resolution_table.empty and self.country_columns:
-            votes = (
-                self.resolution_table[self.country_columns]
-                .astype(str)
-                .apply(lambda s: s.str.strip().str.upper())
-                .replace({"NAN": pd.NA, "NONE": pd.NA, "<NA>": pd.NA, "": pd.NA})
-            )
-
-            self._yes = (votes == "Y").to_numpy()
-            self._no = (votes == "N").to_numpy()
-            self._abstained = (votes == "A").to_numpy()
-            self._voted = self._yes | self._no | self._abstained
-
-            self._row_index: dict[str, int] = {
+        vote_bool_arrays = data.get('vote_bool_arrays')
+        if vote_bool_arrays is not None and self.country_columns:
+            self._yes       = vote_bool_arrays[0]
+            self._no        = vote_bool_arrays[1]
+            self._abstained = vote_bool_arrays[2]
+            self._voted     = vote_bool_arrays[3]
+            self._row_index = {
                 rid: i for i, rid in enumerate(self.resolution_table["undl_id"].tolist())
             }
         else:
@@ -142,7 +131,8 @@ class ResolutionQueryEngine:
             resolution_ids: List of undl_id strings to retrieve. If None or empty,
                 returns the full dict of all bilateral matrices.
         Returns:
-            Dict[str, np.ndarray]: Mapping of undl_id to its (C x C) bilateral matrix.
+            Dict[str, np.ndarray]: Mapping of undl_id to its (C x C) bilateral matrix,
+                where C is the number of countries in the dataset (len(country_columns)).
         """
         if resolution_ids is None or len(resolution_ids) == 0:
             return self.agreement_matrices

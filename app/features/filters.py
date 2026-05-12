@@ -1,12 +1,18 @@
-from dash import Input, Output, State, callback, clientside_callback, html, dcc, ctx, no_update
+"""Filter panel component and shared data-store query callback.
+
+Registers the filter UI (date range, country, subject, keyword, era presets) and
+the central `query_data_on_filter_change` callback that every tab reads from.
+"""
+
+import urllib.parse
+
 import feffery_antd_components as fac
 import pandas as pd
-import urllib.parse
-from pathlib import Path
+from dash import Input, Output, State, callback, html, dcc, ctx, no_update
 
+from .country_utils import _load_joining_dates, get_un_membership_years
+from .wordcloud_interactive import get_keyword_matched_ids
 from .. import data
-
-from .country_utils import joining_dates, get_un_membership_years
 
 prefix = "filter-component"
 ids = {
@@ -402,7 +408,8 @@ def register_callbacks():
                     has_voted = vote_cleaned.isin(["Y", "N", "A"])
                     df = df[has_voted]
                 elif mode == "member":
-                    rows = joining_dates[joining_dates["country"] == country]
+                    jd = _load_joining_dates()
+                    rows = jd[jd["country"] == country]
                     if not rows.empty:
                         min_date = pd.to_datetime(rows["min_date"].min())
                         max_date = pd.to_datetime(rows["max_date"].max())
@@ -413,7 +420,6 @@ def register_callbacks():
 
             keyword = filter_data.get("keyword") if filter_data else None
             if keyword and keyword.strip() and active_tab in _TABS_WITH_KEYWORD and not df.empty:
-                from .wordcloud_interactive import get_keyword_matched_ids
                 matched_ids = get_keyword_matched_ids(df, keyword)
                 df = df[df["undl_id"].isin(matched_ids)]
 

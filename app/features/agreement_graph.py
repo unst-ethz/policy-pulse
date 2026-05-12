@@ -109,7 +109,7 @@ def register_callbacks():
             "where both countries voted. An agreement score of 1 means identical votes on all resolutions; "
             '0 means complete disagreement (Yes vs. No). '
             "Only sessions with at least 3 shared votes are shown. "
-            "Back dots indicate special and emergency sessions; excluded by default "
+            "Black dots indicate special and emergency sessions; excluded by default "
             "(use the checkbox above to include them). "
             "The data only covers GA resolutions that were passed."
         ], style={

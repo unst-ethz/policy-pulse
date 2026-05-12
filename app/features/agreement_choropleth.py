@@ -5,7 +5,7 @@ import plotly.express as px
 
 from .. import data
 
-from .country_coordinates import get_country_longitude
+from .country_utils import get_country_longitude
 from .color_utils import make_adaptive_colorscale_plotly
 
 
@@ -164,7 +164,7 @@ def register_callbacks(query_engine):
         # Center the map on the selected country's longitude (x-axis)
         # Keep y-axis at the equator (latitude = 0)
         country_longitude = get_country_longitude(country1)
-        fig.update_geos(projection_rotation_lon=-country_longitude)
+        fig.update_geos(projection_rotation_lon=country_longitude)
 
         # Change internal padding
         fig.update_layout(

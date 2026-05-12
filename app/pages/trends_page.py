@@ -17,13 +17,52 @@ from dash import (
 )
 
 from .. import data
-from ..features import agreement_by_subject
-from ..features import agreement_choropleth
-from ..features import agreement_graph
-from ..features import filters
-from ..features import multilateral_scatter
-from ..features import resolution_list
-from ..features import wordcloud_interactive
+from ..features import (
+    agreement_by_subject,
+    agreement_choropleth,
+    agreement_graph,
+    filters,
+    multilateral_scatter,
+    resolution_list,
+    wordcloud_interactive
+)
+
+# Tab IDs — defined once here so layout values and callback comparisons stay in sync
+_TAB_RESOLUTION_LIST = "resolution_list"
+_TAB_MAP            = "map"
+_TAB_TIMELINE       = "timeline"
+_TAB_SUBJECT        = "subject"
+_TAB_MULTILATERAL   = "multilateral"
+_TAB_WORDCLOUD      = "wordcloud"
+
+# Country filter mode (CFM) options — controls whether the resolution list is
+# restricted to resolutions where the selected country voted / was a member / not at all.
+_CFM_OPTIONS = [
+    {"label": " Voted on resolution", "value": "voted"},
+    {"label": " Was UN member",       "value": "member"},
+    {"label": " No filter",           "value": "none"},
+]
+_CFM_OPTIONS_DISABLED = [{**o, "disabled": True} for o in _CFM_OPTIONS]
+
+# Base and greyed-out styles for all dropdown controls (country, subject, preset, era)
+_DROPDOWN_STYLE     = {"width": "100%", "fontSize": "14px"}
+_DROPDOWN_STYLE_OFF = {**_DROPDOWN_STYLE, "opacity": "0.5", "cursor": "not-allowed", "backgroundColor": "#e9ecef"}
+
+# Base and greyed-out styles for the keyword text input
+_INPUT_STYLE     = {
+    "width": "100%", "fontSize": "14px", "padding": "8px 10px",
+    "border": "1px solid #ced4da", "borderRadius": "4px",
+    "fontFamily": "inherit", "boxSizing": "border-box",
+}
+_INPUT_STYLE_OFF = {**_INPUT_STYLE, "opacity": "0.5", "cursor": "not-allowed", "backgroundColor": "#e9ecef"}
+
+# Base and greyed-out styles for the "Filter by membership dates" button
+_BTN_STYLE     = {
+    "fontSize": "13px", "fontFamily": "inherit", "border": "1px solid #adb5bd",
+    "borderRadius": "4px", "padding": "4px 10px", "whiteSpace": "nowrap",
+    "cursor": "pointer", "backgroundColor": "transparent", "color": "#495057",
+}
+_BTN_STYLE_OFF = {**_BTN_STYLE, "cursor": "not-allowed", "backgroundColor": "#e9ecef", "color": "#adb5bd"}
 
 
 def title(countr1_alpha3=None):
@@ -37,12 +76,13 @@ def title(countr1_alpha3=None):
 register_page(__name__, path_template="/trends")
 
 
-def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
+def layout(country1_alpha3: str | None = None, **other_keyword_arguments):
+    """Render the full trends page, passing URL query params into the filter store."""
 
-    available = [c for c in data.available_countries if c != countr1_alpha3]
+    available = [c for c in data.available_countries if c != country1_alpha3]
     return html.Div(
         [
-            dcc.Store(id="country1-iso-alpha3", data=countr1_alpha3),
+            dcc.Store(id="country1-iso-alpha3", data=country1_alpha3),
             dcc.Store(id="country1-localised-name"),
             html.H1(
                 [
@@ -64,13 +104,13 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
             # Tab Navigation
             dcc.Tabs(
                 id="country-view-tabs",
-                value="resolution_list",
+                value=_TAB_RESOLUTION_LIST,
                 style={"marginTop": "1rem"},
                 children=[
                     # TAB 1: Resolution List
                     dcc.Tab(
                         label="Resolutions",
-                        value="resolution_list",
+                        value=_TAB_RESOLUTION_LIST,
                         children=[
                             html.Div(
                                 [
@@ -92,7 +132,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                     # TAB 2: Agreement Map
                     dcc.Tab(
                         label="Agreement Map",
-                        value="map",
+                        value=_TAB_MAP,
                         id="tab-agreement-map",
                         disabled=False,
                         children=[
@@ -105,7 +145,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                     # TAB 3: Agreement Timeline
                     dcc.Tab(
                         label="Agreement Timeline",
-                        value="timeline",
+                        value=_TAB_TIMELINE,
                         id="tab-agreement-timeline",
                         disabled=False,
                         children=[
@@ -118,7 +158,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                     # TAB 4: Agreement by Subject
                     dcc.Tab(
                         label="Agreement by Subject",
-                        value="subject",
+                        value=_TAB_SUBJECT,
                         id="tab-agreement-subject",
                         disabled=False,
                         children=[
@@ -131,7 +171,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                     # TAB 5: Multilateral Alignment
                     dcc.Tab(
                         label="Multilateral Overview",
-                        value="multilateral",
+                        value=_TAB_MULTILATERAL,
                         children=[
                             html.Div(
                                 [
@@ -153,7 +193,7 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
                     # TAB 6: Word Cloud
                     dcc.Tab(
                         label="Word Cloud",
-                        value="wordcloud",
+                        value=_TAB_WORDCLOUD,
                         children=[
                             html.Div(
                                 [
@@ -214,16 +254,14 @@ def layout(countr1_alpha3: str | None = None, **other_keyword_arguments):
         ]
     )
 
-
-# Client-side callback from filter component's country 1 (ISO alpha3) to
-# localised name.
+# Client-side callback: resolves country 1 ISO alpha3 to a localised display name.
 clientside_callback(
     """
     function localise_iso_country(filter_store) {
         if (!filter_store) return null;
         const iso_three_digit = filter_store.country1_alpha3;
 
-        // Localize the country code
+        // Localize the country code (convert ISO3 to full name) 
         if (!iso_three_digit) return null;
         const iso2 = window.getCountryISO2(iso_three_digit);
         if (!iso2) return iso_three_digit;
@@ -236,15 +274,6 @@ clientside_callback(
     ],
 )
 
-# clientside_callback(
-#     """
-#     function store_to_heading(localised_name) {
-#         return localised_name;
-#     }
-#     """,
-#     Output("heading-country1-name", "children"),
-#     Input("country1-localised-name", "data"),
-# )
 
 @callback(
     Output("profile-page-link", "href"),
@@ -252,6 +281,11 @@ clientside_callback(
     Input("filter-component-filter-store", "data"),
 )
 def update_country_profile_link(filter_store):
+    """Build the URL for the Country Profile page (/profile) from the current filter state.
+
+    Encodes country1, date range and comparison countries as query parameters.
+    Also styles the link button — greyed out when no primary country is selected.
+    """
     _base = {
         "border": "none", "borderRadius": "4px", "padding": "6px 14px",
         "fontSize": "13px", "fontWeight": "600", "textDecoration": "none",
@@ -274,14 +308,6 @@ def update_country_profile_link(filter_store):
     if end_date:
         params["end_date"] = end_date
 
-    subject_ids = (filter_store or {}).get("subject_ids")
-    if subject_ids:
-        params["subjects"] = "|".join(subject_ids)
-
-    keyword = (filter_store or {}).get("keyword")
-    if keyword and keyword.strip():
-        params["keyword"] = keyword
-
     country2 = (filter_store or {}).get("country2")
     if country2:
         if isinstance(country2, list):
@@ -292,13 +318,13 @@ def update_country_profile_link(filter_store):
     return "/profile?" + urlencode(params), _enabled
 
 
+# Wire up callbacks for each feature module. Must be called at import time
+# so Dash can discover them before the server starts.
 filters.register_callbacks()
 resolution_list.register_callbacks()
 agreement_choropleth.register_callbacks(data.query_engine)
 agreement_graph.register_callbacks()
 agreement_by_subject.register_callbacks(data.query_engine)
-
-
 multilateral_scatter.register_callbacks(data.query_engine)
 wordcloud_interactive.register_callbacks()
 
@@ -315,8 +341,9 @@ wordcloud_interactive.register_callbacks()
     Input("filter-component-filter-store", "data"),
     prevent_initial_call=False,
 )
-def update_tab_states(filter_store):
-    """Gray out tabs visually based on country selection requirements."""
+def grey_out_tabs_without_country(filter_store):
+    """Grey out the Map tab until a main country is selected, and the
+    Timeline and Subject tabs until a comparison country is also selected."""
     if not filter_store:
         country1 = None
         country2 = None
@@ -448,7 +475,8 @@ def prevent_disabled_tab_switch(selected_tab, filter_store):
     Input("country-view-tabs", "value"),
 )
 def update_resolution_count(data_store, active_tab):
-    if active_tab == "timeline":
+    """Show how many resolutions match the current filters, or a note for the timeline tab."""
+    if active_tab == _TAB_TIMELINE:
         return html.Span(
             "Timeline uses full session history — year range, subject and country filters do not apply.",
             style={"fontStyle": "italic"},
@@ -558,114 +586,96 @@ def download_resolutions_csv(n_clicks, filter_store):
     return dcc.send_data_frame(result.to_csv, "resolutions.csv", index=False)
 
 
+# ---------------------------------------------------------------------------
+# Filter control enable/disable logic
+# Constants and helper shared by the two callbacks below, which together
+# grey out filter controls that are irrelevant for the active tab.
+# ---------------------------------------------------------------------------
+def _compute_filter_state(selected_tab: str, country1: str | None) -> dict:
+    """Return boolean flags indicating which filter controls should be disabled."""
+    no_country = not country1
+
+    c1_off = c2_off = preset_off = subj_off = yr_era_off = cfm_off = False
+
+    if selected_tab == _TAB_WORDCLOUD:
+        c1_off = c2_off = preset_off = cfm_off = True  # no country context needed
+    elif selected_tab == _TAB_MULTILATERAL:
+        c2_off = preset_off = True                     # comparison country not used
+    elif selected_tab == _TAB_MAP:
+        c2_off = preset_off = cfm_off = True           # choropleth filters by pair internally
+    elif selected_tab == _TAB_TIMELINE:
+        subj_off = yr_era_off = cfm_off = True         # timeline ignores subject + date range
+    elif selected_tab == _TAB_SUBJECT:
+        subj_off = cfm_off = True                      # tab hardwires "both countries voted"
+
+    if no_country:
+        cfm_off = True
+
+    return {
+        "c1_off":         c1_off,
+        "c2_off":         c2_off,
+        "preset_off":     preset_off,
+        "subj_off":       subj_off,
+        "kw_off":         selected_tab not in (_TAB_RESOLUTION_LIST, _TAB_WORDCLOUD),
+        "cfm_off":        cfm_off,
+        "yr_era_off":     yr_era_off,
+        "membership_off": no_country or c1_off or yr_era_off,
+    }
+
+
 @callback(
-    [
-        Output("filter-component-country-dropdown", "disabled"),
-        Output("filter-component-country2-dropdown", "disabled"),
-        Output("filter-component-preset-dropdown", "disabled"),
-        Output("filter-component-subject-dropdown", "disabled"),
-        Output("filter-component-keyword-search", "disabled"),
-        Output("filter-component-country-filter-mode", "options"),
-        Output("filter-component-year-range", "disabled"),
-        Output("filter-component-era-preset", "disabled"),
-        Output("filter-component-era-prev-btn", "disabled", allow_duplicate=True),
-        Output("filter-component-era-next-btn", "disabled", allow_duplicate=True),
-        Output("filter-component-membership-dates-btn", "disabled"),
-        Output("filter-component-country-dropdown", "style"),
-        Output("filter-component-country2-dropdown", "style"),
-        Output("filter-component-preset-dropdown", "style"),
-        Output("filter-component-subject-dropdown", "style"),
-        Output("filter-component-keyword-search", "style"),
-        Output("filter-component-era-preset", "style"),
-        Output("filter-component-membership-dates-btn", "style"),
-    ],
+    Output("filter-component-country-dropdown",    "disabled"),
+    Output("filter-component-country2-dropdown",   "disabled"),
+    Output("filter-component-preset-dropdown",     "disabled"),
+    Output("filter-component-subject-dropdown",    "disabled"),
+    Output("filter-component-keyword-search",      "disabled"),
+    Output("filter-component-country-filter-mode", "options"),
+    Output("filter-component-year-range",          "disabled"),
+    Output("filter-component-era-preset",          "disabled"),
+    Output("filter-component-era-prev-btn",        "disabled", allow_duplicate=True),
+    Output("filter-component-era-next-btn",        "disabled", allow_duplicate=True),
+    Output("filter-component-membership-dates-btn","disabled"),
     Input("country-view-tabs", "value"),
     Input("filter-component-country-dropdown", "value"),
     prevent_initial_call='initial_duplicate',
 )
-def disable_filters_based_on_tab(selected_tab, country1_dropdown):
-    """Disable filters based on selected tab and country selection."""
-    no_country = not country1_dropdown
-    is_map_tab = selected_tab == "map"
-    is_wordcloud_tab = selected_tab == "wordcloud"
-    is_multilateral_tab = selected_tab == "multilateral"
-    is_timeline_tab = selected_tab == "timeline"
-    is_subject_tab = selected_tab == "subject"
-    keyword_active = selected_tab in ("resolution_list", "wordcloud")
+def _set_filter_disabled_states(selected_tab, country1):
+    s = _compute_filter_state(selected_tab, country1)
+    return (
+        s["c1_off"], s["c2_off"], s["preset_off"], s["subj_off"],
+        s["kw_off"],
+        _CFM_OPTIONS_DISABLED if s["cfm_off"] else _CFM_OPTIONS,
+        s["yr_era_off"], s["yr_era_off"], s["yr_era_off"], s["yr_era_off"],
+        s["membership_off"],
+    )
 
-    base_style = {"width": "100%", "fontSize": "14px"}
-    disabled_style = {**base_style, "opacity": "0.5", "cursor": "not-allowed", "backgroundColor": "#e9ecef"}
 
-    base_input_style = {
-        "width": "100%", "fontSize": "14px", "padding": "8px 10px",
-        "border": "1px solid #ced4da", "borderRadius": "4px",
-        "fontFamily": "inherit", "boxSizing": "border-box",
-    }
-    disabled_input_style = {
-        **base_input_style, "opacity": "0.5", "cursor": "not-allowed", "backgroundColor": "#e9ecef",
-    }
+@callback(
+    Output("filter-component-country-dropdown",    "style"),
+    Output("filter-component-country2-dropdown",   "style"),
+    Output("filter-component-preset-dropdown",     "style"),
+    Output("filter-component-subject-dropdown",    "style"),
+    Output("filter-component-keyword-search",      "style"),
+    Output("filter-component-era-preset",          "style"),
+    Output("filter-component-membership-dates-btn","style"),
+    Input("country-view-tabs", "value"),
+    Input("filter-component-country-dropdown", "value"),
+    prevent_initial_call='initial_duplicate',
+)
+def _set_filter_styles(selected_tab, country1):
+    s = _compute_filter_state(selected_tab, country1)
 
-    kw_disabled = not keyword_active
-    kw_style = base_input_style if keyword_active else disabled_input_style
-
-    # Handle country filter mode (CFM)
-    _cfm_options_base = [
-        {"label": " Voted on resolution", "value": "voted"},
-        {"label": " Was UN member",       "value": "member"},
-        {"label": " No filter",           "value": "none"},
-    ]
-    cfm_enabled  = _cfm_options_base
-    cfm_disabled = [{**o, "disabled": True} for o in _cfm_options_base]
-
-    # Start from "all enabled" defaults ...
-    c1_disabled = c2_disabled = preset_disabled = subj_disabled = yr_era_disabled = False
-    cfm_opts = cfm_enabled
-
-    # ... then override defaults per tab
-    if is_wordcloud_tab:
-        c1_disabled = c2_disabled = preset_disabled = True   # no country context needed
-        cfm_opts = cfm_disabled                              # country filter mode irrelevant
-    elif is_multilateral_tab:
-        c2_disabled = preset_disabled = True                 # comparison country not used
-    elif is_map_tab:
-        c2_disabled = preset_disabled = True                 # comparison country not used
-        cfm_opts = cfm_disabled                              # choropleth filters by pair internally
-    elif is_timeline_tab:
-        subj_disabled = yr_era_disabled = True               # timeline ignores subject + date range
-        cfm_opts = cfm_disabled                              # timeline has its own fixed filter logic
-    elif is_subject_tab:
-        subj_disabled = True                                 # subject filter drives its own content
-        cfm_opts = cfm_disabled                              # tab hardwires "both countries voted"
-
-    # Disable CFM radio items when no main country is selected
-    if no_country:
-        cfm_opts = cfm_disabled
-
-    # Membership button: disabled when no country selected or year range is irrelevant
-    membership_btn_disabled = no_country or c1_disabled or yr_era_disabled
-    _btn_base = {
-        "fontSize": "13px", "fontFamily": "inherit", "border": "1px solid #adb5bd",
-        "borderRadius": "4px", "padding": "4px 10px", "whiteSpace": "nowrap",
-        "cursor": "pointer", "backgroundColor": "transparent", "color": "#495057",
-    }
-    _btn_off = {**_btn_base, "cursor": "not-allowed", "backgroundColor": "#e9ecef", "color": "#adb5bd"}
-    membership_btn_style = _btn_off if membership_btn_disabled else _btn_base
-
-    def _sty(d):
-        return disabled_style if d else base_style
+    def _dd(off):
+        return _DROPDOWN_STYLE_OFF if off else _DROPDOWN_STYLE
 
     return (
-        # --- disabled props ---
-        c1_disabled, c2_disabled, preset_disabled, subj_disabled,
-        kw_disabled,  # keyword: only resolution_list + wordcloud
-        cfm_opts,  # country-filter-mode options list
-        yr_era_disabled, yr_era_disabled, yr_era_disabled, yr_era_disabled,  # year-range, era-preset, era-prev, era-next
-        membership_btn_disabled,
-        # --- style props ---
-        _sty(c1_disabled), _sty(c2_disabled), _sty(preset_disabled), _sty(subj_disabled),
-        kw_style,  # keyword style
-        _sty(yr_era_disabled),  # era-preset style
-        membership_btn_style,
+        _dd(s["c1_off"]),
+        _dd(s["c2_off"]),
+        _dd(s["preset_off"]),
+        _dd(s["subj_off"]),
+        _INPUT_STYLE_OFF if s["kw_off"]         else _INPUT_STYLE,
+        _dd(s["yr_era_off"]),
+        _BTN_STYLE_OFF   if s["membership_off"] else _BTN_STYLE,
     )
 
 

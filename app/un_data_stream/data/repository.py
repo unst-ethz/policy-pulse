@@ -64,7 +64,15 @@ class DataRepository:
         self.logger.info("Initialization complete with fetched data.")
 
     def get_data(self) -> Dict[str, Any]:
-        """Return processed data as a dictionary of DataFrames."""
+        """Return all processed data as a dict consumed by ResolutionQueryEngine.
+
+        Keys:
+            resolution, resolution_subject, subject, closure, broader — pd.DataFrames
+            agreement_matrices  — Dict[undl_id, (C x C) np.ndarray]
+            country_columns     — List[str] of ISO3 country codes (length C)
+            multilateral_scores — (R x C) np.ndarray, float32
+            vote_bool_arrays    — 4-tuple of (R x C) bool arrays (yes, no, abstained, voted)
+        """
         return {
             'resolution': self.resolution_table,
             'resolution_subject': self.resolution_subject_table,
@@ -74,6 +82,7 @@ class DataRepository:
             'agreement_matrices': self.agreement_matrices,
             'country_columns': self.country_columns,
             'multilateral_scores': self.multilateral_scores,
+            'vote_bool_arrays': self.vote_bool_arrays,
         }
     
     def _load_config(self):
@@ -227,15 +236,13 @@ class DataRepository:
         with open(data_path / 'precomputed_agreement_data.pkl', 'rb') as f:
             agreement_data = pickle.load(f)
 
-        if 'multilateral_scores' not in agreement_data:
-            raise KeyError("Cached pkl missing multilateral_scores — stale cache, rebuild required.")
-
-        # One full vote-agreement matrix (C x C) for each resolution
-
+        if 'multilateral_scores' not in agreement_data or 'vote_bool_arrays' not in agreement_data:
+            raise KeyError("Cached pkl is stale (missing multilateral_scores or vote_bool_arrays) — rebuild required.")
 
         self.agreement_matrices = agreement_data['agreement_matrices']
         self.country_columns = agreement_data['country_columns']
         self.multilateral_scores = agreement_data['multilateral_scores']
+        self.vote_bool_arrays = agreement_data['vote_bool_arrays']
     
     def _save_cached_data(self):
         """Save data files into DataFrames."""
@@ -254,6 +261,7 @@ class DataRepository:
                 'agreement_matrices': self.agreement_matrices,
                 'country_columns': self.country_columns,
                 'multilateral_scores': self.multilateral_scores,
+                'vote_bool_arrays': self.vote_bool_arrays,
             }, f)
 
         # Save Metadata (Version)
@@ -299,6 +307,7 @@ class DataRepository:
             consensus_scores,
             self.country_columns,
             self.multilateral_scores,
+            self.vote_bool_arrays,
         ) = processor.calculate_agreement_data(self.resolution_table)
 
         # Add consensus scores to the resolution table

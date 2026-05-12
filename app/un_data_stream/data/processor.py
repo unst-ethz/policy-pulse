@@ -105,16 +105,17 @@ class DataProcessor:
     def calculate_agreement_data(
             self,
             resolutions_df: pd.DataFrame
-    ) -> Tuple[Dict[str, np.ndarray], Dict[str, float], List[str], np.ndarray]:
+    ) -> Tuple[Dict[str, np.ndarray], Dict[str, float], List[str], np.ndarray, Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
         """
         For each resolution, calculate one full vote-agreement matrix (C x C) as well as the
         resolution's aggregate "consensus score" (scalar).
 
         Also compute the compact (R x C) multilateral_scores array, which summarises for each
-        resolution each country's mean pairwise agreement with all other countries that voted.
+        resolution each country's mean pairwise agreement with all other countries that voted,
+        and four (R x C) bool arrays encoding each country's raw vote per resolution.
 
-        Row i of multilateral_scores corresponds to row i of resolutions_df — the same ordering
-        that resolution_table preserves — so no separate index list is needed.
+        Row order in multilateral_scores and the bool arrays matches resolutions_df — the same
+        ordering that resolution_table preserves — so one row-index dict covers all of them.
 
         Args:
             resolutions_df : pd.DataFrame
@@ -128,6 +129,8 @@ class DataProcessor:
                 - country_columns: List of country columns used in the matrices.
                 - multilateral_scores: (R x C) float32 array — per-resolution per-country
                   row-mean alignment score (NaN where country did not vote).
+                - vote_bool_arrays: 4-tuple of (R x C) bool arrays (yes, no, abstained, voted)
+                  in the same row order as resolutions_df / multilateral_scores.
         """
         self.logger.info("Starting bilateral agreement matrix and multilateral scores calculation")
         start_time = time.time()
@@ -173,6 +176,18 @@ class DataProcessor:
 
         multilateral_scores = np.array(multilateral_rows, dtype=np.float32)  # Float32 saves disk space when pickling
 
+        # Step 3: Compute boolean arrays with vote-type indicators. By pickling these arrays,
+        # the query engine will not have to re-parse vote columns on every startup.
+        vote_str = (
+            resolutions_df[country_columns]
+            .astype(str)
+            .apply(lambda s: s.str.strip().str.upper())
+        )
+        vote_yes       = (vote_str == "Y").to_numpy(dtype=bool)
+        vote_no        = (vote_str == "N").to_numpy(dtype=bool)
+        vote_abstained = (vote_str == "A").to_numpy(dtype=bool)
+        vote_voted     = vote_yes | vote_no | vote_abstained
+
         elapsed_time = time.time() - start_time
         n_res = len(agreement_matrices)
         assert n_res == len(resolutions_df)
@@ -181,7 +196,13 @@ class DataProcessor:
             f"and multilateral_scores ({multilateral_scores.shape}) in {elapsed_time:.2f}s"
         )
 
-        return agreement_matrices, consensus_scores, country_columns, multilateral_scores
+        return (
+            agreement_matrices,
+            consensus_scores,
+            country_columns,
+            multilateral_scores,
+            (vote_yes, vote_no, vote_abstained, vote_voted),
+        )
 
     @staticmethod
     def _calculate_single_resolution_matrix(

@@ -2,6 +2,7 @@ import os
 import re
 from collections import Counter
 from io import StringIO
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -587,7 +588,7 @@ def _build_wordcloud(
     filtered_data_json: str,
     mode: str = _DEFAULT_MODE,
     filter_store: dict | None = None,
-    color_mode: str = "frequency",
+    color_mode: Literal["frequency", "consensus"] = "frequency",
 ):
     """Build word cloud figure from filtered data."""
     mode_label = _get_mode_label(mode)

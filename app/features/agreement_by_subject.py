@@ -54,7 +54,7 @@ def calculate_agreement(query_engine, c1, c2, start_date, end_date, subject_list
     # We need to know which subjects each resolution belongs to
     resolution_subject_df = query_engine.resolution_subject_table.copy()
     
-    # 5. For each subject, calculate the disagreement score
+    # 5. For each subject, calculate the agreement score
     agreement_results = []
     
     for subject_id in subject_list:
