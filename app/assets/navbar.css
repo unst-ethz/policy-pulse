@@ -32,3 +32,13 @@
     }
   }
 }
+
+
+.navbar-experimental {
+  h1 {
+    span {
+      color: #e7ce41;
+      font-size: 0.8rem;
+    }
+  }
+}

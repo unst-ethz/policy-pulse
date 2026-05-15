@@ -25,6 +25,11 @@
   opacity: 0.78;
 }
 
+.footer-build-info {
+  opacity: 0.5;
+  font-size: 0.875rem;
+}
+
 .footer-column {
   display: flex;
   flex-direction: column;
