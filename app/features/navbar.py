@@ -2,7 +2,9 @@ from dash import get_relative_path, html, dcc
 
 import os
 
-experimental = os.getenv("WARN_EXPERIMENTAL", "True") == "True"
+# At runtime, set this env variable to True if you want to show indicators
+# that the web page is experimental (e.g. to distinguish from a stable version).
+experimental = os.getenv("WARN_EXPERIMENTAL", "True") == "False"
 
 layout = (
     html.Header(
