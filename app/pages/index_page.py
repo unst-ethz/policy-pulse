@@ -46,7 +46,7 @@ layout = html.Div(
                 html.Div(
                     [
                         html.Img(
-                            src="/assets/main.webp",
+                            src=get_relative_path("/assets/main.webp"),
                             className="main-header-image",
                         ),
                     ],
