@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - develop
+      - stable
 
 env:
   REGISTRY: ghcr.io
@@ -39,7 +39,7 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=
-            type=ref,prefix=branch-,ref=refs/heads/*
+            type=raw,value=stable,enable={{startsWith(github.ref, 'refs/heads/stable')}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
