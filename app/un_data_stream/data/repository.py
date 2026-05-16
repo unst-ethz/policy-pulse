@@ -5,6 +5,7 @@ This module handles storage, retrieval, and caching of processed UN data,
 orchestrating the entire data processing pipeline.
 """
 
+import bz2
 import json
 import logging
 import pickle
@@ -216,19 +217,34 @@ class DataRepository:
         data_path.mkdir(exist_ok=True)
 
         # Load CSV files
+        print("Loading resolution table")
         self.resolution_table = pd.read_csv(data_path / 'resolution_table.csv')
-        self.resolution_subject_table = pd.read_csv(data_path / 'resolution_subject_table.csv')
-        self.subject_table = pd.read_csv(data_path / 'subject_table.csv')
-        self.closure_table = pd.read_csv(data_path / 'closure_table.csv')
-        self.broader_table = pd.read_csv(data_path / 'broader_table.csv')
+        print("Loading resolution subject table")
+        self.resolution_subject_table = pd.read_csv(
+            data_path / "resolution_subject_table.csv"
+        )
+        print("Loading subject table")
+        self.subject_table = pd.read_csv(data_path / "subject_table.csv")
+        print("Loading closure table")
+        self.closure_table = pd.read_csv(data_path / "closure_table.csv")
+        print("Loading broader table")
+        self.broader_table = pd.read_csv(data_path / "broader_table.csv")
+
+        # Load pickle file containing agreement matrices and labels
+        pkl_path = data_path / 'agreement_matrices.pkl'
+        try:
+            # Try loading with compression first
+            with bz2.BZ2File(pkl_path, 'rb') as f:
+                agreement_data = pickle.load(f)
+        except (EOFError, OSError):
+            # Fall back to uncompressed pickle for backward compatibility
+            with open(pkl_path, 'rb') as f:
+                agreement_data = pickle.load(f)
+
+        self.agreement_matrices = agreement_data["agreement_matrices"]
+        self.country_columns = agreement_data["country_columns"]
+
         self.logger.info("Cached data loaded successfully.")
-
-        # Load agreement matrices
-        with open(data_path / 'agreement_matrices.pkl', 'rb') as f:
-            agreement_data = pickle.load(f)
-
-        self.agreement_matrices = agreement_data['agreement_matrices']
-        self.country_columns = agreement_data['country_columns']
     
     def _save_cached_data(self):
         """Save data files into DataFrames."""
@@ -242,7 +258,9 @@ class DataRepository:
         self.closure_table.to_csv(data_path / 'closure_table.csv', index=False)
         self.broader_table.to_csv(data_path / 'broader_table.csv', index=False)
 
-        with open(data_path / 'agreement_matrices.pkl', 'wb') as f:
+        pkl_path = data_path / 'agreement_matrices.pkl'
+        # Save agreement matrices with bz2 compression to reduce disk space
+        with bz2.BZ2File(pkl_path, 'wb') as f:
             agreement_data = {
                 'agreement_matrices': self.agreement_matrices,
                 'country_columns': self.country_columns
