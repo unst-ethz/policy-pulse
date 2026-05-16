@@ -243,6 +243,7 @@ class DataRepository:
         self.logger.info("Loading broader table")
         self.broader_table = pd.read_csv(data_path / "broader_table.csv")
 
+        self.logger.info("Loading agreement matrices")
         # Load pickle file containing agreement matrices and labels
         pkl_path = data_path / 'agreement_matrices.pkl'
         try:
@@ -250,9 +251,19 @@ class DataRepository:
             with bz2.BZ2File(pkl_path, 'rb') as f:
                 agreement_data = pickle.load(f)
         except (EOFError, OSError):
-            # Fall back to uncompressed pickle for backward compatibility
             with open(pkl_path, 'rb') as f:
                 agreement_data = pickle.load(f)
+
+            self.logger.warning("Cache is in old format. Rewriting...")
+            # If it uses float64, convert to float32
+            for key in agreement_data["agreement_matrices"]:
+                agreement_data["agreement_matrices"][key] = agreement_data[
+                    "agreement_matrices"
+                ][key].astype("float32")
+
+            # Write back new cache in compressed format
+            with bz2.BZ2File(pkl_path, "wb") as f:
+                pickle.dump(agreement_data, f)
 
         self.agreement_matrices = agreement_data["agreement_matrices"]
         self.country_columns = agreement_data["country_columns"]
