@@ -230,17 +230,17 @@ class DataRepository:
         data_path.mkdir(exist_ok=True)
 
         # Load CSV files
-        print("Loading resolution table")
+        self.logger.info("Loading resolution table")
         self.resolution_table = pd.read_csv(data_path / 'resolution_table.csv')
-        print("Loading resolution subject table")
+        self.logger.info("Loading resolution subject table")
         self.resolution_subject_table = pd.read_csv(
             data_path / "resolution_subject_table.csv"
         )
-        print("Loading subject table")
+        self.logger.info("Loading subject table")
         self.subject_table = pd.read_csv(data_path / "subject_table.csv")
-        print("Loading closure table")
+        self.logger.info("Loading closure table")
         self.closure_table = pd.read_csv(data_path / "closure_table.csv")
-        print("Loading broader table")
+        self.logger.info("Loading broader table")
         self.broader_table = pd.read_csv(data_path / "broader_table.csv")
 
         # Load pickle file containing agreement matrices and labels
