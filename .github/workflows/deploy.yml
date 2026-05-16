@@ -39,7 +39,7 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=
-            type=raw,value=stable,enable={{startsWith(github.ref, 'refs/heads/stable')}}
+            type=raw,value=stable,enable=${{ github.ref_name == 'stable' }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
