@@ -41,28 +41,41 @@ class DataRepository:
 
         self.logger.info("Initializing UNDataRepository")
 
-        # Check if data is already processed and available
-        if self._has_cached_data():
-            # Version Check
-            if self._check_data_version():
-                # Cached data found and version matches -> load
-                self._load_cached_data()
-                self.logger.info("Initialization complete with cached data.")
-                return
-            else:
-                self.logger.info("Data version mismatch or missing. Rebuilding data...")
+        if not self._has_cached_data() or not self._check_data_version():
+            self.logger.info("Initializing from raw data sources.")
+            # Check if configured data sources are valid
+            if not self._resolve_and_validate_data_urls():
+                self.logger.error(
+                    "One or more configured data sources are invalid. "
+                    "Please review settings in data_sources.yaml."
+                )
+                raise ValueError("Failed to resolve one or more data sources. Check logs for details.")
 
-        # Check if configured data sources are valid
-        if not self._resolve_and_validate_data_urls():
-            self.logger.error(
-                "One or more configured data sources are invalid. "
-                "Please review settings in data_sources.yaml."
-            )
-            raise ValueError("Failed to resolve one or more data sources. Check logs for details.")
+            self._build_data()
+        else:
+            # Cached data found and version matches -> load
+            self.logger.info("Initializing from cached data.")
+            self._load_cached_data()
 
-        self._build_data()
-
-        self.logger.info("Initialization complete with fetched data.")
+        self.logger.info("Initialization complete. Below are memory footprints:")
+        self.logger.info(
+            f"Resolution Table: {self.resolution_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Resolution Subject Table: {self.resolution_subject_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Subject Table: {self.subject_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Closure Table: {self.closure_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Broader Table: {self.broader_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Agreement Matrices: {sum(map(lambda x: x[1].nbytes / (1024**2), self.agreement_matrices.items()))} MB"
+        )
 
     def get_data(self) -> Dict[str, Any]:
         """Return processed data as a dictionary of DataFrames."""
