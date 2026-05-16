@@ -32,3 +32,27 @@
     }
   }
 }
+
+
+.navbar-experimental {
+  h1 {
+    span {
+      color: #ecb92d;
+      font-size: 0.8rem;
+    }
+  }
+
+  position: relative;
+
+  /** show construction-like indicator on right edge with gradients */
+  &::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 10px;
+    background: linear-gradient(45deg, transparent 25%, #ecb92d 25%, #ecb92d 50%, transparent 50%, transparent 75%, #ecb92d 75%, #ecb92d);
+    background-size: 10px 10px;
+  }
+}
