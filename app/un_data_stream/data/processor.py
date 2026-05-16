@@ -157,20 +157,21 @@ class DataProcessor:
       Quickly calculate the agreement matrix for a single resolution.
 
       Uses vectorized calculation via NumPy broadcasting.
+      Stores matrices as float32 to reduce memory by 50% compared to float64.
       
       Args:
           resolution_row: Series containing votes for all countries
           country_columns: List of country column names
       
       Returns:
-          np.ndarray: 2D agreement matrix (n_countries x n_countries)
+          np.ndarray: 2D agreement matrix (n_countries x n_countries) as float32
       """
-      # 1. Map votes to numeric values
-      vote_mapping = {"Y": 1.0, "A": 0.0, "N": -1.0}
+      # 1. Map votes to numeric values using float32 for memory efficiency
+      vote_mapping = {"Y": np.float32(1.0), "A": np.float32(0.0), "N": np.float32(-1.0)}
 
-      # Extract the country votes as a NumPy array (floats to accommodate NaN)
+      # Extract the country votes as a NumPy array (float32 to reduce memory footprint)
       # Using .get() for safety, defaulting to np.nan
-      votes = np.array([vote_mapping.get(resolution_row[c], np.nan) for c in country_columns])
+      votes = np.array([vote_mapping.get(resolution_row[c], np.nan) for c in country_columns], dtype=np.float32)
 
       # 2. Use broadcasting to compute all pairwise absolute differences
       # votes[:, np.newaxis] creates a column vector (N, 1)
@@ -179,6 +180,6 @@ class DataProcessor:
       abs_diff_mat = np.abs(votes[:, np.newaxis] - votes[np.newaxis, :])
 
       # 3. Apply the agreement-score formula to the entire matrix at once
-      agreement_matrix = 1.0 - (abs_diff_mat / 2.0)
+      agreement_matrix = (np.float32(1.0) - (abs_diff_mat / np.float32(2.0))).astype(np.float32)
 
       return agreement_matrix

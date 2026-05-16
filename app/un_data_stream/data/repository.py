@@ -5,6 +5,7 @@ This module handles storage, retrieval, and caching of processed UN data,
 orchestrating the entire data processing pipeline.
 """
 
+import bz2
 import json
 import logging
 import pickle
@@ -40,28 +41,41 @@ class DataRepository:
 
         self.logger.info("Initializing UNDataRepository")
 
-        # Check if data is already processed and available
-        if self._has_cached_data():
-            # Version Check
-            if self._check_data_version():
-                # Cached data found and version matches -> load
-                self._load_cached_data()
-                self.logger.info("Initialization complete with cached data.")
-                return
-            else:
-                self.logger.info("Data version mismatch or missing. Rebuilding data...")
+        if not self._has_cached_data() or not self._check_data_version():
+            self.logger.info("Initializing from raw data sources.")
+            # Check if configured data sources are valid
+            if not self._resolve_and_validate_data_urls():
+                self.logger.error(
+                    "One or more configured data sources are invalid. "
+                    "Please review settings in data_sources.yaml."
+                )
+                raise ValueError("Failed to resolve one or more data sources. Check logs for details.")
 
-        # Check if configured data sources are valid
-        if not self._resolve_and_validate_data_urls():
-            self.logger.error(
-                "One or more configured data sources are invalid. "
-                "Please review settings in data_sources.yaml."
-            )
-            raise ValueError("Failed to resolve one or more data sources. Check logs for details.")
+            self._build_data()
+        else:
+            # Cached data found and version matches -> load
+            self.logger.info("Initializing from cached data.")
+            self._load_cached_data()
 
-        self._build_data()
-
-        self.logger.info("Initialization complete with fetched data.")
+        self.logger.info("Initialization complete. Below are memory footprints:")
+        self.logger.info(
+            f"Resolution Table: {self.resolution_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Resolution Subject Table: {self.resolution_subject_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Subject Table: {self.subject_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Closure Table: {self.closure_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Broader Table: {self.broader_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Agreement Matrices: {sum(map(lambda x: x[1].nbytes / (1024**2), self.agreement_matrices.items()))} MB"
+        )
 
     def get_data(self) -> Dict[str, Any]:
         """Return processed data as a dictionary of DataFrames."""
@@ -216,19 +230,45 @@ class DataRepository:
         data_path.mkdir(exist_ok=True)
 
         # Load CSV files
+        self.logger.info("Loading resolution table")
         self.resolution_table = pd.read_csv(data_path / 'resolution_table.csv')
-        self.resolution_subject_table = pd.read_csv(data_path / 'resolution_subject_table.csv')
-        self.subject_table = pd.read_csv(data_path / 'subject_table.csv')
-        self.closure_table = pd.read_csv(data_path / 'closure_table.csv')
-        self.broader_table = pd.read_csv(data_path / 'broader_table.csv')
+        self.logger.info("Loading resolution subject table")
+        self.resolution_subject_table = pd.read_csv(
+            data_path / "resolution_subject_table.csv"
+        )
+        self.logger.info("Loading subject table")
+        self.subject_table = pd.read_csv(data_path / "subject_table.csv")
+        self.logger.info("Loading closure table")
+        self.closure_table = pd.read_csv(data_path / "closure_table.csv")
+        self.logger.info("Loading broader table")
+        self.broader_table = pd.read_csv(data_path / "broader_table.csv")
+
+        self.logger.info("Loading agreement matrices")
+        # Load pickle file containing agreement matrices and labels
+        pkl_path = data_path / 'agreement_matrices.pkl'
+        try:
+            # Try loading with compression first
+            with bz2.BZ2File(pkl_path, 'rb') as f:
+                agreement_data = pickle.load(f)
+        except (EOFError, OSError):
+            with open(pkl_path, 'rb') as f:
+                agreement_data = pickle.load(f)
+
+            self.logger.warning("Cache is in old format. Rewriting...")
+            # If it uses float64, convert to float32
+            for key in agreement_data["agreement_matrices"]:
+                agreement_data["agreement_matrices"][key] = agreement_data[
+                    "agreement_matrices"
+                ][key].astype("float32")
+
+            # Write back new cache in compressed format
+            with bz2.BZ2File(pkl_path, "wb") as f:
+                pickle.dump(agreement_data, f)
+
+        self.agreement_matrices = agreement_data["agreement_matrices"]
+        self.country_columns = agreement_data["country_columns"]
+
         self.logger.info("Cached data loaded successfully.")
-
-        # Load agreement matrices
-        with open(data_path / 'agreement_matrices.pkl', 'rb') as f:
-            agreement_data = pickle.load(f)
-
-        self.agreement_matrices = agreement_data['agreement_matrices']
-        self.country_columns = agreement_data['country_columns']
     
     def _save_cached_data(self):
         """Save data files into DataFrames."""
@@ -242,7 +282,9 @@ class DataRepository:
         self.closure_table.to_csv(data_path / 'closure_table.csv', index=False)
         self.broader_table.to_csv(data_path / 'broader_table.csv', index=False)
 
-        with open(data_path / 'agreement_matrices.pkl', 'wb') as f:
+        pkl_path = data_path / 'agreement_matrices.pkl'
+        # Save agreement matrices with bz2 compression to reduce disk space
+        with bz2.BZ2File(pkl_path, 'wb') as f:
             agreement_data = {
                 'agreement_matrices': self.agreement_matrices,
                 'country_columns': self.country_columns
