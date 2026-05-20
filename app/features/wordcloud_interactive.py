@@ -359,7 +359,7 @@ def get_keyword_matched_ids(
     return matched_ids
 
 
-def _get_wordcloud_layout(word_freq_dict, seed=42):
+def _get_wordcloud_layout(word_freq_dict, seed=42, canvas_width=1200):
     """Generate word positions using wordcloud library to avoid overlaps"""
     if not word_freq_dict:
         return {}, {}, {}
@@ -368,7 +368,7 @@ def _get_wordcloud_layout(word_freq_dict, seed=42):
         # Create WordCloud object with appropriate settings
         # Use a larger canvas with 2:1 aspect ratio (width:height)
         # width, height = 1600, 900
-        width, height = 1200, 800
+        width, height = canvas_width, 800
 
         wordcloud = WordCloud(
             width=width,
@@ -686,10 +686,16 @@ def _build_wordcloud(
         words = list(word_freq.keys())
         freqs = list(word_freq.values())
 
-        # Get word positions from wordcloud library
-        seed = 42  # Deterministic seed based on words
+        # Get word positions from wordcloud library.
+        # In consensus mode use a narrower canvas so words cluster in the left
+        # ~75% of the plot, leaving the right side free for the colorbar.
+        # The normalization formula below still references wc_norm_width=1200,
+        # so the narrower pixel positions map to the left portion of the axis.
+        seed = 42
+        consensus_bar = color_mode == "consensus" and "consensus_score" in df.columns
+        wc_gen_width = 1150 if consensus_bar else 1200
         word_positions, sizes_from_wc, orientations_from_wc = _get_wordcloud_layout(
-            word_freq, seed=seed
+            word_freq, seed=seed, canvas_width=wc_gen_width
         )
         word_keys = word_positions.keys()
 
@@ -724,7 +730,8 @@ def _build_wordcloud(
         sizes = []
 
         # WordCloud canvas dimensions (from _get_wordcloud_layout)
-        wc_width, wc_height = 1200, 800
+        wc_width, wc_height = wc_gen_width, 800
+        # wc_width, wc_height = 1200, 800
         # wc_width, wc_height = 1600, 900
 
         for word in words:
@@ -744,7 +751,7 @@ def _build_wordcloud(
             y_positions.append(y_normalized)
 
             # Use wordcloud's font size, but scale it appropriately for plotly
-            wc_font_size = sizes_from_wc[word_key]
+            wc_font_size = sizes_from_wc[word_key] * 0.9
             # Scale font size proportionally to maintain visual consistency
             # Increase the scaling factor to make words larger
             plotly_size = max(16, min(80, int(wc_font_size)))
@@ -840,7 +847,7 @@ def _build_wordcloud(
         )
 
         traces = [hover_trace, text_trace]
-        if color_mode == "consensus" and lo is not None:
+        if consensus_bar and lo is not None:
             traces.insert(0, go.Scatter(
                 x=[None], y=[None],
                 mode="markers",
