@@ -1,4 +1,4 @@
-from dash import html
+from dash import get_relative_path, html
 
 
 def register_callbacks():
@@ -7,6 +7,6 @@ def register_callbacks():
 
 layout = html.Div(
     [
-        html.Img(src="/assets/wordcloud.png", width="100%"),
+        html.Img(src=get_relative_path("/assets/wordcloud.png"), width="100%"),
     ]
 )

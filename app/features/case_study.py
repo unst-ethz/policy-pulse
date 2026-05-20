@@ -1,4 +1,4 @@
-from dash import html, dcc
+from dash import get_relative_path, html, dcc
 
 
 _share_step = lambda n: html.Div([
@@ -21,7 +21,7 @@ _tip = html.P(
     [
         html.Em("Tip: "),
         "We recommend opening the ",
-        dcc.Link("Trends page", href="/trends"),
+        dcc.Link("Trends page", href=get_relative_path("/trends")),
         " in a separate tab so you can follow along step by step without losing your place.",
     ],
     style={"fontStyle": "italic", "color": "#666"},
@@ -55,7 +55,7 @@ layout = html.Div(
                                 html.P(
                                     [
                                         "Head to the ",
-                                        dcc.Link("Trends page", href="/trends"),
+                                        dcc.Link("Trends page", href=get_relative_path("/trends")),
                                         ". This is where all the analysis tools live. "
                                         "You'll see a filter panel at the top and a set of tabs below it, let's walk through them.",
                                     ]
@@ -198,7 +198,7 @@ layout = html.Div(
                                 html.P(
                                     [
                                         "Head to the ",
-                                        dcc.Link("Trends page", href="/trends"),
+                                        dcc.Link("Trends page", href=get_relative_path("/trends")),
                                         ". Set ",
                                         html.Strong("Bulgaria"),
                                         " as the main country and ",
