@@ -5,7 +5,6 @@ This module handles storage, retrieval, and caching of processed UN data,
 orchestrating the entire data processing pipeline.
 """
 
-import bz2
 import json
 import logging
 import pickle
@@ -258,7 +257,7 @@ class DataRepository:
         self.logger.info("Loading agreement matrices")
         # Load full vote-agreement matrices
         pkl_path = data_path / 'precomputed_agreement_data.pkl'
-        with open(pkl_path, 'rb') as f:
+        with open(pkl_path, 'r+b') as f:
             try:
                 uncompressed = blosc2.decompress(f.read())
                 assert isinstance(uncompressed, bytes), "Decompressed data is not bytes"
@@ -266,6 +265,15 @@ class DataRepository:
                 self.logger.info(f"Blosc2 decompression failed: {e}. Attempting fallback to no compression.")
                 f.seek(0)
                 uncompressed = f.read()
+
+                # Migrate to compressed data
+                self.logger.info("Migrating to compressed data format.")
+                compressed = blosc2.compress(uncompressed, typesize=1)
+                assert isinstance(compressed, bytes), "Compressed data is not bytes"
+                f.seek(0)
+                f.write(compressed)
+                f.truncate()
+
             agreement_data = pickle.loads(uncompressed)
 
         # If old agreement_matrices.pkl exists, remove it
