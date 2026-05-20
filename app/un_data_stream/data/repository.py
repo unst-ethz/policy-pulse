@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict
 
+import blosc2
 import pandas as pd
 import yaml
 
@@ -257,8 +258,15 @@ class DataRepository:
         self.logger.info("Loading agreement matrices")
         # Load full vote-agreement matrices
         pkl_path = data_path / 'precomputed_agreement_data.pkl'
-        with bz2.BZ2File(pkl_path, 'rb') as f:
-            agreement_data = pickle.load(f)
+        with open(pkl_path, 'rb') as f:
+            try:
+                uncompressed = blosc2.decompress(f.read())
+                assert isinstance(uncompressed, bytes), "Decompressed data is not bytes"
+            except RuntimeError as e:
+                self.logger.info(f"Blosc2 decompression failed: {e}. Attempting fallback to no compression.")
+                f.seek(0)
+                uncompressed = f.read()
+            agreement_data = pickle.loads(uncompressed)
 
         # If old agreement_matrices.pkl exists, remove it
         old_pkl_path = data_path / 'agreement_matrices.pkl'
@@ -287,13 +295,15 @@ class DataRepository:
         self.broader_table.to_csv(data_path / 'broader_table.csv', index=False)
 
         pkl_path = data_path / 'precomputed_agreement_data.pkl'
-        with bz2.BZ2File(pkl_path, 'wb') as f:
-            pickle.dump({
+        with open(pkl_path, 'wb') as f:
+            compressed = blosc2.compress(pickle.dumps({
                 'agreement_matrices': self.agreement_matrices,
                 'country_columns': self.country_columns,
                 'multilateral_scores': self.multilateral_scores,
                 'vote_bool_arrays': self.vote_bool_arrays,
-            }, f)
+            }), typesize=1)
+            assert isinstance(compressed, bytes), "Compressed data is not bytes"
+            f.write(compressed)
 
         # Save Metadata (Version)
         metadata = {
