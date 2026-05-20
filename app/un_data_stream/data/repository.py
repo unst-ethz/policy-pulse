@@ -257,24 +257,14 @@ class DataRepository:
         self.logger.info("Loading agreement matrices")
         # Load full vote-agreement matrices
         pkl_path = data_path / 'precomputed_agreement_data.pkl'
-        try:
-            # Try loading with compression first
-            with bz2.BZ2File(pkl_path, 'rb') as f:
-                agreement_data = pickle.load(f)
-        except (EOFError, OSError):
-            with open(pkl_path, 'rb') as f:
-                agreement_data = pickle.load(f)
+        with bz2.BZ2File(pkl_path, 'rb') as f:
+            agreement_data = pickle.load(f)
 
-            self.logger.warning("Cache is in old format. Rewriting...")
-            # If it uses float64, convert to float32
-            for key in agreement_data["agreement_matrices"]:
-                agreement_data["agreement_matrices"][key] = agreement_data[
-                    "agreement_matrices"
-                ][key].astype("float32")
-
-            # Write back new cache in compressed format
-            with bz2.BZ2File(pkl_path, "wb") as f:
-                pickle.dump(agreement_data, f)
+        # If old agreement_matrices.pkl exists, remove it
+        old_pkl_path = data_path / 'agreement_matrices.pkl'
+        if old_pkl_path.exists():
+            old_pkl_path.unlink()
+            self.logger.info("Removed old agreement_matrices.pkl to save space")
 
         if 'multilateral_scores' not in agreement_data or 'vote_bool_arrays' not in agreement_data:
             raise KeyError("Cached pkl is stale (missing multilateral_scores or vote_bool_arrays) — rebuild required.")
