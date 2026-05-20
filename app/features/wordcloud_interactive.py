@@ -693,7 +693,8 @@ def _build_wordcloud(
         # so the narrower pixel positions map to the left portion of the axis.
         seed = 42
         consensus_bar = color_mode == "consensus" and "consensus_score" in df.columns
-        wc_gen_width = 1150 if consensus_bar else 1200
+        # wc_gen_width = 1150 if consensus_bar else 1200
+        wc_gen_width = 1150
         word_positions, sizes_from_wc, orientations_from_wc = _get_wordcloud_layout(
             word_freq, seed=seed, canvas_width=wc_gen_width
         )
