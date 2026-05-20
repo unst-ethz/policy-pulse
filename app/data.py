@@ -77,16 +77,14 @@ def get_country_search_terms(iso3_code: str) -> str:
 
 
 # Build M49 region tree for AntdTreeSelect
-_M49_PATH = os.path.join(os.path.dirname(__file__), "assets", "m49_regional_groupings.csv")
-
-
 def get_region_tree_data() -> list[dict]:
     """Build nested treeData for AntdTreeSelect from M49 regional groupings CSV.
 
     Returns a nested hierarchy: World → Region → Sub-region → [Intermediate Region] → Country.
     Each node has: key, title, value, and children (list of child nodes).
     """
-    df = pd.read_csv(_M49_PATH, sep=";")
+    from .features.country_utils import _load_m49
+    df = _load_m49()
 
     # Collect nodes by code for deduplication and parent lookup
     regions: dict[str, dict] = {}
@@ -151,9 +149,8 @@ def get_region_tree_data() -> list[dict]:
         regions[r_code].setdefault("children", []).append(node)
 
     # Use joining_dates.csv as the authoritative source for countries with voting data
-    _joining_path = os.path.join(os.path.dirname(__file__), "assets", "joining_dates.csv")
-    _voting_df = pd.read_csv(_joining_path)
-    valid = set(_voting_df["country"].tolist())
+    from .features.country_utils import _load_joining_dates
+    valid = set(_load_joining_dates()["country"].tolist())
 
     for parent_dict in [inter_regions, sub_regions]:
         for code, node in parent_dict.items():
@@ -209,6 +206,8 @@ def get_region_tree_data() -> list[dict]:
 
 
 REGION_TREE_DATA = get_region_tree_data()
+
+from .features.country_utils import get_country_region, get_country_subregion
 
 # Top level subjects (level 0 in the hierarchy)
 TOP_LEVEL_SUBJECTS = {

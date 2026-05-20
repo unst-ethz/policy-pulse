@@ -3,7 +3,7 @@
 # Note:
 #    The library API's 'name' field stores the raw name of a data asset WITHOUT the format
 #    suffix (e.g., ".csv"), which is instead stored in a separate 'format' field.
-version: "1.2"  # Increment this version to bust local caches
+version: "1.3"  # Increment this version to bust local caches
 last_updated: "2026-03-11"  # SL refactor to support auto-updating data assets
 debug: true
 logs: true

@@ -5,7 +5,8 @@ import plotly.express as px
 
 from .. import data
 
-from .country_coordinates import get_country_longitude
+from .country_utils import get_country_longitude
+from .color_utils import make_adaptive_colorscale_plotly
 
 
 def register_callbacks(query_engine):
@@ -19,11 +20,15 @@ def register_callbacks(query_engine):
         [
             Input("filter-component-data-store", "data"),
             Input("filter-component-filter-store", "data"),
+            Input("choropleth-color-mode", "value"),
         ],
     )
-    def generate_chart(filtered_data, filter_store):
+    def generate_chart(filtered_data, filter_store, color_mode):
+        adaptive_colour_scale = "adaptive" in (color_mode or [])
+
         if not filtered_data or not filter_store:
             return go.Figure(), "", ""
+
         all_resolutions = pd.read_json(filtered_data, orient="split")
         if all_resolutions.empty:
             status_msg = html.Div([html.Div([html.Strong("No resolutions to plot")])])
@@ -36,79 +41,86 @@ def register_callbacks(query_engine):
             )
             return go.Figure(), status_msg, ""
 
-        start_year = filter_store.get("start_year")
-        end_year = filter_store.get("end_year")
-
-        resolutions_in_year = all_resolutions.copy()
-        if start_year or end_year:
-            dates = pd.to_datetime(resolutions_in_year["date"], errors="coerce").dt.year
-            if start_year:
-                resolutions_in_year = resolutions_in_year[dates >= int(start_year)]
-            if end_year:
-                resolutions_in_year = resolutions_in_year[dates <= int(end_year)]
-
         agreement_data = query_engine.query_agreement_between_countries(
             country1,
-            resolution_ids=(resolutions_in_year["undl_id"].tolist()),
+            resolution_ids=all_resolutions["undl_id"].tolist(),
             average=True,
         )
 
-        # Transpose and remove the first two rows which are for the selected
-        # country etc
-        agreement_data = agreement_data.T[2:]
-        agreement_data = agreement_data.reset_index()
-        agreement_data.columns = ["three_letter_country", "agreement_raw"]
-
-        # Make new column by applying data.get_country_name to three_letter_country
+        # Clean the returned agreement data
+        agreement_data.drop(columns=['source_country', 'resolution_count'], inplace=True)
+        agreement_data = agreement_data.T.reset_index()
+        agreement_data.columns = ["three_letter_country", "agreement_score"]
         agreement_data["Country"] = agreement_data["three_letter_country"].apply(
             data.get_country_display_name
         )
-        agreement_data["Agreement"] = agreement_data["agreement_raw"].apply(
+        agreement_data["Agreement"] = agreement_data["agreement_score"].apply(
             lambda x: f"{x:.2f} with {data.get_country_display_name(country1)}"
             if pd.notna(x) else "No shared vote"
         )
 
+        # Set up colour scale based on the distribution of consensus scores
+        # Crucial: We need to restrict to resolutions where country1 actually voted
+        # since these are the only ones that can contribute to any bilateral agreement
+        # score on the Choropleth map.
+        country1_resolutions = all_resolutions.dropna(subset=[country1]) if country1 in all_resolutions.columns else all_resolutions
+        has_consensus = "consensus_score" in all_resolutions.columns and not country1_resolutions.empty
+        use_adaptive = adaptive_colour_scale and has_consensus
+        if use_adaptive:
+            colorscale, lo, avg, hi = make_adaptive_colorscale_plotly(
+                country1_resolutions["consensus_score"],
+                base_colorscale="RdYlBu",
+                lo=0.0,
+                hi=1.0,
+            )
+            range_color = [0, 1]
+            colorbar_settings = dict(
+                len=0.9,
+                tickvals=[0, avg, 1],
+                ticktext=["0 (Always opposed)", f"{avg:.2f} (avg)", "1 (Always agreeing)"],
+            )
+        else:
+            colorscale = px.colors.diverging.RdYlBu
+            range_color = [0, 1]
+            colorbar_settings = dict(
+                len=0.9,
+                tickvals=[0, 0.25, 0.5, 0.75, 1.0],
+                ticktext=["0 (Always opposed)", "0.25", "0.5", "0.75", "1 (Always agreeing)"],
+            )
+
         if agreement_data.empty:
-            # Simulate neutral 0.5 value for all countries
             agreement_data = pd.DataFrame(
                 {
                     "three_letter_country": ["NAN"],
                     "Country": ["No data for selected filters"],
-                    "agreement_raw": [0.5],
+                    "agreement_score": [None],
+                    "Agreement": [""],
                 }
             )
 
-        # Make sure the agreement column is numeric, so we can apply the
-        # continuous color scale
-        agreement_data[["agreement_raw"]] = agreement_data[["agreement_raw"]].apply(
-            pd.to_numeric
+        agreement_data["agreement_score"] = pd.to_numeric(
+            agreement_data["agreement_score"], errors="coerce"
         )
 
         # Separate countries with no shared votes (NaN agreement)
-        no_shared_votes = agreement_data[agreement_data["agreement_raw"].isna()].copy()
-        agreement_data = agreement_data[agreement_data["agreement_raw"].notna()]
+        no_shared_votes = agreement_data[agreement_data["agreement_score"].isna()].copy()
+        agreement_data = agreement_data[agreement_data["agreement_score"].notna()]
 
         # Plot the choropleth world map
-        # Note: Recent `plotly` versions actually seem to use an official
-        # UN data source to generate simplified geometries for the world map.
-        # See the description of this plotly PR:
-        # https://github.com/plotly/plotly.js/pull/7393
         fig = px.choropleth(
             agreement_data,
-            color="agreement_raw",
-            color_continuous_scale=px.colors.diverging.RdYlBu,  # Red-Yellow-Blue
-            range_color=[0, 1],
+            color="agreement_score",
+            color_continuous_scale=colorscale,
+            range_color=range_color,
             locations="three_letter_country",
             projection="robinson",
             hover_name="Country",
             hover_data={
                 "Agreement": True,
                 "three_letter_country": False,
-                "agreement_raw": False,
+                "agreement_score": False,
             },
-            labels={
-                "agreement_raw": ""
-            },  # For consistency with legend in the subject tab
+            labels={"agreement_score": ""},
         )
 
         # Change default colour for missing-data countries
@@ -141,7 +153,7 @@ def register_callbacks(query_engine):
             go.Choropleth(
                 locations=[country1],
                 z=[1],  # dummy value
-                colorscale=[[0, "green"], [1, "green"]],  # solid green color
+                colorscale=[[0, "#a078d3"], [1, "#a078d3"]],
                 showscale=False,
                 hovertemplate=f"<b>{data.get_country_display_name(country1)}</b> (Selected)<extra></extra>",
                 marker_line_color="black",
@@ -152,40 +164,44 @@ def register_callbacks(query_engine):
         # Center the map on the selected country's longitude (x-axis)
         # Keep y-axis at the equator (latitude = 0)
         country_longitude = get_country_longitude(country1)
-        fig.update_geos(projection_rotation_lon=-country_longitude)
+        fig.update_geos(projection_rotation_lon=country_longitude)
 
         # Change internal padding
         fig.update_layout(
             margin=dict(l=10, r=10, t=0, b=0),
-            coloraxis_colorbar=dict(
-                len=0.9,  # Reduce legend height
-                tickvals=[0, 0.25, 0.5, 0.75, 1.0],
-                ticktext=[
-                    "0 (Always voting opposed)",
-                    "0.25",
-                    "0.5",
-                    "0.75",
-                    "1 (Always voting the same)",
-                ],
-            ),
+            coloraxis_colorbar=colorbar_settings,
         )
 
-        # Status message
+        # Details annotation
         country1_name = data.get_country_display_name(country1)
-        # f"{country1_name} is highlighted in green.
+        shared_intro = (
+            f"The map shows the pairwise vote agreement between {country1_name} and other countries. "
+            "A score of 1 (dark blue) means that two countries voted the same on all selected "
+            "General Assembly (GA) resolutions; a score of 0 (dark red) means that two countries "
+            "always voted in opposite ways (Yes vs. No). "
+        )
+        shared_disclaimer = (
+            "The data only covers GA resolutions that were successfully passed. "
+            "The map provides a simplified, static overview of political geography. Some smaller nations "
+            "and territories are not shown and the map does not reflect historical border changes over time. "
+            "The boundaries and names shown and the designations used on this map do not imply official "
+            "endorsement or acceptance by the United Nations."
+        )
+
+        middle_part = ""
+        if use_adaptive:
+            middle_part = (
+                "The midpoint of the colour scale (yellow) is anchored at the average consensus score "
+                f"across selected resolutions ({avg:.2f}). The consensus score of a resolution is the "
+                "average pairwise vote agreement across all country pairs that both cast a vote. "
+                f"Countries appearing blue thus agreed with {country1_name} more than the global average; "
+                "those appearing red agreed less. "
+            )
+
+        note_text = shared_intro + middle_part + shared_disclaimer
+
         note_msg = html.P(
-            [
-                html.Strong("Details: "),
-                f"The map shows the pairwise vote agreement between {country1_name} and other countries. "
-                "An agreement score of 1 (dark blue) means that two countries voted the same on all "
-                "General Assembly (GA) resolutions. A score of 0 (dark red) means that two countries "
-                'always voted in opposite ways ("yes" vs. "no"). The data only covers GA resolutions '
-                "that were successfully passed. The map provides a simplified, static overview of "
-                "political geography. Some smaller nations and territories are not shown and the  "
-                "map does not reflect historical border changes over time. The boundaries and names "
-                "shown and the designations used on this map do not imply official endorsement or "
-                "acceptance by the United Nations."
-            ],
+            [html.Strong("Details: "), note_text],
             style={
                 "maxWidth": "100%",
                 "margin": "0 0 0 0",
@@ -206,6 +222,12 @@ layout = [
     html.Div(
         [
             html.Div(id="agreement-choropleth-status"),
+            dcc.Checklist(
+                id="choropleth-color-mode",
+                options=[{"label": " Centre colour scale on average consensus score", "value": "adaptive"}],
+                value=[],
+                style={"fontSize": "14px", "color": "#555", "marginBottom": "8px", "paddingLeft": "2%"},
+            ),
             dcc.Loading(
                 children=[
                     dcc.Graph(

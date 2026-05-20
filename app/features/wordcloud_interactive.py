@@ -2,19 +2,21 @@ import os
 import re
 from collections import Counter
 from io import StringIO
+from typing import Literal
+
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
 from dash import Input, Output, State, callback, html, dcc, no_update
 from dash.exceptions import PreventUpdate
-import plotly.graph_objects as go
-import pandas as pd
-import numpy as np
-import random
 from matplotlib import cm as mpl_cm
 from matplotlib import colors as mpl_colors
-from wordcloud import WordCloud
 from rapidfuzz import process as fuzz_process
+from wordcloud import WordCloud
 
-from .. import data
+from .color_utils import make_adaptive_colorscale_plotly
 from .resolution_list import create_vote_indicator
+from .. import data
 
 # Initialize word cloud data on module load
 _resolution_wc_data_by_mode = {}
@@ -34,6 +36,7 @@ _WORDCLOUD_MODES = {
     "action": {"label": "Action", "source": "undlid_keywords_3d_noun_fixed.csv:Action"},
     "category": {"label": "Subjects", "source": "query_resolutions():subjects"},
 }
+_CONSENSUS_CMAP_COLORS = ["#ff66cc", "#e6b24b", "#33cc33"]
 
 
 def _init_wc_data():
@@ -356,7 +359,7 @@ def get_keyword_matched_ids(
     return matched_ids
 
 
-def _get_wordcloud_layout(word_freq_dict, seed=42):
+def _get_wordcloud_layout(word_freq_dict, seed=42, canvas_width=1200):
     """Generate word positions using wordcloud library to avoid overlaps"""
     if not word_freq_dict:
         return {}, {}, {}
@@ -365,7 +368,7 @@ def _get_wordcloud_layout(word_freq_dict, seed=42):
         # Create WordCloud object with appropriate settings
         # Use a larger canvas with 2:1 aspect ratio (width:height)
         # width, height = 1600, 900
-        width, height = 1200, 800
+        width, height = canvas_width, 800
 
         wordcloud = WordCloud(
             width=width,
@@ -429,24 +432,59 @@ def _get_wordcloud_layout(word_freq_dict, seed=42):
         return {}, {}, {}
 
 
-def _get_viridis_colors(frequencies):
-    """Get color mapping for word frequencies using blue colormap."""
-    # Use blue color scheme - 'Blues' for light to dark
+def _assign_colors_from_blues_cmap(frequencies):
+    """Map word frequencies to hex colours using the Blues matplotlib colormap.
+
+    Normalises each frequency into [0.3, 1.0] to avoid very light colours at the low end;
+    uniform frequencies get a fixed medium blue.
+    """
     cmap = mpl_cm.get_cmap("Blues")
     freq_arr = np.array(frequencies, dtype=float)
     if len(freq_arr) == 0:
         return []
     if np.max(freq_arr) != np.min(freq_arr):
-        # Normalize to 0.3-1.0 range instead of 0-1 to avoid very light/white colors
-        # This keeps the blue theme but starts from a more visible blue
         normed = 0.3 + 0.7 * (
             (freq_arr - np.min(freq_arr)) / (np.max(freq_arr) - np.min(freq_arr))
         )
     else:
-        # If all frequencies are the same, use a medium blue
         normed = np.full_like(freq_arr, 0.6)
     colors = [mpl_colors.rgb2hex(cmap(v)) for v in normed]
     return colors
+
+
+def _assign_colors_from_custom_cmap(consensus_scores: list, colorscale: list, lo: float, hi: float) -> list:
+    """Map consensus scores to colours using a caller-supplied Plotly colorscale.
+
+    Normalises each score into [lo, hi], then looks up the nearest colour entry by
+    binary-searching the colorscale's position array. Scores outside the range are
+    clamped to the extremes; missing scores get a neutral grey.
+    """
+    span = hi - lo if hi > lo else 1.0
+    positions = np.array([p for p, _ in colorscale])
+    clrs = [c for _, c in colorscale]
+    result = []
+    for score in consensus_scores:
+        if score is None or (isinstance(score, float) and np.isnan(score)):
+            result.append("#aaaaaa")
+        else:
+            t = float(np.clip((score - lo) / span, 0.0, 1.0))
+            idx = int(np.clip(np.searchsorted(positions, t), 0, len(clrs) - 1))
+            result.append(clrs[idx])
+    return result
+
+
+def _map_words_to_consensus_scores(words: list, mode: str, df: pd.DataFrame) -> list:
+    """Return the average consensus score for each word across its associated resolutions.
+
+    Words with no matching scored resolutions get None.
+    """
+    mode_word_map = _wc_word_undlid_map_by_mode.get(mode, {})
+    c_score_map = df.set_index(df["undl_id"].astype(str))["consensus_score"].dropna().to_dict()
+    word_scores = []
+    for word in words:
+        res_scores = [c_score_map[rid] for x in mode_word_map.get(word, []) if (rid := str(x)) in c_score_map]
+        word_scores.append(float(np.mean(res_scores)) if res_scores else None)
+    return word_scores
 
 
 def _apply_country_filter(df: pd.DataFrame, filter_store: dict | None) -> pd.DataFrame:
@@ -550,6 +588,7 @@ def _build_wordcloud(
     filtered_data_json: str,
     mode: str = _DEFAULT_MODE,
     filter_store: dict | None = None,
+    color_mode: Literal["frequency", "consensus"] = "frequency",
 ):
     """Build word cloud figure from filtered data."""
     mode_label = _get_mode_label(mode)
@@ -647,10 +686,17 @@ def _build_wordcloud(
         words = list(word_freq.keys())
         freqs = list(word_freq.values())
 
-        # Get word positions from wordcloud library
-        seed = 42  # Deterministic seed based on words
+        # Get word positions from wordcloud library.
+        # In consensus mode use a narrower canvas so words cluster in the left
+        # ~75% of the plot, leaving the right side free for the colorbar.
+        # The normalization formula below still references wc_norm_width=1200,
+        # so the narrower pixel positions map to the left portion of the axis.
+        seed = 42
+        consensus_bar = color_mode == "consensus" and "consensus_score" in df.columns
+        # wc_gen_width = 1150 if consensus_bar else 1200
+        wc_gen_width = 1150
         word_positions, sizes_from_wc, orientations_from_wc = _get_wordcloud_layout(
-            word_freq, seed=seed
+            word_freq, seed=seed, canvas_width=wc_gen_width
         )
         word_keys = word_positions.keys()
 
@@ -685,7 +731,8 @@ def _build_wordcloud(
         sizes = []
 
         # WordCloud canvas dimensions (from _get_wordcloud_layout)
-        wc_width, wc_height = 1200, 800
+        wc_width, wc_height = wc_gen_width, 800
+        # wc_width, wc_height = 1200, 800
         # wc_width, wc_height = 1600, 900
 
         for word in words:
@@ -705,7 +752,7 @@ def _build_wordcloud(
             y_positions.append(y_normalized)
 
             # Use wordcloud's font size, but scale it appropriately for plotly
-            wc_font_size = sizes_from_wc[word_key]
+            wc_font_size = sizes_from_wc[word_key] * 0.9
             # Scale font size proportionally to maintain visual consistency
             # Increase the scaling factor to make words larger
             plotly_size = max(16, min(80, int(wc_font_size)))
@@ -716,14 +763,24 @@ def _build_wordcloud(
         # print(f"y_positions: {y_positions}")
         # print(f"sizes: {sizes}")
 
-        # Colors based on frequency
-        colors = _get_viridis_colors(freqs)
-
         click_result_counts = [search_count_by_word.get(word, 0) for word in words]
-        hover_text = [
-            f"Click to search <b>{word}</b><br>{count} resolutions"
-            for word, count in zip(words, click_result_counts)
-        ]
+
+        lo = hi = avg = None
+        if color_mode == "consensus" and "consensus_score" in df.columns:
+            colorscale, lo, avg, hi = make_adaptive_colorscale_plotly(df["consensus_score"], _CONSENSUS_CMAP_COLORS)
+            word_scores = _map_words_to_consensus_scores(words, mode, df)
+            word_colors = _assign_colors_from_custom_cmap(word_scores, colorscale, lo, hi)
+            hover_text = [
+                f"Click to search <b>{word}</b><br>{count} resolutions"
+                + (f"<br>Avg. consensus: {score:.2f}" if score is not None else "")
+                for word, count, score in zip(words, click_result_counts, word_scores)
+            ]
+        else:
+            word_colors = _assign_colors_from_blues_cmap(freqs)
+            hover_text = [
+                f"Click to search <b>{word}</b><br>{count} resolutions"
+                for word, count in zip(words, click_result_counts)
+            ]
 
         # Calculate hover marker positions centered on words
         # Since textposition="bottom right", the anchor is at bottom-right corner
@@ -774,6 +831,7 @@ def _build_wordcloud(
             ),
             hovertemplate="%{customdata[0]}<extra></extra>",
             customdata=hover_customdata,
+            hoverlabel=dict(bgcolor="white", font=dict(color="black")),
             showlegend=False,
         )
 
@@ -783,13 +841,32 @@ def _build_wordcloud(
             mode="text",
             text=words,
             textposition="bottom right",
-            textfont=dict(size=sizes, color=colors),
+            textfont=dict(size=sizes, color=word_colors),
             hoverinfo="skip",  # disable hover on text itself
             hovertemplate=None,
             showlegend=False,
         )
 
-        fig = go.Figure(data=[hover_trace, text_trace])
+        traces = [hover_trace, text_trace]
+        if consensus_bar and lo is not None:
+            traces.insert(0, go.Scatter(
+                x=[None], y=[None],
+                mode="markers",
+                marker=dict(
+                    colorscale=colorscale,
+                    cmin=lo, cmax=hi,
+                    color=[lo],
+                    showscale=True,
+                    colorbar=dict(
+                        thickness=20, len=0.5, x=1.01,
+                        tickvals=[lo, avg, hi],
+                        ticktext=[f"{lo:.2f}", f"{avg:.2f} (avg)", f"{hi:.2f}"],
+                    ),
+                ),
+                hoverinfo="none",
+                showlegend=False,
+            ))
+        fig = go.Figure(data=traces)
         fig.update_layout(
             showlegend=False,
             xaxis=dict(
@@ -824,26 +901,72 @@ def register_callbacks():
     # Initialize data on first callback registration
     _init_wc_data()
 
+    _DETAILS_FREQUENCY = (
+        "Each word represents a unique keyword or phrase found in the titles of selected resolutions. "
+        "Word size and colour both reflect the number of resolutions in whose title the word appears. "
+        "The data only covers GA resolutions that were successfully passed."
+    )
+    _DETAILS_CONSENSUS = (
+        "Each word represents a unique keyword or phrase found in the titles of selected resolutions. "
+        "Word size reflects the number of resolutions in whose title the word appears. "
+        "Word colour reflects the average consensus score of the resolutions associated with each word — "
+        "the consensus score of a resolution is the average pairwise vote agreement across all country "
+        "pairs that both cast a vote. A score of 1 means all countries voted identically; "
+        "lower values indicate more divided votes. "
+        "Green words thus appear in resolutions with broad consensus; pink words in more divisive resolutions. "
+        "The colour scale runs from the 1st to the 99th percentile of consensus scores across the selected "
+        "resolutions, and its midpoint (amber) is anchored at the global consensus average. "
+        "The data only covers GA resolutions that were successfully passed."
+    )
+    _DETAILS_STYLE = {
+        "maxWidth": "100%",
+        "margin": "0 0 0 0",
+        "paddingLeft": "2%",
+        "paddingTop": "10px",
+        "color": "#7f8c8d",
+        "fontSize": "16px",
+        "lineHeight": "1.6",
+        "textAlign": "left",
+        "borderTop": "1px solid #eee",
+    }
+
     @callback(
-        Output("wordcloud-interactive-chart", "figure"),
+        [
+            Output("wordcloud-interactive-chart", "figure"),
+            Output("wordcloud-details", "children"),
+        ],
         Input("filter-component-data-store", "data"),
         Input("wordcloud-mode-tabs", "value"),
         Input("filter-component-filter-store", "data"),
+        Input("wordcloud-color-mode", "value"),
     )
-    def update_wordcloud_chart(filtered_data, selected_mode, filter_store):
-        """Update word cloud when filter data changes."""
+    def update_wordcloud_chart(filtered_data, selected_mode, filter_store, color_mode):
+        """Update word cloud and details caption when filters or colour mode change."""
+        resolved_color_mode = color_mode or "frequency"
+        details_text = _DETAILS_CONSENSUS if resolved_color_mode == "consensus" else _DETAILS_FREQUENCY
+        details = html.P([html.Strong("Details: "), details_text], style=_DETAILS_STYLE)
+
         if not filtered_data:
-            return go.Figure().add_annotation(
-                text="Loading data...",
-                x=0.5,
-                y=0.5,
-                xref="paper",
-                yref="paper",
-                showarrow=False,
-                font=dict(size=16, color="#7f8c8d"),
+            return (
+                go.Figure().add_annotation(
+                    text="Loading data...",
+                    x=0.5, y=0.5,
+                    xref="paper", yref="paper",
+                    showarrow=False,
+                    font=dict(size=16, color="#7f8c8d"),
+                ),
+                details,
             )
         mode = selected_mode if selected_mode in _WORDCLOUD_MODES else _DEFAULT_MODE
-        return _build_wordcloud(filtered_data, mode=mode, filter_store=filter_store)
+        return (
+            _build_wordcloud(
+                filtered_data,
+                mode=mode,
+                filter_store=filter_store,
+                color_mode=resolved_color_mode,
+            ),
+            details,
+        )
 
     @callback(
         Output("wordcloud-interactive-meta", "children"),
@@ -1077,7 +1200,6 @@ def register_callbacks():
             return html.Div(f"Error: {str(e)}", style={"color": "red"})
 
 
-# TODO: Add an annotation (explanatory caption) similar to the map and timeline tabs
 layout = (
     html.Div(
         [
@@ -1100,6 +1222,30 @@ layout = (
                     dcc.Tab(label="Action", value="action"),
                     dcc.Tab(label="Subjects", value="category"),
                 ],
+            ),
+            html.Div(
+                [
+                    html.Span(
+                        "Colour by:",
+                        style={"fontSize": "14px", "color": "#555", "marginRight": "10px"},
+                    ),
+                    dcc.RadioItems(
+                        id="wordcloud-color-mode",
+                        options=[
+                            {"label": "Frequency", "value": "frequency"},
+                            {"label": "Avg. consensus score", "value": "consensus"},
+                        ],
+                        value="frequency",
+                        inline=True,
+                        labelStyle={"marginRight": "16px", "fontSize": "14px"},
+                    ),
+                ],
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "padding": "8px 4px",
+                    "marginTop": "6px",
+                },
             ),
             # html.Div(
             #     "Use the camera icon (top-right) to download PNG",
@@ -1131,6 +1277,7 @@ layout = (
                 type="cube",
                 color="#3498db",
             ),
+            html.P(id="wordcloud-details"),
             # Resolution table (hidden — click-to-search now handles this via the Resolutions tab)
             html.Div(
                 [

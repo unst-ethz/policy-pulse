@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict
 
+import blosc2
 import pandas as pd
 import yaml
 
@@ -40,31 +41,55 @@ class DataRepository:
 
         self.logger.info("Initializing UNDataRepository")
 
-        # Check if data is already processed and available
-        if self._has_cached_data():
-            # Version Check
-            if self._check_data_version():
-                # Cached data found and version matches -> load
-                self._load_cached_data()
-                self.logger.info("Initialization complete with cached data.")
-                return
-            else:
-                self.logger.info("Data version mismatch or missing. Rebuilding data...")
+        if not self._has_cached_data() or not self._check_data_version():
+            self.logger.info("Initializing from raw data sources.")
+            # Check if configured data sources are valid
+            if not self._resolve_and_validate_data_urls():
+                self.logger.error(
+                    "One or more configured data sources are invalid. "
+                    "Please review settings in data_sources.yaml."
+                )
+                raise ValueError("Failed to resolve one or more data sources. Check logs for details.")
 
-        # Check if configured data sources are valid
-        if not self._resolve_and_validate_data_urls():
-            self.logger.error(
-                "One or more configured data sources are invalid. "
-                "Please review settings in data_sources.yaml."
-            )
-            raise ValueError("Failed to resolve one or more data sources. Check logs for details.")
+            self._build_data()
+        else:
+            # Cached data found and version matches -> load
+            self.logger.info("Initializing from cached data.")
+            self._load_cached_data()
 
-        self._build_data()
-
-        self.logger.info("Initialization complete with fetched data.")
+        self.logger.info("Initialization complete. Below are memory footprints:")
+        self.logger.info(
+            f"Resolution Table: {self.resolution_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Resolution Subject Table: {self.resolution_subject_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Subject Table: {self.subject_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Closure Table: {self.closure_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Broader Table: {self.broader_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Agreement Matrices: {sum(map(lambda x: x[1].nbytes / (1024**2), self.agreement_matrices.items()))} MB"
+        )
+        self.logger.info(
+            f"Multilateral Scores: {self.multilateral_scores.nbytes / (1024**2):.2f} MB"
+        )
 
     def get_data(self) -> Dict[str, Any]:
-        """Return processed data as a dictionary of DataFrames."""
+        """Return all processed data as a dict consumed by ResolutionQueryEngine.
+
+        Keys:
+            resolution, resolution_subject, subject, closure, broader — pd.DataFrames
+            agreement_matrices  — Dict[undl_id, (C x C) np.ndarray]
+            country_columns     — List[str] of ISO3 country codes (length C)
+            multilateral_scores — (R x C) np.ndarray, float32
+            vote_bool_arrays    — 4-tuple of (R x C) bool arrays (yes, no, abstained, voted)
+        """
         return {
             'resolution': self.resolution_table,
             'resolution_subject': self.resolution_subject_table,
@@ -72,7 +97,9 @@ class DataRepository:
             'closure': self.closure_table,
             'broader': self.broader_table,
             'agreement_matrices': self.agreement_matrices,
-            'country_columns': self.country_columns
+            'country_columns': self.country_columns,
+            'multilateral_scores': self.multilateral_scores,
+            'vote_bool_arrays': self.vote_bool_arrays,
         }
     
     def _load_config(self):
@@ -170,7 +197,7 @@ class DataRepository:
             'subject_table.csv',
             'closure_table.csv',
             'broader_table.csv',
-            'agreement_matrices.pkl'
+            'precomputed_agreement_data.pkl'
         ]
         all_exist = all((data_path / file).exists() for file in required_files)
         if all_exist:
@@ -216,19 +243,52 @@ class DataRepository:
         data_path.mkdir(exist_ok=True)
 
         # Load CSV files
+        self.logger.info("Loading resolution table")
         self.resolution_table = pd.read_csv(data_path / 'resolution_table.csv')
+        self.logger.info("Loading resolution subject table")
         self.resolution_subject_table = pd.read_csv(data_path / 'resolution_subject_table.csv')
+        self.logger.info("Loading subject table")
         self.subject_table = pd.read_csv(data_path / 'subject_table.csv')
+        self.logger.info("Loading closure table")
         self.closure_table = pd.read_csv(data_path / 'closure_table.csv')
+        self.logger.info("Loading broader table")
         self.broader_table = pd.read_csv(data_path / 'broader_table.csv')
-        self.logger.info("Cached data loaded successfully.")
 
-        # Load agreement matrices
-        with open(data_path / 'agreement_matrices.pkl', 'rb') as f:
-            agreement_data = pickle.load(f)
+        self.logger.info("Loading agreement matrices")
+        # Load full vote-agreement matrices
+        pkl_path = data_path / 'precomputed_agreement_data.pkl'
+        with open(pkl_path, 'r+b') as f:
+            try:
+                uncompressed = blosc2.decompress(f.read())
+                assert isinstance(uncompressed, bytes), "Decompressed data is not bytes"
+            except RuntimeError as e:
+                self.logger.info(f"Blosc2 decompression failed: {e}. Attempting fallback to no compression.")
+                f.seek(0)
+                uncompressed = f.read()
+
+                # Migrate to compressed data
+                self.logger.info("Migrating to compressed data format.")
+                compressed = blosc2.compress(uncompressed, typesize=1)
+                assert isinstance(compressed, bytes), "Compressed data is not bytes"
+                f.seek(0)
+                f.write(compressed)
+                f.truncate()
+
+            agreement_data = pickle.loads(uncompressed)
+
+        # If old agreement_matrices.pkl exists, remove it
+        old_pkl_path = data_path / 'agreement_matrices.pkl'
+        if old_pkl_path.exists():
+            old_pkl_path.unlink()
+            self.logger.info("Removed old agreement_matrices.pkl to save space")
+
+        if 'multilateral_scores' not in agreement_data or 'vote_bool_arrays' not in agreement_data:
+            raise KeyError("Cached pkl is stale (missing multilateral_scores or vote_bool_arrays) — rebuild required.")
 
         self.agreement_matrices = agreement_data['agreement_matrices']
         self.country_columns = agreement_data['country_columns']
+        self.multilateral_scores = agreement_data['multilateral_scores']
+        self.vote_bool_arrays = agreement_data['vote_bool_arrays']
     
     def _save_cached_data(self):
         """Save data files into DataFrames."""
@@ -242,13 +302,17 @@ class DataRepository:
         self.closure_table.to_csv(data_path / 'closure_table.csv', index=False)
         self.broader_table.to_csv(data_path / 'broader_table.csv', index=False)
 
-        with open(data_path / 'agreement_matrices.pkl', 'wb') as f:
-            agreement_data = {
+        pkl_path = data_path / 'precomputed_agreement_data.pkl'
+        with open(pkl_path, 'wb') as f:
+            compressed = blosc2.compress(pickle.dumps({
                 'agreement_matrices': self.agreement_matrices,
-                'country_columns': self.country_columns
-            }
-            pickle.dump(agreement_data, f)
-            
+                'country_columns': self.country_columns,
+                'multilateral_scores': self.multilateral_scores,
+                'vote_bool_arrays': self.vote_bool_arrays,
+            }), typesize=1)
+            assert isinstance(compressed, bytes), "Compressed data is not bytes"
+            f.write(compressed)
+
         # Save Metadata (Version)
         metadata = {
             'version': self.config.get('version', 'unknown'),
@@ -286,8 +350,17 @@ class DataRepository:
         # Normalize ga_resolutions
         self.resolution_table, self.resolution_subject_table = processor.normalize_resolutions(ga_resolutions)
 
-        # Calculate the agreement matrix
-        self.agreement_matrices, self.country_columns = processor.calculate_agreement_matrix(self.resolution_table)
+        # Calculate agreement data for all resolutions
+        (
+            self.agreement_matrices,
+            consensus_scores,
+            self.country_columns,
+            self.multilateral_scores,
+            self.vote_bool_arrays,
+        ) = processor.calculate_agreement_data(self.resolution_table)
+
+        # Add consensus scores to the resolution table
+        self.resolution_table['consensus_score'] = self.resolution_table['undl_id'].map(consensus_scores)
 
         
         expanded_subjects = set()
@@ -303,7 +376,6 @@ class DataRepository:
         self.subject_table = self.subject_table[self.subject_table['subject_id'].isin(expanded_subjects)]
         self.closure_table = self.closure_table[self.closure_table['ancestor_id'].isin(expanded_subjects)]
         self.broader_table = self.broader_table[self.broader_table['parent_id'].isin(expanded_subjects)]
-
 
         # Save processed data
         self._save_cached_data()
