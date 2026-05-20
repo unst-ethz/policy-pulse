@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict
 
+import blosc2
 import pandas as pd
 import yaml
 
@@ -40,28 +41,44 @@ class DataRepository:
 
         self.logger.info("Initializing UNDataRepository")
 
-        # Check if data is already processed and available
-        if self._has_cached_data():
-            # Version Check
-            if self._check_data_version():
-                # Cached data found and version matches -> load
-                self._load_cached_data()
-                self.logger.info("Initialization complete with cached data.")
-                return
-            else:
-                self.logger.info("Data version mismatch or missing. Rebuilding data...")
+        if not self._has_cached_data() or not self._check_data_version():
+            self.logger.info("Initializing from raw data sources.")
+            # Check if configured data sources are valid
+            if not self._resolve_and_validate_data_urls():
+                self.logger.error(
+                    "One or more configured data sources are invalid. "
+                    "Please review settings in data_sources.yaml."
+                )
+                raise ValueError("Failed to resolve one or more data sources. Check logs for details.")
 
-        # Check if configured data sources are valid
-        if not self._resolve_and_validate_data_urls():
-            self.logger.error(
-                "One or more configured data sources are invalid. "
-                "Please review settings in data_sources.yaml."
-            )
-            raise ValueError("Failed to resolve one or more data sources. Check logs for details.")
+            self._build_data()
+        else:
+            # Cached data found and version matches -> load
+            self.logger.info("Initializing from cached data.")
+            self._load_cached_data()
 
-        self._build_data()
-
-        self.logger.info("Initialization complete with fetched data.")
+        self.logger.info("Initialization complete. Below are memory footprints:")
+        self.logger.info(
+            f"Resolution Table: {self.resolution_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Resolution Subject Table: {self.resolution_subject_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Subject Table: {self.subject_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Closure Table: {self.closure_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Broader Table: {self.broader_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            f"Agreement Matrices: {sum(map(lambda x: x[1].nbytes / (1024**2), self.agreement_matrices.items()))} MB"
+        )
+        self.logger.info(
+            f"Multilateral Scores: {self.multilateral_scores.nbytes / (1024**2):.2f} MB"
+        )
 
     def get_data(self) -> Dict[str, Any]:
         """Return all processed data as a dict consumed by ResolutionQueryEngine.
@@ -226,15 +243,44 @@ class DataRepository:
         data_path.mkdir(exist_ok=True)
 
         # Load CSV files
+        self.logger.info("Loading resolution table")
         self.resolution_table = pd.read_csv(data_path / 'resolution_table.csv')
+        self.logger.info("Loading resolution subject table")
         self.resolution_subject_table = pd.read_csv(data_path / 'resolution_subject_table.csv')
+        self.logger.info("Loading subject table")
         self.subject_table = pd.read_csv(data_path / 'subject_table.csv')
+        self.logger.info("Loading closure table")
         self.closure_table = pd.read_csv(data_path / 'closure_table.csv')
+        self.logger.info("Loading broader table")
         self.broader_table = pd.read_csv(data_path / 'broader_table.csv')
 
+        self.logger.info("Loading agreement matrices")
         # Load full vote-agreement matrices
-        with open(data_path / 'precomputed_agreement_data.pkl', 'rb') as f:
-            agreement_data = pickle.load(f)
+        pkl_path = data_path / 'precomputed_agreement_data.pkl'
+        with open(pkl_path, 'r+b') as f:
+            try:
+                uncompressed = blosc2.decompress(f.read())
+                assert isinstance(uncompressed, bytes), "Decompressed data is not bytes"
+            except RuntimeError as e:
+                self.logger.info(f"Blosc2 decompression failed: {e}. Attempting fallback to no compression.")
+                f.seek(0)
+                uncompressed = f.read()
+
+                # Migrate to compressed data
+                self.logger.info("Migrating to compressed data format.")
+                compressed = blosc2.compress(uncompressed, typesize=1)
+                assert isinstance(compressed, bytes), "Compressed data is not bytes"
+                f.seek(0)
+                f.write(compressed)
+                f.truncate()
+
+            agreement_data = pickle.loads(uncompressed)
+
+        # If old agreement_matrices.pkl exists, remove it
+        old_pkl_path = data_path / 'agreement_matrices.pkl'
+        if old_pkl_path.exists():
+            old_pkl_path.unlink()
+            self.logger.info("Removed old agreement_matrices.pkl to save space")
 
         if 'multilateral_scores' not in agreement_data or 'vote_bool_arrays' not in agreement_data:
             raise KeyError("Cached pkl is stale (missing multilateral_scores or vote_bool_arrays) — rebuild required.")
@@ -256,13 +302,16 @@ class DataRepository:
         self.closure_table.to_csv(data_path / 'closure_table.csv', index=False)
         self.broader_table.to_csv(data_path / 'broader_table.csv', index=False)
 
-        with open(data_path / 'precomputed_agreement_data.pkl', 'wb') as f:
-            pickle.dump({
+        pkl_path = data_path / 'precomputed_agreement_data.pkl'
+        with open(pkl_path, 'wb') as f:
+            compressed = blosc2.compress(pickle.dumps({
                 'agreement_matrices': self.agreement_matrices,
                 'country_columns': self.country_columns,
                 'multilateral_scores': self.multilateral_scores,
                 'vote_bool_arrays': self.vote_bool_arrays,
-            }, f)
+            }), typesize=1)
+            assert isinstance(compressed, bytes), "Compressed data is not bytes"
+            f.write(compressed)
 
         # Save Metadata (Version)
         metadata = {

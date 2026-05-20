@@ -213,6 +213,7 @@ class DataProcessor:
         Quickly calculate the full vote-agreement matrix for a single resolution.
 
         Uses vectorized calculation via NumPy broadcasting.
+      Stores matrices as float32 to reduce memory by 50% compared to float64.
 
         Args:
             resolution_row: Series containing votes for all countries
@@ -222,11 +223,11 @@ class DataProcessor:
             np.ndarray: 2D agreement matrix (C x C)
         """
         # 1. Map votes to numeric values
-        vote_mapping = {"Y": 1.0, "A": 0.0, "N": -1.0}
+        vote_mapping = {"Y": np.float32(1.0), "A": np.float32(0.0), "N": np.float32(-1.0)}
 
         # Extract the country votes as a NumPy array (floats to accommodate NaN)
         # Using .get() for safety, defaulting to np.nan
-        votes = np.array([vote_mapping.get(resolution_row[c], np.nan) for c in country_columns])
+        votes = np.array([vote_mapping.get(resolution_row[c], np.nan) for c in country_columns], dtype=np.float32)
 
         # 2. Use broadcasting to compute all pairwise absolute differences
         # votes[:, np.newaxis] creates a column vector (C, 1)
