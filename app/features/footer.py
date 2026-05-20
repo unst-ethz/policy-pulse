@@ -1,5 +1,13 @@
 from dash import html
 
+import os
+
+build_commit = os.getenv("BUILD_COMMIT", "unknown")
+build_date = os.getenv("BUILD_DATE", "unknown")
+if build_date != "unknown":
+    # GitHub provides with full ISO 8601 format, keep only date part
+    build_date = build_date.split("T")[0]
+
 layout = html.Footer(
     html.Div(
         [
@@ -11,6 +19,12 @@ layout = html.Footer(
                         "in collaboration with the UN Dag Hammarskjöld Library.",
                         className="footer-subtitle",
                     ),
+                    html.Span(
+                        "Commit {} - {}".format(build_commit, build_date),
+                        className="footer-build-info",
+                    )
+                    if build_commit != "unknown" and build_date != "unknown"
+                    else None,
                 ],
                 className="footer-column",
             ),
