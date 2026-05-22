@@ -11,6 +11,7 @@ from dash import (
     State,
     callback,
     clientside_callback,
+    get_relative_path,
     html,
     dcc,
     register_page,
@@ -315,7 +316,7 @@ def update_country_profile_link(filter_store):
         else:
             params["country2"] = country2
 
-    return "/profile?" + urlencode(params), _enabled
+    return get_relative_path("/profile?" + urlencode(params)), _enabled
 
 
 # Wire up callbacks for each feature module. Must be called at import time
