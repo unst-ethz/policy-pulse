@@ -94,7 +94,7 @@ def _build_stats_component():
             ),
             # _stats_card("🏷️", "Subjects", f"{unique_subjects:,}", f""),
             _stats_card("🏷️", "Subjects", f"{unique_subjects:,}", f"{total_subject_links:,} resolutions with assigned subjects"),
-            html.Div("Vote Composition Across Accepted Resolutions", style={"fontWeight": "600", "color": "#1f2937", "marginBottom": "8px"}),
+            html.Div("Vote Composition Across Accepted Resolutions", style={"fontWeight": "600", "color": "#1f2937", "marginBottom": "8px", "fontSize": "0.8rem", "whiteSpace": "nowrap"}),
             html.Div(
                 [
                     html.Div(style={"width": f"{y_pct:.2f}%", "backgroundColor": "#74bb88", "height": "100%"}),
