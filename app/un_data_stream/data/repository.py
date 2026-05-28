@@ -238,6 +238,35 @@ class DataRepository:
              self.logger.error(f"Error checking data version: {e}")
              return False
     
+    # Columns present in resolution_table.csv that are NOT country vote columns.
+    # Used by _read_resolution_table to determine which columns to read as categorical.
+    _RESOLUTION_META_COLS: set = {
+        'undl_id', 'date', 'session', 'resolution', 'draft',
+        'committee_report', 'meeting', 'title', 'agenda_title',
+        'subjects', 'total_yes', 'total_no', 'total_abstentions',
+        'total_non_voting', 'total_ms', 'undl_link', 'subject_id',
+        'description', 'agenda', 'modality', 'source_dataset', 'consensus_score',
+    }
+
+    @staticmethod
+    def _read_resolution_table(path: Path) -> pd.DataFrame:
+        """Read resolution_table.csv with vote columns as CategoricalDtype.
+
+        Uses a two-pass strategy: the first pass reads only the header row to
+        discover which columns are vote columns; the second pass reads the full
+        file with an explicit dtype map so pandas never allocates the
+        intermediate object arrays.  This reduces both steady-state memory
+        (int8 codes instead of object pointers) and peak memory during load.
+        """
+        vote_dtype = pd.CategoricalDtype(categories=["Y", "N", "A", "X"], ordered=False)
+        header = pd.read_csv(path, nrows=0).columns.tolist()
+        dtype_map = {
+            c: vote_dtype
+            for c in header
+            if c not in DataRepository._RESOLUTION_META_COLS
+        }
+        return pd.read_csv(path, dtype=dtype_map, low_memory=False)
+
     def _load_cached_data(self):
         """Load cached data files into DataFrames."""
         data_path = Path(self.config['paths']['data'])
@@ -245,7 +274,7 @@ class DataRepository:
 
         # Load CSV files
         self.logger.info("Loading resolution table")
-        self.resolution_table = pd.read_csv(data_path / 'resolution_table.csv')
+        self.resolution_table = self._read_resolution_table(data_path / 'resolution_table.csv')
         self.logger.info("Loading resolution subject table")
         self.resolution_subject_table = pd.read_csv(data_path / 'resolution_subject_table.csv')
         self.logger.info("Loading subject table")
