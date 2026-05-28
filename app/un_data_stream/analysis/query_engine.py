@@ -177,13 +177,20 @@ class ResolutionQueryEngine:
 
         self.logger.info(f"Analyzing agreement for '{country_code}' across {len(rows)} resolutions")
 
-        # v[r, c] ∈ {1 (yes), -1 (no), 0 (abstained), nan (non-voter)}
-        v = self._yes[rows].astype(np.float32) - self._no[rows].astype(np.float32)  # (R', C)
-        v[~self._voted[rows]] = np.nan
+        # Reconstruct numeric vote indicators by subtracting bool arrays for "yes" - "no":
+        # True - False = 1 (yes),
+        # False - True = -1 (no),
+        # False - False = 0 (abstained);
+        # non-voters masked to nan below.
+        yes_float = self._yes[rows].astype(np.float32)
+        no_float = self._no[rows].astype(np.float32)
+        v = yes_float - no_float                            # (R', C) — all countries' votes
+        v[~self._voted[rows]] = np.nan                      # X / missing → excluded from scoring
 
-        v_c = v[:, country_idx]                                 # (R',)
-        agree = 1.0 - np.abs(v_c[:, np.newaxis] - v) / 2.0      # (R', C)
-        agree[:, country_idx] = np.nan                          # mask self-comparison
+        v_c = v[:, country_idx]                             # (R',) — reference country's votes
+        # broadcast (R',1) vs (R',C): one subtraction covers all resolutions × all countries at once
+        agree = 1.0 - np.abs(v_c[:, np.newaxis] - v) / 2.0  # (R', C) — agreement scores ∈ {0.0, 0.5, 1.0, nan}
+        agree[:, country_idx] = np.nan                      # mask self-comparison
 
         other_idx = [i for i in range(len(self.country_columns)) if i != country_idx]
         other_cols = [self.country_columns[i] for i in other_idx]
