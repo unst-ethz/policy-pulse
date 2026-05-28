@@ -107,6 +107,12 @@ class DataRepository:
         with open(self.config_path, 'r') as file:
             self.config = yaml.safe_load(file)
 
+        # Resolve relative paths in config relative to project root (parent of config dir)
+        project_root = Path(self.config_path).resolve().parent.parent
+        for key, val in self.config.get('paths', {}).items():
+            if not Path(val).is_absolute():
+                self.config['paths'][key] = str(project_root / val)
+
     def _setup_logging(self):
         """Setup logging configuration with file and console handlers."""
         # Create logger
