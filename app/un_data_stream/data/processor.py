@@ -163,11 +163,13 @@ class DataProcessor:
             agreement_matrix = self._calculate_single_resolution_matrix(row, country_columns)
             consensus_scores[undl_id] = self._calculate_single_consensus_score(agreement_matrix)
 
-            # Per-country row-mean (off-diagonal only) for the multilateral scores array
-            mat_no_diag = np.where(off_diag_mask, agreement_matrix, np.nan)
-            num_valid = np.sum(~np.isnan(mat_no_diag), axis=1)
-            row_means = np.full(n, np.nan)
-            row_agreement_sums = np.nansum(mat_no_diag, axis=1)
+            # Per-country multilateral score: mean agreement with every *other* voting country.
+            # Diagonal is masked to nan so self-agreement (always 1.0) does not inflate the mean.
+            mat_no_diag = np.where(off_diag_mask, agreement_matrix, np.nan)  # (C, C)
+            num_valid = np.sum(~np.isnan(mat_no_diag), axis=1)               # (C,) — voting partners per country
+            row_means = np.full(n, np.nan)                                   # (C,) — default nan for non-voters
+            row_agreement_sums = np.nansum(mat_no_diag, axis=1)              # (C,)
+            # out= / where= writes results directly into row_means, leaving nan where num_valid == 0
             np.divide(row_agreement_sums, num_valid, out=row_means, where=num_valid > 0)
             multilateral_rows.append(row_means)
 
@@ -225,17 +227,11 @@ class DataProcessor:
         # Using .get() for safety, defaulting to np.nan
         votes = np.array([vote_mapping.get(resolution_row[c], np.nan) for c in country_columns], dtype=np.float32)
 
-        # 2. Use broadcasting to compute all pairwise absolute differences
-        # votes[:, np.newaxis] creates a column vector (C, 1)
-        # votes[np.newaxis, :] creates a row vector (1, C)
-        # The subtraction results in an (C, C) matrix of all combinations
-        abs_diff_mat = np.abs(votes[:, np.newaxis] - votes[np.newaxis, :])
+        # broadcast (C,1) vs (1,C): all pairwise vote differences in one operation
+        abs_diff_mat = np.abs(votes[:, np.newaxis] - votes[np.newaxis, :])  # (C, C)
 
-        # 3. Apply the agreement-score formula to the entire matrix at once
-        agreement_matrix = (1.0 - (abs_diff_mat / 2.0))
-
-        # 4. Downcast to save disk space when pickling later
-        agreement_matrix = agreement_matrix.astype(np.float32)
+        # agreement formula: scores ∈ {0.0, 0.5, 1.0, nan}
+        agreement_matrix = (1.0 - (abs_diff_mat / 2.0)).astype(np.float32)  # (C, C)
 
         return agreement_matrix
 
@@ -255,10 +251,11 @@ class DataProcessor:
             float
         """
 
-        # We take the mean of the lower triangle of the matrix (excluding the diagonal)
-        # to get the average of all unique pairwise scores, ignoring NaNs.
+        # The matrix is symmetric, so the lower triangle contains every unique country pair
+        # exactly once. Taking its nanmean gives the average pairwise agreement without
+        # double-counting. k=-1 excludes the diagonal (self-agreement, always 1.0).
         n_countries = agreement_matrix.shape[0]
-        tril_indices = np.tril_indices(n_countries, k=-1)  # k=-1 to exclude diagonal
+        tril_indices = np.tril_indices(n_countries, k=-1)
         lower_triangle_values = agreement_matrix[tril_indices]
 
         with warnings.catch_warnings():
