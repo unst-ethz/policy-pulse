@@ -144,7 +144,7 @@ def test_multilateral_scores(
     country_cols = list(votes.keys())
     df = pd.DataFrame([{'undl_id': 'TEST/1', **votes}])
 
-    _, _, _, multilateral_scores = data_processor.calculate_agreement_data(df)
+    _, _, multilateral_scores, _ = data_processor.calculate_agreement_data(df)
 
     assert multilateral_scores.shape == (1, len(country_cols))
     assert multilateral_scores.dtype == np.float32
@@ -159,19 +159,17 @@ def test_multilateral_scores(
                 f"Country {country_cols[i]}: expected {expected:.4f}, got {actual[i]:.4f}"
 
 
-def test_calculate_agreement_matrix_performance(data_processor, random_un_votes_dataframe):
+def test_calculate_agreement_data_performance(data_processor, random_un_votes_dataframe):
     """
-    Test the compute-time performance of the agreement-matrix calculation
-    using the shared fixture.
+    Test the compute-time performance of calculate_agreement_data using the shared fixture.
     """
     start = time.perf_counter()
-    matrices, c_scores, countries, multilateral_scores = data_processor.calculate_agreement_data(
+    c_scores, countries, multilateral_scores, vote_bool_arrays = data_processor.calculate_agreement_data(
         random_un_votes_dataframe
     )
     end = time.perf_counter()
 
     n_res = len(random_un_votes_dataframe)
-    assert len(matrices) == n_res
     assert len(c_scores) == n_res
     assert len(countries) == 193
     assert multilateral_scores.shape == (n_res, 193)

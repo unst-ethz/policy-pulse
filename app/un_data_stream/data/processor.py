@@ -7,6 +7,7 @@ registered processors for different dataset types.
 
 import time
 import logging
+import warnings
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, List, Tuple
@@ -105,17 +106,17 @@ class DataProcessor:
     def calculate_agreement_data(
             self,
             resolutions_df: pd.DataFrame
-    ) -> Tuple[Dict[str, np.ndarray], Dict[str, float], List[str], np.ndarray, Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
+    ) -> Tuple[Dict[str, float], List[str], np.ndarray, Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
         """
-        For each resolution, calculate one full vote-agreement matrix (C x C) as well as the
-        resolution's aggregate "consensus score" (scalar).
+        For each resolution, compute the consensus score (scalar) and per-country
+        multilateral alignment scores.  Also build four compact bool arrays encoding
+        each country's raw vote per resolution.
 
-        Also compute the compact (R x C) multilateral_scores array, which summarises for each
-        resolution each country's mean pairwise agreement with all other countries that voted,
-        and four (R x C) bool arrays encoding each country's raw vote per resolution.
+        A per-resolution (C x C) agreement matrix is constructed transiently to derive
+        consensus and multilateral scores, but is never stored or returned.
 
-        Row order in multilateral_scores and the bool arrays matches resolutions_df — the same
-        ordering that resolution_table preserves — so one row-index dict covers all of them.
+        Row order in multilateral_scores and the bool arrays matches resolutions_df — the
+        same ordering that resolution_table preserves — so one row-index dict covers all.
 
         Args:
             resolutions_df : pd.DataFrame
@@ -124,15 +125,14 @@ class DataProcessor:
 
         Returns:
             Tuple of:
-                - agreement_matrices: Dict mapping undl_id to its (C x C) agreement matrix.
-                - consensus_scores: Dict mapping undl_id to its score.
-                - country_columns: List of country columns used in the matrices.
+                - consensus_scores: Dict mapping undl_id to its consensus score (scalar).
+                - country_columns: List of country columns in the vote data.
                 - multilateral_scores: (R x C) float32 array — per-resolution per-country
                   row-mean alignment score (NaN where country did not vote).
                 - vote_bool_arrays: 4-tuple of (R x C) bool arrays (yes, no, abstained, voted)
                   in the same row order as resolutions_df / multilateral_scores.
         """
-        self.logger.info("Starting bilateral agreement matrix and multilateral scores calculation")
+        self.logger.info("Starting consensus and multilateral scores calculation")
         start_time = time.time()
 
         # Step 1: Identify country columns (exclude metadata)
@@ -153,18 +153,15 @@ class DataProcessor:
         n = len(country_columns)
         off_diag_mask = ~np.eye(n, dtype=bool)
 
-        # Step 2: Calculate the full agreement matrix and consensus score for each resolution.
-        # Also build the compact (R x C) multilateral scores array in the same pass.
-        agreement_matrices = {}
+        # Step 2: For each resolution, compute consensus score and multilateral scores.
+        # The agreement matrix is built transiently per resolution and not retained.
         consensus_scores = {}
         multilateral_rows = []
 
         for idx, row in progressbar(resolutions_df.iterrows(), total=len(resolutions_df)):
             undl_id = row['undl_id']
             agreement_matrix = self._calculate_single_resolution_matrix(row, country_columns)
-            c_score = self._calculate_single_consensus_score(agreement_matrix)
-            agreement_matrices[undl_id] = agreement_matrix
-            consensus_scores[undl_id] = c_score
+            consensus_scores[undl_id] = self._calculate_single_consensus_score(agreement_matrix)
 
             # Per-country row-mean (off-diagonal only) for the multilateral scores array
             mat_no_diag = np.where(off_diag_mask, agreement_matrix, np.nan)
@@ -174,7 +171,7 @@ class DataProcessor:
             np.divide(row_agreement_sums, num_valid, out=row_means, where=num_valid > 0)
             multilateral_rows.append(row_means)
 
-        multilateral_scores = np.array(multilateral_rows, dtype=np.float32)  # Float32 saves disk space when pickling
+        multilateral_scores = np.array(multilateral_rows, dtype=np.float32)  # float32 saves disk space when pickling
 
         # Step 3: Compute boolean arrays with vote-type indicators. By pickling these arrays,
         # the query engine will not have to re-parse vote columns on every startup.
@@ -189,15 +186,14 @@ class DataProcessor:
         vote_voted     = vote_yes | vote_no | vote_abstained
 
         elapsed_time = time.time() - start_time
-        n_res = len(agreement_matrices)
+        n_res = len(consensus_scores)
         assert n_res == len(resolutions_df)
         self.logger.info(
-            f"Calculated {n_res} bilateral matrices, consensus scores, "
+            f"Calculated {n_res} consensus scores "
             f"and multilateral_scores ({multilateral_scores.shape}) in {elapsed_time:.2f}s"
         )
 
         return (
-            agreement_matrices,
             consensus_scores,
             country_columns,
             multilateral_scores,
@@ -265,7 +261,8 @@ class DataProcessor:
         tril_indices = np.tril_indices(n_countries, k=-1)  # k=-1 to exclude diagonal
         lower_triangle_values = agreement_matrix[tril_indices]
 
-        with np.errstate(invalid='ignore'):  # Suppress warning for all-NaN slice
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
             consensus_score = np.nanmean(lower_triangle_values)
 
         return float(consensus_score)

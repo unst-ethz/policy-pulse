@@ -74,9 +74,6 @@ class DataRepository:
             f"Broader Table: {self.broader_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
         )
         self.logger.info(
-            f"Agreement Matrices: {sum(map(lambda x: x[1].nbytes / (1024**2), self.agreement_matrices.items()))} MB"
-        )
-        self.logger.info(
             f"Multilateral Scores: {self.multilateral_scores.nbytes / (1024**2):.2f} MB"
         )
 
@@ -85,7 +82,6 @@ class DataRepository:
 
         Keys:
             resolution, resolution_subject, subject, closure, broader — pd.DataFrames
-            agreement_matrices  — Dict[undl_id, (C x C) np.ndarray]
             country_columns     — List[str] of ISO3 country codes (length C)
             multilateral_scores — (R x C) np.ndarray, float32
             vote_bool_arrays    — 4-tuple of (R x C) bool arrays (yes, no, abstained, voted)
@@ -96,7 +92,6 @@ class DataRepository:
             'subject': self.subject_table,
             'closure': self.closure_table,
             'broader': self.broader_table,
-            'agreement_matrices': self.agreement_matrices,
             'country_columns': self.country_columns,
             'multilateral_scores': self.multilateral_scores,
             'vote_bool_arrays': self.vote_bool_arrays,
@@ -260,8 +255,7 @@ class DataRepository:
         self.logger.info("Loading broader table")
         self.broader_table = pd.read_csv(data_path / 'broader_table.csv')
 
-        self.logger.info("Loading agreement matrices")
-        # Load full vote-agreement matrices
+        self.logger.info("Loading precomputed vote data")
         pkl_path = data_path / 'precomputed_agreement_data.pkl'
         with open(pkl_path, 'r+b') as f:
             try:
@@ -291,7 +285,6 @@ class DataRepository:
         if 'multilateral_scores' not in agreement_data or 'vote_bool_arrays' not in agreement_data:
             raise KeyError("Cached pkl is stale (missing multilateral_scores or vote_bool_arrays) — rebuild required.")
 
-        self.agreement_matrices = agreement_data['agreement_matrices']
         self.country_columns = agreement_data['country_columns']
         self.multilateral_scores = agreement_data['multilateral_scores']
         self.vote_bool_arrays = agreement_data['vote_bool_arrays']
@@ -311,7 +304,6 @@ class DataRepository:
         pkl_path = data_path / 'precomputed_agreement_data.pkl'
         with open(pkl_path, 'wb') as f:
             compressed = blosc2.compress(pickle.dumps({
-                'agreement_matrices': self.agreement_matrices,
                 'country_columns': self.country_columns,
                 'multilateral_scores': self.multilateral_scores,
                 'vote_bool_arrays': self.vote_bool_arrays,
@@ -356,9 +348,8 @@ class DataRepository:
         # Normalize ga_resolutions
         self.resolution_table, self.resolution_subject_table = processor.normalize_resolutions(ga_resolutions)
 
-        # Calculate agreement data for all resolutions
+        # Calculate consensus scores and compact vote arrays for all resolutions
         (
-            self.agreement_matrices,
             consensus_scores,
             self.country_columns,
             self.multilateral_scores,
