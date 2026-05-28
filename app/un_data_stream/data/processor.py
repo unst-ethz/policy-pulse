@@ -211,7 +211,7 @@ class DataProcessor:
         Quickly calculate the full vote-agreement matrix for a single resolution.
 
         Uses vectorized calculation via NumPy broadcasting.
-      Stores matrices as float32 to reduce memory by 50% compared to float64.
+        Result is float32 to keep the transient matrix small during the build loop.
 
         Args:
             resolution_row: Series containing votes for all countries
