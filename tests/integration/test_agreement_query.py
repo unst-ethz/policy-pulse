@@ -1,4 +1,4 @@
-"""Correctness and performance tests for query_agreement_between_countries.
+"""Integration tests for correctness and performance of query_agreement_between_countries.
 
 --- Bilateral agreement score ---
 For a single resolution and two countries A and B, the bilateral agreement score
@@ -6,17 +6,17 @@ is defined as:
 
     score(A, B) = 1 - |v_A - v_B| / 2
 
-where v_A, v_B ∈ {1 (yes), 0 (abstained), -1 (no)}.  A score of NaN is produced
-whenever either country did not vote (X or missing).  Because the vote values are
+where v_A, v_B ∈ {1 (yes), 0 (abstained), -1 (no)}. A score of NaN is produced
+whenever either country did not vote (X or missing). Because the vote values are
 integers, the score can only ever be exactly 0.0, 0.5, or 1.0.
 
 Across a set of resolutions the score is the nanmean of per-resolution scores.
 
 --- Correctness tests ---
 Tests use a reference implementation (_reference_agreement) that derives expected
-values directly from raw vote strings in resolution_table.  It is intentionally
+values directly from raw vote strings in resolution_table. It is intentionally
 naive — simple enough to be obviously correct — and shares no code with the query
-engine.  Tests assert that the engine matches this reference rather than
+engine. Tests assert that the engine matches this reference rather than
 hard-coded 'golden values', so correctness is re-verified against the live
 dataset on every run.
 
@@ -41,6 +41,7 @@ headroom above what the vectorised implementation actually takes.
 """
 
 import time
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -269,7 +270,6 @@ def test_vote_values_in_expected_set(engine):
     Catches upstream data changes that introduce a new vote code which would
     silently map to NaN in the categorical dtype and corrupt agreement scores.
     """
-    import pandas as pd
     from app.un_data_stream.data.repository import DataRepository
     rt = engine.resolution_table
     vote_cols = [c for c in rt.columns if c not in DataRepository._RESOLUTION_META_COLS]

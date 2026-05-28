@@ -212,8 +212,8 @@ class ResolutionQueryEngine:
         
     def query_multilateral_stats(self, resolution_ids: Optional[List[str]] = None) -> pd.DataFrame:
         """
-        For each country, compute the average multilateral alignment and abstention rate
-        across the given resolutions, based on the full precomputed (R x C) arrays.
+        For each country, compute multilateral alignment and voting rate statistics
+        across the given resolutions, based on the precomputed (R x C) arrays.
 
         Args:
             resolution_ids: List of undl_ids to include. If None or empty, uses all
@@ -224,6 +224,8 @@ class ResolutionQueryEngine:
                 - country: ISO3 country code
                 - multilateral_alignment: mean pairwise agreement with all other voting
                   countries, averaged across selected resolutions (NaN if no participation)
+                - yes_rate: fraction of votes cast as Yes (NaN if no votes)
+                - no_rate: fraction of votes cast as No (NaN if no votes)
                 - abstention_rate: fraction of votes cast as abstentions (NaN if no votes)
                 - participation_count: number of selected resolutions the country voted on
         """
@@ -238,8 +240,9 @@ class ResolutionQueryEngine:
         if not rows:
             return pd.DataFrame()
 
-        align_slice = self._multilateral_scores[rows]              # (R', C) float32
-        avg_alignment = np.nanmean(align_slice, axis=0)            # (C,) float64
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            avg_alignment = np.nanmean(self._multilateral_scores[rows], axis=0)  # (C,)
 
         voted_slice = self._voted[rows]                            # (R', C) bool
         abstained_slice = self._abstained[rows]                    # (R', C) bool
@@ -250,10 +253,15 @@ class ResolutionQueryEngine:
         yes_votes = yes_slice.sum(axis=0)                          # (C,) int
         no_votes = no_slice.sum(axis=0)                            # (C,) int
 
+        # out= / where= writes results into pre-filled nan arrays, leaving nan
+        # where participation == 0, without triggering divide-by-zero warnings
         voted = participation > 0
-        abstention_rate = np.where(voted, abstentions / participation, np.nan)
-        yes_rate        = np.where(voted, yes_votes   / participation, np.nan)
-        no_rate         = np.where(voted, no_votes    / participation, np.nan)
+        abstention_rate = np.full(len(participation), np.nan)
+        yes_rate        = np.full(len(participation), np.nan)
+        no_rate         = np.full(len(participation), np.nan)
+        np.divide(abstentions, participation, out=abstention_rate, where=voted)
+        np.divide(yes_votes,   participation, out=yes_rate,        where=voted)
+        np.divide(no_votes,    participation, out=no_rate,         where=voted)
         # TODO: Add "Not-Voting Share" (fraction of selected resolutions with no vote cast).
         #  Crucial: This would need to reflect countries' membership dates in the UN to be meaningful.
 
