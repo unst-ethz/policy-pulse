@@ -298,7 +298,7 @@ def register_callbacks():
             vote_cols_needed = [c for c in ([country1] + comparison_countries) if c]
             if vote_cols_needed and not df.empty:
                 res_table = data.query_engine.resolution_table
-                available = [c for c in vote_cols_needed if c in res_table.columns]
+                available = list(dict.fromkeys(c for c in vote_cols_needed if c in res_table.columns))
                 if available:
                     vote_df = res_table.loc[
                         res_table["undl_id"].isin(df["undl_id"]), ["undl_id"] + available
