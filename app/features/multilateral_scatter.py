@@ -1,3 +1,5 @@
+import textwrap
+
 from dash import dcc, Input, Output, callback, html
 import plotly.graph_objects as go
 import pandas as pd
@@ -14,6 +16,10 @@ _REGION_COLORS = {
     "Oceania":  "#9467BD",
     "Other":    "#7F7F7F",
 }
+
+_COLOR_DISAGREE = "#c0392b"
+_COLOR_AGREE    = "#1558b0"
+_COLOR_MEAN     = "#888888"
 
 _MIN_VOTES_THRESHOLD = 10
 
@@ -45,6 +51,35 @@ _Y_AXIS_DETAILS = {
 }
 
 
+def _wrap(text: str, width: int = 36) -> str:
+    """Break long callout text into lines for a Plotly annotation box."""
+    return "<br>".join(textwrap.wrap(text, width))
+
+
+def _callout_position(y_metric: str, cx: float, cy: float) -> tuple[float, float, str, str]:
+    """Return (x, y, xanchor, yanchor) for the callout annotation.
+
+    Primary positions keep the callout out of the dense data region:
+      - yes_rate      → top-left    (data clusters top-right)
+      - abstention/no → bottom-left (data clusters bottom-right)
+
+    Falls back to the vertically mirrored corner (top-left ↔ bottom-left) when
+    the selected country's paper-coordinate position (cx, cy) would be occluded
+    by the primary box. The occlusion thresholds assume the box spans roughly
+    0.30 × 0.20 paper units, which holds for the current font size and wrap width.
+    """
+    if y_metric == "yes_rate":
+        occluded = cx < 0.30 and cy > 0.80
+        if occluded:
+            return 0.02, 0.04, "left", "bottom"   # top-left → bottom-left
+        return 0.02, 0.96, "left", "top"
+    else:
+        occluded = cx < 0.30 and cy < 0.20
+        if occluded:
+            return 0.02, 0.96, "left", "top"      # bottom-left → top-left
+        return 0.02, 0.04, "left", "bottom"
+
+
 def register_callbacks(query_engine):
 
     @callback(
@@ -64,11 +99,11 @@ def register_callbacks(query_engine):
         if not filtered_data:
             return go.Figure(), "", ""
 
-        all_resolutions = pd.read_json(filtered_data, orient="split")
-        if all_resolutions.empty:
+        resolutions = pd.read_json(filtered_data, orient="split")
+        if resolutions.empty:
             return go.Figure(), html.Div([html.Strong("No resolutions to plot")]), ""
 
-        stats = query_engine.query_multilateral_stats(all_resolutions["undl_id"].tolist())
+        stats = query_engine.query_multilateral_stats(resolutions["undl_id"].tolist())
         if stats.empty:
             return go.Figure(), html.Div([html.Strong("No data available")]), ""
 
@@ -77,6 +112,7 @@ def register_callbacks(query_engine):
         stats = stats.dropna(subset=["multilateral_alignment"])
         stats = stats[stats["participation_count"] >= _MIN_VOTES_THRESHOLD]
 
+        mean_alignment = stats["multilateral_alignment"].mean()
         y_label = _Y_AXIS_LABELS[y_metric]
         fig = go.Figure()
 
@@ -95,13 +131,20 @@ def register_callbacks(query_engine):
                 hovertemplate=(
                     "<b>%{text}</b><br>"
                     "Multilateral vote agreement: %{customdata[0]:.3f}<br>"
-                    f"{y_label}: " + "%{customdata[1]:.1%}<br>"
+                    f"{y_label}: %{{customdata[1]:.1%}}<br>"
                     "Votes cast: %{customdata[2]:.0f}"
                     "<extra></extra>"
                 ),
             ))
 
+        # Axis bounds computed here so the callout corner picker can use them.
+        x_lo = min(0.295, stats["multilateral_alignment"].min() * 0.95)
+        x_hi = max(0.95,  stats["multilateral_alignment"].max() * 1.05)
+        y_lo = -0.01  # small gap so markers at y=0 aren't clipped by the axis line
+        y_hi = max(0.505, stats[y_metric].max() * 1.06)
+
         country1 = (filter_store or {}).get("country1_alpha3")
+
         if country1:
             highlight = stats[stats["country"] == country1]
             if not highlight.empty:
@@ -113,7 +156,7 @@ def register_callbacks(query_engine):
                     showlegend=False,
                     marker=dict(
                         size=14,
-                        color=_REGION_COLORS.get(row["region"], "#7F7F7F"),
+                        color=_REGION_COLORS.get(row["region"], _REGION_COLORS["Other"]),
                         line=dict(color="black", width=2),
                     ),
                     text=[row["country_name"]],
@@ -127,27 +170,98 @@ def register_callbacks(query_engine):
                     ),
                 ))
 
-        mean_alignment = stats["multilateral_alignment"].mean()
+                country_name = row["country_name"]
+                if row["multilateral_alignment"] >= mean_alignment:
+                    side, tendency = "right", "tends to vote like the majority of Member States"
+                else:
+                    side, tendency = "left", "tends to vote against the majority of Member States"
 
-        x_lo = min(0.295, stats["multilateral_alignment"].min() * 0.95)
-        x_hi = max(0.95, stats["multilateral_alignment"].max() * 1.05)
-        y_hi = max(0.505, stats[y_metric].max() * 1.05)
+                cx = (row["multilateral_alignment"] - x_lo) / (x_hi - x_lo)
+                cy = (row[y_metric] - y_lo) / (y_hi - y_lo)
+                ax, ay, xanchor, yanchor = _callout_position(y_metric, cx, cy)
+
+                fig.add_annotation(
+                    xref="paper", yref="paper",
+                    x=ax, y=ay,
+                    xanchor=xanchor, yanchor=yanchor,
+                    text=_wrap(
+                        f"{country_name} is located to the {side} of the mean "
+                        f"line, showing that it {tendency}."
+                    ),
+                    showarrow=False,
+                    align="left",
+                    bgcolor="rgba(255, 255, 255, 0.88)",
+                    bordercolor="#bbb",
+                    borderwidth=1,
+                    borderpad=8,
+                    font=dict(size=13, color="#333"),
+                )
+
+        # mean_fraction: exact position of the mean line in paper coords (used for arrow tails).
+        # mean_fraction_clamped: pulled into [0.2, 0.8] so text labels stay readable at extremes.
+        mean_fraction         = (mean_alignment - x_lo) / (x_hi - x_lo)
+        mean_fraction_clamped = max(0.2, min(0.8, mean_fraction))
 
         fig.update_layout(
             xaxis=dict(title="Multilateral Vote Agreement", range=[x_lo, x_hi]),
-            yaxis=dict(title=y_label, tickformat=".0%", range=[0, y_hi]),
+            yaxis=dict(title=y_label, tickformat=".0%", range=[y_lo, y_hi]),
             legend=dict(title="Region"),
-            margin=dict(l=50, r=20, t=40, b=50),
+            margin=dict(l=50, r=20, t=100, b=50),
             hovermode="closest",
         )
 
         fig.add_vline(
             x=mean_alignment,
-            line=dict(color="#888888", width=1, dash="dash"),
+            line=dict(color=_COLOR_MEAN, width=1, dash="dash"),
             annotation_text=f"mean ({mean_alignment:.2f})",
             annotation_position="top right",
-            annotation_font=dict(color="#888888", size=11),
+            annotation_font=dict(color=_COLOR_MEAN, size=11),
         )
+
+        # Row 1 — text labels, centred within each half (clamped position)
+        fig.add_annotation(
+            xref="paper", yref="paper",
+            x=mean_fraction_clamped / 2,
+            y=1.13,
+            text="Tend to disagree with the majority",
+            showarrow=False,
+            font=dict(color=_COLOR_DISAGREE, size=13),
+            xanchor="center",
+            yanchor="bottom",
+        )
+        fig.add_annotation(
+            xref="paper", yref="paper",
+            x=mean_fraction_clamped + (1 - mean_fraction_clamped) / 2,
+            y=1.13,
+            text="Tend to agree with the majority",
+            showarrow=False,
+            font=dict(color=_COLOR_AGREE, size=13),
+            xanchor="center",
+            yanchor="bottom",
+        )
+
+        # Row 2 — spanning arrows.
+        # Plotly does not render showarrow shafts that cross the plot/margin boundary,
+        # so we use add_shape for the line (which supports yref="paper" values > 1)
+        # and a tiny pixel-offset annotation for just the arrowhead triangle at each tip.
+        arrow_y     = 1.06
+        arrow_size  = 1.5  # arrowhead length multiplier
+        arrow_width = 1.5  # arrowhead stroke width; equal to arrow_size here by coincidence
+        fig.add_shape(type="line", xref="paper", yref="paper",
+            x0=0.01, y0=arrow_y, x1=mean_fraction, y1=arrow_y,
+            line=dict(color=_COLOR_DISAGREE, width=2))
+        fig.add_shape(type="line", xref="paper", yref="paper",
+            x0=mean_fraction, y0=arrow_y, x1=0.99, y1=arrow_y,
+            line=dict(color=_COLOR_AGREE, width=2))
+        # Arrowhead triangles: tail is 8px behind the tip so only the head is drawn
+        fig.add_annotation(xref="paper", yref="paper", axref="pixel", ayref="pixel",
+            x=0.01, y=arrow_y, ax=8, ay=0,
+            text="", showarrow=True,
+            arrowhead=2, arrowsize=arrow_size, arrowwidth=arrow_width, arrowcolor=_COLOR_DISAGREE)
+        fig.add_annotation(xref="paper", yref="paper", axref="pixel", ayref="pixel",
+            x=0.99, y=arrow_y, ax=-8, ay=0,
+            text="", showarrow=True,
+            arrowhead=2, arrowsize=arrow_size, arrowwidth=arrow_width, arrowcolor=_COLOR_AGREE)
 
         note_msg = html.P(
             [
@@ -158,7 +272,7 @@ def register_callbacks(query_engine):
                 f"resolutions. {_Y_AXIS_DETAILS[y_metric]} "
                 "The dashed vertical line marks the mean multilateral voting agreement across all plotted countries. "
                 "The more a country is located to the left of the mean line, the more often it votes "
-                f"against the majority. "
+                "against the majority. "
                 f"Countries with fewer than {_MIN_VOTES_THRESHOLD} votes cast are excluded. "
                 "The data only covers GA resolutions that were successfully passed."
             ],
