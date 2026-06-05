@@ -3,8 +3,9 @@ import pandas as pd
 from .. import data
 
 
-PAGE_SIZE = 10
-LOAD_MORE_SIZE = 50
+_PAGE_SIZE = 10
+_LOAD_MORE_SIZE = 50
+_NO_FILTER = "NO_FILTER"
 
 VOTE_MAP = {
     "Y": {"symbol": "✓", "color": "#2ecc71", "label": "Yes"},           # green checkmark
@@ -15,13 +16,24 @@ VOTE_MAP = {
 _VOTE_NA = {"symbol": "·", "color": "#ccc", "label": "Non-member / no data"}  # tiny grey dot
 
 
+def create_vote_summary(yes_count, no_count, abstain_count):
+    def fmt(n):
+        return str(int(n)) if pd.notna(n) else "–"
+    items = [("Yes", yes_count), ("No", no_count), ("Abstain", abstain_count)]
+    inner = " · ".join(f"{label}: {fmt(count)}" for label, count in items)
+    return html.Span(
+        f"({inner})",
+        style={"fontSize": "0.9em", "marginLeft": "12px", "color": "#666"},
+    )
+
+
 def create_vote_indicator(country_name, vote):
     if pd.isna(vote) or vote not in VOTE_MAP:
         config = _VOTE_NA
         return html.Span(
             [
                 html.Span(config["symbol"], style={"marginRight": "4px", "color": config["color"]}),
-                html.Span(f"{country_name}"),
+                html.Span(country_name),
             ],
             style={"color": "#bbb", "marginRight": "15px", "fontSize": "0.9em"},
         )
@@ -29,7 +41,7 @@ def create_vote_indicator(country_name, vote):
     return html.Span(
         [
             html.Span(config["symbol"], style={"color": config["color"], "marginRight": "4px", "fontWeight": "bold"}),
-            html.Span(f"{country_name}"),
+            html.Span(country_name),
         ],
         style={"fontWeight": "500", "marginRight": "15px", "fontSize": "0.9em"},
     )
@@ -92,13 +104,13 @@ layout = [
                                     dcc.Dropdown(
                                         id="rl-vote-filter",
                                         options=[
-                                            {"label": "Show All", "value": "NO_FILTER"},
+                                            {"label": "Show All", "value": _NO_FILTER},
                                             {"label": "Yes", "value": "Y"},
                                             {"label": "No", "value": "N"},
                                             {"label": "Abstain", "value": "A"},
                                             {"label": "Did not vote", "value": "X"},
                                         ],
-                                        value="NO_FILTER",
+                                        value=_NO_FILTER,
                                         clearable=False,
                                         style={
                                             "width": "180px",
@@ -121,7 +133,7 @@ layout = [
                                     dcc.Dropdown(
                                         id="rl-agreement-dropdown",
                                         options=[
-                                            {"label": "Show All", "value": "NO_FILTER"},
+                                            {"label": "Show All", "value": _NO_FILTER},
                                             {"label": "Agreed (Voted Same)", "value": "AGREED"},
                                             {
                                                 "label": "Disagreed (Voted Differently)",
@@ -132,7 +144,7 @@ layout = [
                                                 "value": "STRONGLY_DISAGREED",
                                             },
                                         ],
-                                        value="NO_FILTER",
+                                        value=_NO_FILTER,
                                         clearable=False,
                                         style={
                                             "width": "250px",
@@ -145,8 +157,6 @@ layout = [
                             ),
                         ],
                     ),
-                    # Placeholder or info text when multiple countries selected?
-                    # Making it empty if not single country usually looks cleaner.
                     html.Div(
                         id="rl-multi-country-msg",
                         style={
@@ -341,7 +351,7 @@ def register_callbacks():
         
         filtered_df = df.copy().sort_values(sort_by, ascending=ascending, na_position="last")
 
-        if country1 and show_agreement_filter and agreement_filter != "NO_FILTER":
+        if country1 and show_agreement_filter and agreement_filter != _NO_FILTER:
             c2 = comparison_countries[0]
             if country1 in filtered_df.columns and c2 in filtered_df.columns:
                 filtered_df = filtered_df.dropna(subset=[country1, c2])
@@ -354,14 +364,14 @@ def register_callbacks():
                     cond2 = (filtered_df[country1] == "N") & (filtered_df[c2] == "Y")
                     filtered_df = filtered_df[cond1 | cond2]
 
-        if country1 and not comparison_countries and vote_filter and vote_filter != "NO_FILTER":
+        if country1 and not comparison_countries and vote_filter and vote_filter != _NO_FILTER:
             if country1 in filtered_df.columns:
                 filtered_df = filtered_df[filtered_df[country1] == vote_filter]
 
         total_count = len(filtered_df)
 
         # 3. Pagination
-        current_limit = PAGE_SIZE + ((n_clicks or 0) * LOAD_MORE_SIZE)
+        current_limit = _PAGE_SIZE + ((n_clicks or 0) * _LOAD_MORE_SIZE)
         display_df = filtered_df.head(current_limit)
         shown_count = len(display_df)
 
@@ -378,14 +388,20 @@ def register_callbacks():
             link = row.get("undl_link", "#")
             date_val = row.get("date")
             date_str = (
-                date_val.strftime("%d %b %Y") if pd.notnull(date_val) else "Unknown"
+                date_val.strftime("%d %b %Y") if pd.notna(date_val) else "Unknown"
             )
             session_val = row.get("session", "")
             session_str = f"Session {session_val}" if session_val else ""
             title = row.get("title", "Untitled")
             consensus_score = row.get("consensus_score")
 
-            consensus_display = f"{consensus_score:.2f}" if pd.notnull(consensus_score) else "N/A"
+            consensus_display = f"{consensus_score:.2f}" if pd.notna(consensus_score) else "N/A"
+
+            vote_summary = create_vote_summary(
+                row.get("total_yes"),
+                row.get("total_no"),
+                row.get("total_abstentions"),
+            )
 
             indicators = []
 
@@ -398,7 +414,7 @@ def register_callbacks():
 
             # Comparators (all selected countries)
             for c2 in comparison_countries:
-                if c2 in df.columns:
+                if c2 in filtered_df.columns:
                     indicators.append(
                         create_vote_indicator(data.get_country_name(c2), row.get(c2))
                     )
@@ -411,7 +427,7 @@ def register_callbacks():
                                 [
                                     html.A(
                                         html.Span(
-                                            f"{res_id}",
+                                            res_id,
                                             style={"color": "#007bff", "fontWeight": "bold"},
                                         ),
                                         href=link,
@@ -437,11 +453,12 @@ def register_callbacks():
                                     html.Span(
                                         f"Consensus score: {consensus_display}",
                                         style={
-                                            "color": "#666" if pd.notnull(consensus_score) else "#999",
+                                            "color": "#666" if pd.notna(consensus_score) else "#999",
                                             "fontSize": "0.9em",
                                             "marginLeft": "12px",
                                         },
                                     ),
+                                    vote_summary,
                                 ],
                                 style={"marginBottom": "0.5rem", "display": "flex", "alignItems": "center", "flexWrap": "wrap"},
                             ),
