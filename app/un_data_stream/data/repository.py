@@ -209,7 +209,7 @@ class DataRepository:
             'subject_table.csv',
             'closure_table.csv',
             'broader_table.csv',
-            'member_states_table.csv'
+            'member_states_table.csv',
             'precomputed_agreement_data.pkl'
         ]
         all_exist = all((data_path / file).exists() for file in required_files)
@@ -266,6 +266,7 @@ class DataRepository:
         self.closure_table = pd.read_csv(data_path / 'closure_table.csv')
         self.logger.info("Loading broader table")
         self.broader_table = pd.read_csv(data_path / 'broader_table.csv')
+        self.logger.info("Loading member states table")
         self.member_states_table = pd.read_csv(data_path / 'member_states_table.csv')
         self.logger.info("Cached data loaded successfully.")
 

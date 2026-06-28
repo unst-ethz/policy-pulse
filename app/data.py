@@ -1,5 +1,4 @@
 import os
-import sys
 from typing import Any
 import pandas as pd
 
@@ -77,21 +76,21 @@ def _build_name_index(member_states_df: pd.DataFrame) -> dict[str, dict]:
                                                   abbreviations from the 'Other Names' column
         year_range:      tuple[int, int] | None - set only for retired ISOs (no active row)
     """
+    # A row is "currently active" if either:
+    #  (a) End date is NaN, OR
+    #  (b) it encodes multi-period membership where the final period is open
+    #      (more Start segments than End segments in the comma-separated strings,
+    #      e.g. KHM Cambodia: starts 1955/1975/1990, ends 1970/1976 -> third period is open).
+    def _is_active(row) -> bool:
+        if pd.isna(row["End date"]):
+            return True
+        return len(_parse_years(row["Start date"])) > len(_parse_years(row["End date"]))
+
     index: dict[str, dict] = {}
 
     for iso, group in member_states_df.groupby("ISO Code"):
         if not isinstance(iso, str) or not iso.strip():
             continue
-
-        # A row is "currently active" if either:
-        #  (a) End date is NaN, OR
-        #  (b) it encodes multi-period membership where the final period is open
-        #      (more Start segments than End segments in the comma-separated strings,
-        #      e.g. KHM Cambodia: starts 1955/1975/1990, ends 1970/1976 -> third period is open).
-        def _is_active(row) -> bool:
-            if pd.isna(row["End date"]):
-                return True
-            return len(_parse_years(row["Start date"])) > len(_parse_years(row["End date"]))
 
         active_mask = group.apply(_is_active, axis=1)
         active = group[active_mask]
