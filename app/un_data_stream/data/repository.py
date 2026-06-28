@@ -253,13 +253,13 @@ class DataRepository:
     
     # Columns present in resolution_table.csv that are NOT country vote columns.
     # Used by _read_resolution_table to determine which columns to read as categorical.
-    _RESOLUTION_META_COLS: set = {
+    _RESOLUTION_META_COLS: frozenset = frozenset({
         'undl_id', 'date', 'session', 'resolution', 'draft',
         'committee_report', 'meeting', 'title', 'agenda_title',
         'subjects', 'total_yes', 'total_no', 'total_abstentions',
         'total_non_voting', 'total_ms', 'undl_link', 'subject_id',
         'description', 'agenda', 'modality', 'source_dataset', 'consensus_score',
-    }
+    })
 
     @staticmethod
     def _read_resolution_table(path: Path) -> pd.DataFrame:
@@ -302,7 +302,7 @@ class DataRepository:
 
         self.logger.info("Loading precomputed vote data")
         pkl_path = data_path / 'precomputed_agreement_data.pkl'
-        with open(pkl_path, 'r+b') as f:
+        with open(pkl_path, 'rb') as f:
             try:
                 uncompressed = blosc2.decompress(f.read())
                 assert isinstance(uncompressed, bytes), "Decompressed data is not bytes"
