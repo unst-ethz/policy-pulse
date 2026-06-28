@@ -68,6 +68,28 @@
   }
 }
 
+/* Word cloud tab selector */
+.wc-tab-radio {
+  display: flex;
+  border-bottom: 1px solid #d1d5db;
+  margin-bottom: 4px;
+}
+
+.wc-tab-radio label {
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.wc-tab-radio label:has(input:checked) {
+  color: #1b3357;
+  border-bottom: 2px solid #1b3357;
+  font-weight: 600;
+}
+
+.wc-tab-radio label:hover {
+  color: #1b3357;
+}
+
 .desktop-only-dual-column {
   display: flex;
   flex-direction: row;

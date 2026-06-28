@@ -11,6 +11,7 @@ from typing import Dict, Any
 from ..fetchers.ga_fetcher import GAResolutionFetcher
 from ..fetchers.sc_fetcher import SCResolutionFetcher
 from ..fetchers.thesaurus_fetcher import ThesaurusFetcher
+from ..fetchers.member_states_fetcher import MemberStatesFetcher
 from ..core.abstractions import DatasetFetcher
 
 
@@ -27,6 +28,9 @@ class DataFetcher:
         
         # Thesaurus fetcher (separate from datasets)
         self.thesaurus_fetcher = ThesaurusFetcher(logger)
+
+        # Member-state authority list fetcher (separate from datasets)
+        self.member_states_fetcher = MemberStatesFetcher(logger)
     
     def _register_default_fetchers(self):
         """Register default dataset fetchers."""
@@ -60,5 +64,13 @@ class DataFetcher:
         thesaurus_config = self.config['data_sources'].get('thesaurus')
         if not thesaurus_config:
             raise ValueError("No thesaurus configuration found")
-        
+
         return self.thesaurus_fetcher.fetch(thesaurus_config)
+
+    def fetch_member_states(self):
+        """Fetch member-state authority list."""
+        member_states_config = self.config['data_sources'].get('member_states')
+        if not member_states_config:
+            raise ValueError("No member_states configuration found")
+
+        return self.member_states_fetcher.fetch(member_states_config)

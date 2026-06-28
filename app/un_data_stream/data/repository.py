@@ -32,6 +32,7 @@ class DataRepository:
         self.resolution_subject_table: pd.DataFrame
         self.subject_table: pd.DataFrame
         self.closure_table: pd.DataFrame
+        self.member_states_table: pd.DataFrame
 
         # Load configuration
         self._load_config()
@@ -93,6 +94,7 @@ class DataRepository:
             'closure': self.closure_table,
             'broader': self.broader_table,
             'country_columns': self.country_columns,
+            'member_states': self.member_states_table,
             'multilateral_scores': self.multilateral_scores,
             'vote_bool_arrays': self.vote_bool_arrays,
         }
@@ -187,6 +189,16 @@ class DataRepository:
                 self.logger.error(f"Failed to resolve/check URL for thesaurus: {e}")
                 all_valid = False
 
+        # 3. Check Member States
+        member_states_config = self.config['data_sources'].get('member_states')
+        if member_states_config:
+            try:
+                url = fetcher_orchestrator.member_states_fetcher.resolve_url(member_states_config)
+                self.logger.info(f"Successfully resolved URL for member_states: {url}")
+            except Exception as e:
+                self.logger.error(f"Failed to resolve/check URL for member_states: {e}")
+                all_valid = False
+
         return all_valid
     
     def _has_cached_data(self) -> bool:
@@ -198,6 +210,7 @@ class DataRepository:
             'subject_table.csv',
             'closure_table.csv',
             'broader_table.csv',
+            'member_states_table.csv',
             'precomputed_agreement_data.pkl'
         ]
         all_exist = all((data_path / file).exists() for file in required_files)
@@ -283,6 +296,9 @@ class DataRepository:
         self.closure_table = pd.read_csv(data_path / 'closure_table.csv')
         self.logger.info("Loading broader table")
         self.broader_table = pd.read_csv(data_path / 'broader_table.csv')
+        self.logger.info("Loading member states table")
+        self.member_states_table = pd.read_csv(data_path / 'member_states_table.csv')
+        self.logger.info("Cached data loaded successfully.")
 
         self.logger.info("Loading precomputed vote data")
         pkl_path = data_path / 'precomputed_agreement_data.pkl'
@@ -329,6 +345,7 @@ class DataRepository:
         self.subject_table.to_csv(data_path / 'subject_table.csv', index=False)
         self.closure_table.to_csv(data_path / 'closure_table.csv', index=False)
         self.broader_table.to_csv(data_path / 'broader_table.csv', index=False)
+        self.member_states_table.to_csv(data_path / 'member_states_table.csv', index=False)
 
         pkl_path = data_path / 'precomputed_agreement_data.pkl'
         with open(pkl_path, 'wb') as f:
@@ -356,6 +373,7 @@ class DataRepository:
         fetcher = DataFetcher(self.config, self.logger)
         resolutions_raw = fetcher.fetch_resolutions()
         thesaurus_graph = fetcher.fetch_thesaurus()
+        self.member_states_table = fetcher.fetch_member_states()
 
         # Process data
         processor = DataProcessor(self.config, self.logger)
