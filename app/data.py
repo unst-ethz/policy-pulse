@@ -1,10 +1,12 @@
-import os
+from pathlib import Path
 from typing import Any
+
 import pandas as pd
 
 from .un_data_stream import DataRepository, ResolutionQueryEngine
 
-repo = DataRepository(config_path="config/data_sources.yaml")
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+repo = DataRepository(config_path=str(_PROJECT_ROOT / "config" / "data_sources.yaml"))
 query_engine = ResolutionQueryEngine(repo=repo)
 
 available_countries = query_engine.get_available_countries()

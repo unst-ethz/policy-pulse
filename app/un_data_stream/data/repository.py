@@ -75,9 +75,6 @@ class DataRepository:
             f"Broader Table: {self.broader_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
         )
         self.logger.info(
-            f"Agreement Matrices: {sum(map(lambda x: x[1].nbytes / (1024**2), self.agreement_matrices.items()))} MB"
-        )
-        self.logger.info(
             f"Multilateral Scores: {self.multilateral_scores.nbytes / (1024**2):.2f} MB"
         )
 
@@ -86,7 +83,6 @@ class DataRepository:
 
         Keys:
             resolution, resolution_subject, subject, closure, broader — pd.DataFrames
-            agreement_matrices  — Dict[undl_id, (C x C) np.ndarray]
             country_columns     — List[str] of ISO3 country codes (length C)
             multilateral_scores — (R x C) np.ndarray, float32
             vote_bool_arrays    — 4-tuple of (R x C) bool arrays (yes, no, abstained, voted)
@@ -97,7 +93,6 @@ class DataRepository:
             'subject': self.subject_table,
             'closure': self.closure_table,
             'broader': self.broader_table,
-            'agreement_matrices': self.agreement_matrices,
             'country_columns': self.country_columns,
             'member_states': self.member_states_table,
             'multilateral_scores': self.multilateral_scores,
@@ -108,6 +103,12 @@ class DataRepository:
         """Load configuration from YAML file."""
         with open(self.config_path, 'r') as file:
             self.config = yaml.safe_load(file)
+
+        # Resolve relative paths in config relative to project root (parent of config dir)
+        project_root = Path(self.config_path).resolve().parent.parent
+        for key, val in self.config.get('paths', {}).items():
+            if not Path(val).is_absolute():
+                self.config['paths'][key] = str(project_root / val)
 
     def _setup_logging(self):
         """Setup logging configuration with file and console handlers."""
@@ -250,6 +251,35 @@ class DataRepository:
              self.logger.error(f"Error checking data version: {e}")
              return False
     
+    # Columns present in resolution_table.csv that are NOT country vote columns.
+    # Used by _read_resolution_table to determine which columns to read as categorical.
+    _RESOLUTION_META_COLS: frozenset = frozenset({
+        'undl_id', 'date', 'session', 'resolution', 'draft',
+        'committee_report', 'meeting', 'title', 'agenda_title',
+        'subjects', 'total_yes', 'total_no', 'total_abstentions',
+        'total_non_voting', 'total_ms', 'undl_link', 'subject_id',
+        'description', 'agenda', 'modality', 'source_dataset', 'consensus_score',
+    })
+
+    @staticmethod
+    def _read_resolution_table(path: Path) -> pd.DataFrame:
+        """Read resolution_table.csv with vote columns as CategoricalDtype.
+
+        Uses a two-pass strategy: the first pass reads only the header row to
+        discover which columns are vote columns; the second pass reads the full
+        file with an explicit dtype map so pandas never allocates the
+        intermediate object arrays.  This reduces both steady-state memory
+        (int8 codes instead of object pointers) and peak memory during load.
+        """
+        vote_dtype = pd.CategoricalDtype(categories=["Y", "N", "A", "X"], ordered=False)
+        header = pd.read_csv(path, nrows=0).columns.tolist()
+        dtype_map = {
+            c: vote_dtype
+            for c in header
+            if c not in DataRepository._RESOLUTION_META_COLS
+        }
+        return pd.read_csv(path, dtype=dtype_map, low_memory=False)
+
     def _load_cached_data(self):
         """Load cached data files into DataFrames."""
         data_path = Path(self.config['paths']['data'])
@@ -257,7 +287,7 @@ class DataRepository:
 
         # Load CSV files
         self.logger.info("Loading resolution table")
-        self.resolution_table = pd.read_csv(data_path / 'resolution_table.csv')
+        self.resolution_table = self._read_resolution_table(data_path / 'resolution_table.csv')
         self.logger.info("Loading resolution subject table")
         self.resolution_subject_table = pd.read_csv(data_path / 'resolution_subject_table.csv')
         self.logger.info("Loading subject table")
@@ -270,10 +300,9 @@ class DataRepository:
         self.member_states_table = pd.read_csv(data_path / 'member_states_table.csv')
         self.logger.info("Cached data loaded successfully.")
 
-        self.logger.info("Loading agreement matrices")
-        # Load full vote-agreement matrices
+        self.logger.info("Loading precomputed vote data")
         pkl_path = data_path / 'precomputed_agreement_data.pkl'
-        with open(pkl_path, 'r+b') as f:
+        with open(pkl_path, 'rb') as f:
             try:
                 uncompressed = blosc2.decompress(f.read())
                 assert isinstance(uncompressed, bytes), "Decompressed data is not bytes"
@@ -301,7 +330,6 @@ class DataRepository:
         if 'multilateral_scores' not in agreement_data or 'vote_bool_arrays' not in agreement_data:
             raise KeyError("Cached pkl is stale (missing multilateral_scores or vote_bool_arrays) — rebuild required.")
 
-        self.agreement_matrices = agreement_data['agreement_matrices']
         self.country_columns = agreement_data['country_columns']
         self.multilateral_scores = agreement_data['multilateral_scores']
         self.vote_bool_arrays = agreement_data['vote_bool_arrays']
@@ -322,7 +350,6 @@ class DataRepository:
         pkl_path = data_path / 'precomputed_agreement_data.pkl'
         with open(pkl_path, 'wb') as f:
             compressed = blosc2.compress(pickle.dumps({
-                'agreement_matrices': self.agreement_matrices,
                 'country_columns': self.country_columns,
                 'multilateral_scores': self.multilateral_scores,
                 'vote_bool_arrays': self.vote_bool_arrays,
@@ -368,9 +395,8 @@ class DataRepository:
         # Normalize ga_resolutions
         self.resolution_table, self.resolution_subject_table = processor.normalize_resolutions(ga_resolutions)
 
-        # Calculate agreement data for all resolutions
+        # Calculate consensus scores and compact vote arrays for all resolutions
         (
-            self.agreement_matrices,
             consensus_scores,
             self.country_columns,
             self.multilateral_scores,
