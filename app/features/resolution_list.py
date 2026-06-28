@@ -1,37 +1,47 @@
 from dash import callback, Input, Output, State, html, dcc
 import pandas as pd
 from .. import data
-from pathlib import Path
-
-cwd = Path(__file__).resolve().parent
-file_path = cwd.parent / "assets" / "joining_dates.csv"
-joining_dates = pd.read_csv(file_path)
 
 
-PAGE_SIZE = 10
-LOAD_MORE_SIZE = 50
+_PAGE_SIZE = 10
+_LOAD_MORE_SIZE = 50
+_NO_FILTER = "NO_FILTER"
+
+VOTE_MAP = {
+    "Y": {"symbol": "✓", "color": "#2ecc71", "label": "Yes"},           # green checkmark
+    "N": {"symbol": "✗", "color": "#e74c3c", "label": "No"},            # red 'x'
+    "A": {"symbol": "●", "color": "#f39c12", "label": "Abstain"},       # yellow dot
+    "X": {"symbol": "–", "color": "#999",    "label": "Did not vote"},  # grey hyphen
+}
+_VOTE_NA = {"symbol": "·", "color": "#ccc", "label": "Non-member / no data"}  # tiny grey dot
+
+
+def create_vote_summary(yes_count, no_count, abstain_count):
+    def fmt(n):
+        return str(int(n)) if pd.notna(n) else "–"
+    items = [("Yes", yes_count), ("No", no_count), ("Abstain", abstain_count)]
+    inner = " · ".join(f"{label}: {fmt(count)}" for label, count in items)
+    return html.Span(
+        f"({inner})",
+        style={"fontSize": "0.9em", "marginLeft": "12px", "color": "#666"},
+    )
 
 
 def create_vote_indicator(country_name, vote):
-    VOTE_MAP = {
-        "Y": {"color": "green", "label": "Yes"},
-        "N": {"color": "red", "label": "No"},
-        "A": {"color": "orange", "label": "Abstain"},
-        "X": {"color": "blue", "label": "Not Voting"},
-    }
     if pd.isna(vote) or vote not in VOTE_MAP:
+        config = _VOTE_NA
         return html.Span(
             [
-            html.Span("●", style={"marginRight": "4px"}),
-            html.Span(f"{country_name}"),
-        ],
-            style={"color": "#999", "marginRight": "15px", "fontSize": "0.9em"},
+                html.Span(config["symbol"], style={"marginRight": "4px", "color": config["color"]}),
+                html.Span(country_name),
+            ],
+            style={"color": "#bbb", "marginRight": "15px", "fontSize": "0.9em"},
         )
     config = VOTE_MAP[vote]
     return html.Span(
         [
-            html.Span("●", style={"color": config["color"], "marginRight": "4px"}),
-            html.Span(f"{country_name}"),
+            html.Span(config["symbol"], style={"color": config["color"], "marginRight": "4px", "fontWeight": "bold"}),
+            html.Span(country_name),
         ],
         style={"fontWeight": "500", "marginRight": "15px", "fontSize": "0.9em"},
     )
@@ -56,23 +66,25 @@ layout = [
                             "borderRadius": "8px",
                         },
                         children=[
-                            # Sort by date (always visible)
+                            # Sort by dropdown
                             html.Div(
                                 [
                                     html.Label(
-                                        "Sort by Date:",
+                                        "Sort by:",
                                         style={"fontWeight": "bold", "marginRight": "10px"},
                                     ),
                                     dcc.Dropdown(
                                         id="rl-sort-dropdown",
                                         options=[
-                                            {"label": "Newest First", "value": "desc"},
-                                            {"label": "Oldest First", "value": "asc"},
+                                            {"label": "Date (Newest First)", "value": "date_desc"},
+                                            {"label": "Date (Oldest First)", "value": "date_asc"},
+                                            {"label": "Consensus Score (Highest First)", "value": "consensus_desc"},
+                                            {"label": "Consensus Score (Lowest First)", "value": "consensus_asc"},
                                         ],
-                                        value="desc",
+                                        value="date_desc",
                                         clearable=False,
                                         style={
-                                            "width": "180px",
+                                            "width": "300px",
                                             "display": "inline-block",
                                             "verticalAlign": "middle",
                                         },
@@ -92,13 +104,13 @@ layout = [
                                     dcc.Dropdown(
                                         id="rl-vote-filter",
                                         options=[
-                                            {"label": "Show All", "value": "NO_FILTER"},
+                                            {"label": "Show All", "value": _NO_FILTER},
                                             {"label": "Yes", "value": "Y"},
                                             {"label": "No", "value": "N"},
                                             {"label": "Abstain", "value": "A"},
-                                            {"label": "Not Voting", "value": "X"},
+                                            {"label": "Did not vote", "value": "X"},
                                         ],
-                                        value="NO_FILTER",
+                                        value=_NO_FILTER,
                                         clearable=False,
                                         style={
                                             "width": "180px",
@@ -121,7 +133,7 @@ layout = [
                                     dcc.Dropdown(
                                         id="rl-agreement-dropdown",
                                         options=[
-                                            {"label": "Show All", "value": "NO_FILTER"},
+                                            {"label": "Show All", "value": _NO_FILTER},
                                             {"label": "Agreed (Voted Same)", "value": "AGREED"},
                                             {
                                                 "label": "Disagreed (Voted Differently)",
@@ -132,7 +144,7 @@ layout = [
                                                 "value": "STRONGLY_DISAGREED",
                                             },
                                         ],
-                                        value="NO_FILTER",
+                                        value=_NO_FILTER,
                                         clearable=False,
                                         style={
                                             "width": "250px",
@@ -145,8 +157,6 @@ layout = [
                             ),
                         ],
                     ),
-                    # Placeholder or info text when multiple countries selected?
-                    # Making it empty if not single country usually looks cleaner.
                     html.Div(
                         id="rl-multi-country-msg",
                         style={
@@ -157,23 +167,17 @@ layout = [
                     ),
                 ],
                 style={"marginBottom": "20px", "minHeight": "5px"},
-            ),  # Keep some space
+            ),
             # --- Vote Legend ---
             html.Div(
                 [
                     html.Span("Vote key:", style={"fontWeight": "bold", "marginRight": "12px", "fontSize": "0.85em", "color": "#555"}),
                     *[
                         html.Span(
-                            [html.Span("●", style={"color": color, "marginRight": "4px"}), label],
+                            [html.Span(v["symbol"], style={"color": v["color"], "marginRight": "4px", "fontWeight": "bold"}), v["label"]],
                             style={"fontSize": "0.85em", "marginRight": "14px"},
                         )
-                        for color, label in [
-                            ("green", "Yes"),
-                            ("red", "No"),
-                            ("orange", "Abstain"),
-                            ("blue", "Not Voting"),
-                            ("#999", "N/A"),
-                        ]
+                        for v in [*VOTE_MAP.values(), _VOTE_NA]
                     ],
                 ],
                 style={
@@ -230,17 +234,16 @@ def register_callbacks():
         Output("rl-vote-filter-wrapper", "style"),
         Output("rl-multi-country-msg", "children"),
         Output("rl-multi-country-msg", "style"),
-        Input(
-            "filter-component-filter-store", "data"
-        ),  # Global Filter PARAMETERS (Start, End, Subject, Country1, Country2)
-        Input("rl-agreement-dropdown", "value"),  # Local Filter (Conditional)
-        Input("rl-vote-filter", "value"),  # Vote filter (main country only)
-        Input("rl-load-more-btn", "n_clicks"),  # Pagination
-        Input("rl-sort-dropdown", "value"),  # Date sort order
-        State("country1-iso-alpha3", "data"),  # Current Main Country (fallback)
+        Input("filter-component-data-store", "data"),
+        Input("filter-component-filter-store", "data"),
+        Input("rl-agreement-dropdown", "value"),
+        Input("rl-vote-filter", "value"),
+        Input("rl-load-more-btn", "n_clicks"),
+        Input("rl-sort-dropdown", "value"),
+        State("country1-iso-alpha3", "data"),
     )
     def update_resolution_list(
-        filter_params, agreement_filter, vote_filter, n_clicks, sort_order, country1_backup
+        data_store, filter_params, agreement_filter, vote_filter, n_clicks, sort_order, country1_backup
     ):
         # Default Styles
         btn_style_hidden = {"display": "none"}
@@ -252,7 +255,7 @@ def register_callbacks():
             "cursor": "pointer",
         }
 
-        if not filter_params:
+        if not data_store or not filter_params:
             return (
                 html.Div("Loading...", style={"padding": "20px"}),
                 "",
@@ -264,10 +267,6 @@ def register_callbacks():
             )
 
         # Extract Params
-        start_date = filter_params.get("start_date")
-        end_date = filter_params.get("end_date")
-        subject_ids = filter_params.get("subject_ids")
-        # Try both the params and backup store for country1, but allow it to be None
         country1 = filter_params.get("country1_alpha3") or country1_backup
 
         # Extract comparison countries (can be list, string or None)
@@ -300,53 +299,25 @@ def register_callbacks():
             # Show vote filter only when main country is selected with no comparison countries
             vote_filter_style = {"display": "flex", "alignItems": "center"}
 
-        # 1. Query Data
+        # 1. Load pre-filtered resolutions from the shared data store,
+        #    then join vote columns from the resolution table for display.
         try:
-            underlying_countries = []
-            for i in comparison_countries:
-                underlying_countries.append(i)
-            if country1:
-                underlying_countries.append(country1)
-            if len(underlying_countries) == 0:
-                df = data.query_engine.query_resolutions(
-                    start_date=start_date,
-                    end_date=end_date,
-                    subject_ids=subject_ids,
-                    include_descendants=True,
-                )
-            else:
-                min_starting_date = min_starting_date = joining_dates[joining_dates['country'] == underlying_countries[0]]['min_date'].to_list()[0]
-                max_ending_date = joining_dates[joining_dates['country'] == underlying_countries[0]]['max_date'].to_list()[0]
-                for c in underlying_countries:
-                    if (
-                        joining_dates[joining_dates["country"] == c][
-                            "min_date"
-                        ].to_list()[0]
-                        < min_starting_date
-                    ):
-                        min_starting_date = joining_dates[
-                            joining_dates["country"] == c
-                        ]["min_date"].to_list()[0]
-                if (
-                        joining_dates[joining_dates["country"] == c][
-                            "max_date"
-                        ].to_list()[0]
-                        > max_ending_date
-                    ):
-                        max_ending_date = joining_dates[
-                            joining_dates["country"] == c
-                        ]["max_date"].to_list()[0]
-                df = data.query_engine.query_resolutions(
-                    start_date=start_date
-                    if min_starting_date < start_date
-                    else min_starting_date,
-                    end_date=end_date if max_ending_date > end_date else max_ending_date,
-                    subject_ids=subject_ids,
-                    include_descendants=True,
-                )
+            df = pd.read_json(data_store, orient="split")
+
+            # Join vote columns for country1 + comparison countries
+            vote_cols_needed = [c for c in ([country1] + comparison_countries) if c]
+            if vote_cols_needed and not df.empty:
+                res_table = data.query_engine.resolution_table
+                available = [c for c in vote_cols_needed if c in res_table.columns]
+                if available:
+                    vote_df = res_table.loc[
+                        res_table["undl_id"].isin(df["undl_id"]), ["undl_id"] + available
+                    ]
+                    df = df.merge(vote_df, on="undl_id", how="left")
+
         except Exception as e:
             return (
-                html.Div(f"Error querying data: {e}", style={"color": "red"}),
+                html.Div(f"Error loading data: {e}", style={"color": "red"}),
                 "",
                 btn_style_hidden,
                 agreement_container_style,
@@ -368,17 +339,19 @@ def register_callbacks():
                 multi_msg_style,
             )
 
-        # Keyword search: OR logic across comma-separated phrases
-        keyword = filter_params.get("keyword")
-        if keyword and keyword.strip():
-            from . import wordcloud_interactive  # lazy import to avoid circular dependency
-            matched_ids = wordcloud_interactive.get_keyword_matched_ids(df, keyword)
-            df = df[df["undl_id"].isin(matched_ids)]
+        # 2. Filter & Sort Logic
+        if sort_order == "date_asc":
+            sort_by, ascending = "date", True
+        elif sort_order == "consensus_desc":
+            sort_by, ascending = "consensus_score", False
+        elif sort_order == "consensus_asc":
+            sort_by, ascending = "consensus_score", True
+        else:  # Default to date_desc
+            sort_by, ascending = "date", False
+        
+        filtered_df = df.copy().sort_values(sort_by, ascending=ascending, na_position="last")
 
-        # 2. Filter Logic
-        filtered_df = df.copy().sort_values("date", ascending=(sort_order == "asc"), na_position="last")
-
-        if country1 and show_agreement_filter and agreement_filter != "NO_FILTER":
+        if country1 and show_agreement_filter and agreement_filter != _NO_FILTER:
             c2 = comparison_countries[0]
             if country1 in filtered_df.columns and c2 in filtered_df.columns:
                 filtered_df = filtered_df.dropna(subset=[country1, c2])
@@ -391,14 +364,14 @@ def register_callbacks():
                     cond2 = (filtered_df[country1] == "N") & (filtered_df[c2] == "Y")
                     filtered_df = filtered_df[cond1 | cond2]
 
-        if country1 and not comparison_countries and vote_filter and vote_filter != "NO_FILTER":
+        if country1 and not comparison_countries and vote_filter and vote_filter != _NO_FILTER:
             if country1 in filtered_df.columns:
                 filtered_df = filtered_df[filtered_df[country1] == vote_filter]
 
         total_count = len(filtered_df)
 
         # 3. Pagination
-        current_limit = PAGE_SIZE + ((n_clicks or 0) * LOAD_MORE_SIZE)
+        current_limit = _PAGE_SIZE + ((n_clicks or 0) * _LOAD_MORE_SIZE)
         display_df = filtered_df.head(current_limit)
         shown_count = len(display_df)
 
@@ -411,16 +384,25 @@ def register_callbacks():
 
         cards = []
         for _, row in display_df.iterrows():
-            # Basic Info
             res_id = row.get("resolution", "N/A")
             link = row.get("undl_link", "#")
             date_val = row.get("date")
             date_str = (
-                date_val.strftime("%Y-%m-%d") if pd.notnull(date_val) else "Unknown"
+                date_val.strftime("%d %b %Y") if pd.notna(date_val) else "Unknown"
             )
+            session_val = row.get("session", "")
+            session_str = f"Session {session_val}" if session_val else ""
             title = row.get("title", "Untitled")
+            consensus_score = row.get("consensus_score")
 
-            # Vote Indicators
+            consensus_display = f"{consensus_score:.2f}" if pd.notna(consensus_score) else "N/A"
+
+            vote_summary = create_vote_summary(
+                row.get("total_yes"),
+                row.get("total_no"),
+                row.get("total_abstentions"),
+            )
+
             indicators = []
 
             # Main Country (only if selected)
@@ -432,7 +414,7 @@ def register_callbacks():
 
             # Comparators (all selected countries)
             for c2 in comparison_countries:
-                if c2 in row:
+                if c2 in filtered_df.columns:
                     indicators.append(
                         create_vote_indicator(data.get_country_name(c2), row.get(c2))
                     )
@@ -445,7 +427,7 @@ def register_callbacks():
                                 [
                                     html.A(
                                         html.Span(
-                                            f"{res_id}",
+                                            res_id,
                                             style={"color": "#007bff", "fontWeight": "bold"},
                                         ),
                                         href=link,
@@ -460,8 +442,25 @@ def register_callbacks():
                                             "marginLeft": "12px",
                                         },
                                     ),
+                                    html.Span(
+                                        session_str,
+                                        style={
+                                            "color": "#666",
+                                            "fontSize": "0.9em",
+                                            "marginLeft": "12px",
+                                        },
+                                    ) if session_str else None,
+                                    html.Span(
+                                        f"Consensus score: {consensus_display}",
+                                        style={
+                                            "color": "#666" if pd.notna(consensus_score) else "#999",
+                                            "fontSize": "0.9em",
+                                            "marginLeft": "12px",
+                                        },
+                                    ),
+                                    vote_summary,
                                 ],
-                                style={"marginBottom": "0.5rem"},
+                                style={"marginBottom": "0.5rem", "display": "flex", "alignItems": "center", "flexWrap": "wrap"},
                             ),
                             html.Div(title),
                         ],

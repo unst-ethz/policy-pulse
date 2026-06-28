@@ -3,7 +3,11 @@ import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
 from io import StringIO
+import  plotly.express as px
 from ..data import get_country_name
+
+
+_SPECIAL_SESSION_COLOUR = 'black'
 
 
 def register_callbacks():
@@ -16,9 +20,10 @@ def register_callbacks():
         [
             Input("filter-component-filter-store", "data"),
             Input("moving-average-data", "data"),
+            Input("special-sessions-radio", "value"),
         ],
     )
-    def generate_chart(filter_store, session_data):
+    def generate_chart(filter_store, session_data, special_sessions):
         if session_data is None or not filter_store:
             return go.Figure(), html.Div("No data"), ""
 
@@ -33,8 +38,12 @@ def register_callbacks():
         # detect special/emergency sessions (contain "sp" e.g. "1sp", "7emsp")
         is_special = df["session"].astype(str).str.contains("sp", case=False, na=False)
 
+        if not special_sessions:
+            df = df[~is_special]
+            is_special = is_special[~is_special]
+
         fig = go.Figure()
-        colors = ["blue", "orange", "green", "purple", "brown", "pink", "gray", "olive", "cyan", "teal"]
+        colors = px.colors.qualitative.D3
         for i, c in enumerate(selected):
             avg_col = f"avg_agreement_{c}"
             n_col = f"n_votes_{c}"
@@ -52,8 +61,8 @@ def register_callbacks():
                 df_c[n_col].values if n_col in df_c.columns else np.zeros(len(df_c)),
             ])
 
-            # per-point marker colors: red for special sessions, country color otherwise
-            marker_colors = ["red" if s else country_color for s in special_c]
+            # per-point marker colors
+            marker_colors = [_SPECIAL_SESSION_COLOUR if s else country_color for s in special_c]
 
             fig.add_trace(
                 go.Scatter(
@@ -78,7 +87,7 @@ def register_callbacks():
             title=f"Agreement: {get_country_name(country1)} vs {', '.join([get_country_name(c) for c in selected])}",
             xaxis_title="Year",
             yaxis_title="Agreement Score",
-            yaxis=dict(range=[0, 1]),
+            yaxis=dict(range=[-0.03, 1.06]),
             template="plotly_white",
         )
 
@@ -98,10 +107,11 @@ def register_callbacks():
             "and the selected comparison countries per UN General Assembly session. "
             "Each point represents the mean agreement score across all resolutions in that session "
             "where both countries voted. An agreement score of 1 means identical votes on all resolutions; "
-            '0 means complete disagreement ("yes" vs. "no"). '
+            '0 means complete disagreement (Yes vs. No). '
             "Only sessions with at least 3 shared votes are shown. "
-            "Red dots indicate special or emergency sessions. "
-            "The data only covers GA resolutions that were passed (accepted)."
+            "Black dots indicate special and emergency sessions; excluded by default "
+            "(use the checkbox above to include them). "
+            "The data only covers GA resolutions that were passed."
         ], style={
             "maxWidth": "100%",
             "margin": "0 0 0 0",
@@ -120,9 +130,23 @@ def register_callbacks():
 layout = [
     html.Div(
         [
+            html.Div(
+                dcc.Checklist(
+                    id="special-sessions-radio",
+                    options=[{"label": " Include special / emergency sessions", "value": "include"}],
+                    value=[],
+                    style={"fontSize": "14px", "color": "#555"},
+                ),
+                style={"padding": "4px 0 8px 0"},
+            ),
             html.Div(id="agreement-chart-status"),
             dcc.Loading(
-                children=[dcc.Graph(id="agreement-chart", style={"height": "600px"})],
+                children=[
+                    dcc.Graph(
+                        id="agreement-chart",
+                        style={"height": "600px", "width": "100%"},
+                    )
+                ],
                 type="cube",
                 color="#3498db",
             ),
