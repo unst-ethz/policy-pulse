@@ -99,7 +99,7 @@ class DataRepository:
             'broader': self.broader_table,
             'agreement_matrices': self.agreement_matrices,
             'country_columns': self.country_columns,
-            'member_states': self.member_states_table
+            'member_states': self.member_states_table,
             'multilateral_scores': self.multilateral_scores,
             'vote_bool_arrays': self.vote_bool_arrays,
         }
