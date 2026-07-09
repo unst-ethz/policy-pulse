@@ -3,6 +3,8 @@ import functools
 from dash import Input, Output, callback, html
 import pandas as pd
 
+from app.features.resolution_list import create_vote_summary
+
 from .. import data
 
 INITIAL_VISIBLE = 3
@@ -84,6 +86,17 @@ def _build_resolution_card(row):
     abstain_count = _safe_count(row.get("total_abstentions", 0))
     not_voting_count = _safe_count(row.get("total_non_voting", 0))
     total_ms = _safe_count(row.get("total_ms", 0))
+    session_val = row.get("session", "")
+    session_str = f"Session {session_val}" if session_val else ""
+
+    consensus_score = row.get("consensus_score")
+    consensus_display = f"{consensus_score:.2f}" if pd.notna(consensus_score) else "N/A"
+
+    vote_summary = create_vote_summary(
+        row.get("total_yes"),
+        row.get("total_no"),
+        row.get("total_abstentions"),
+    )
 
     y_pct = _safe_pct(yes_count, total_ms)
     n_pct = _safe_pct(no_count, total_ms)
@@ -94,76 +107,69 @@ def _build_resolution_card(row):
         [
             html.Div(
                 [
-                    html.Span(date_str, style={"color": "#666", "fontSize": "0.9em"}),
-                    html.A(
-                        html.Span(
-                            f"{res_id}",
-                            style={
-                                "color": "#007bff",
-                                "fontWeight": "600",
-                                "fontSize": "1.05em",
-                            },
-                        ),
-                        href=link,
-                        target="_blank",
-                        style={"textDecoration": "none"},
+                    html.Div(
+                        [
+                            html.A(
+                                html.Span(
+                                    res_id,
+                                    style={"color": "#007bff", "fontWeight": "bold"},
+                                ),
+                                href=link,
+                                target="_blank",
+                                style={"textDecoration": "none"},
+                            ),
+                            html.Span(
+                                date_str,
+                                style={
+                                    "color": "#666",
+                                    "fontSize": "0.9em",
+                                    "marginLeft": "12px",
+                                },
+                            ),
+                            html.Span(
+                                session_str,
+                                style={
+                                    "color": "#666",
+                                    "fontSize": "0.9em",
+                                    "marginLeft": "12px",
+                                },
+                            )
+                            if session_str
+                            else None,
+                            html.Span(
+                                f"Consensus score: {consensus_display}",
+                                style={
+                                    "color": "#666"
+                                    if pd.notna(consensus_score)
+                                    else "#999",
+                                    "fontSize": "0.9em",
+                                    "marginLeft": "12px",
+                                },
+                            ),
+                            vote_summary,
+                        ],
+                        style={
+                            "marginBottom": "0.5rem",
+                            "display": "flex",
+                            "alignItems": "center",
+                            "flexWrap": "wrap",
+                        },
+                    ),
+                    html.Div(title),
+                    html.Div(
+                        category_tag,
+                        style={
+                            "color": "#666",
+                            "fontSize": "0.75em",
+                            "marginTop": "0.5rem",
+                            "padding": "2px 6px",
+                            "borderRadius": "8px",
+                            "backgroundColor": "#dbebff",
+                            "width": "fit-content",
+                        },
                     ),
                 ],
-                style={
-                    "display": "flex",
-                    "justifyContent": "space-between",
-                    "alignItems": "center",
-                    "gap": "12px",
-                },
-            ),
-            html.Div(
-                title,
-                style={
-                    "marginTop": "6px",
-                    "marginBottom": "8px",
-                    "fontSize": "1.05em",
-                },
-            ),
-            html.Span(
-                category_tag,
-                style={
-                    "display": "inline-block",
-                    "marginBottom": "8px",
-                    "padding": "2px 8px",
-                    "fontSize": "0.8em",
-                    "fontWeight": "600",
-                    "color": "#1b3357",
-                    "backgroundColor": "#eaf1ff",
-                    "borderRadius": "999px",
-                },
-            ),
-            html.Div(
-                [
-                    html.Span(
-                        f"Yes: {yes_count} ({y_pct:.1f}%)",
-                        style={"color": "#1a7f37", "fontWeight": "500"},
-                    ),
-                    html.Span(
-                        f"No: {no_count} ({n_pct:.1f}%)",
-                        style={"color": "#cf222e", "fontWeight": "500"},
-                    ),
-                    html.Span(
-                        f"Abstain: {abstain_count} ({a_pct:.1f}%)",
-                        style={"color": "#9a6700", "fontWeight": "500"},
-                    ),
-                    html.Span(
-                        f"Not Voting: {not_voting_count} ({x_pct:.1f}%)",
-                        style={"color": "#0969da", "fontWeight": "500"},
-                    ),
-                ],
-                style={
-                    "display": "flex",
-                    "flexWrap": "wrap",
-                    "gap": "12px",
-                    "paddingTop": "8px",
-                    "borderTop": "1px solid #eee",
-                    "fontSize": "0.92em",
-                },
+                className="resolution-card-main",
             ),
         ],
         className="resolution-card",
