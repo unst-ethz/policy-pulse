@@ -6,10 +6,10 @@ This module handles fetching and parsing thesaurus data in RDF/TTL format.
 
 from io import BytesIO
 
-import requests
 from rdflib import Graph
 
 from ..core.abstractions import DatasetFetcher
+from ..core.web_utils import download_bytes
 
 
 class ThesaurusFetcher(DatasetFetcher):
@@ -20,10 +20,7 @@ class ThesaurusFetcher(DatasetFetcher):
         
         graph = Graph()
         
-        response = requests.get(url)
-        response.raise_for_status()
-
-        ttl_content = BytesIO(response.content)
+        ttl_content = BytesIO(download_bytes(url))
         self.logger.info(f"Downloaded thesaurus file successfully")
 
         graph.parse(ttl_content, format="turtle")

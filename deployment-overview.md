@@ -1,83 +1,79 @@
-# How Our Deployment Works
+# Deploying the React frontend and API
 
-## The Flow
+> **TEST ONLY:** The `policy-pulse-react` branch is an experimental migration for review and testing. These instructions document candidate deployment packaging, not an approved production release. Real-data validation remains required before any production cutover.
 
-```
-You push to main
-       ↓
-GitHub Actions builds a Docker image (~1-2 min)
-       ↓
-Watchtower (running on our VM) notices the new image
-       ↓
-Old container is removed, new one starts (Site goes down)
-       ↓
-App downloads and preprocesses data (~5 min)
-       ↓
-Site is up again
-```
+Policy Pulse now uses two independently built containers: an Nginx container serving React, and a FastAPI container running the existing scientific engine. The Compose frontend binds to loopback port 8050 by default, preserving the previous reverse-proxy destination. Only the frontend is exposed to the host.
 
----
+## Release process
 
-## Key Components
+Pull requests and branch pushes run the offline scientific/API suite, generated-schema check, frontend tests, browser journeys, and production container smoke test. Pushes to `main` or `stable` run the same checks before publishing two images:
 
-**GitHub Actions** — Automatically builds a Docker image whenever we push to `main` using the `Dockerfile`. The image contains our code and dependencies.
+- `ghcr.io/unst-ethz/policy-pulse/backend:<full-commit-sha>`
+- `ghcr.io/unst-ethz/policy-pulse/frontend:<full-commit-sha>`
 
-**Watchtower** — A service running on our VM that checks every 60 seconds if there's a new image. When it finds one, it pulls it and restarts the app.
+The workflow publishes versioned images. It does not change the VM or advance a floating `latest` tag. The previous single-container Watchtower deployment must be explicitly replaced with this Compose stack during a reviewed traffic cutover. Do not independently auto-update the two images.
 
-**Nginx** — A reverse proxy that sits in front of our app. It handles incoming web requests and forwards them to our Dash app. Can use Nginx to add SSL later.
+## Before switching traffic
 
-**Gunicorn** — The server that runs our Python app. We use the `--preload` flag, which loads the resolution data once, processes it and then spawns worker processes that share the processed data.
+1. Retain the old Compose configuration and running image digest for rollback.
+2. Use the same tested commit for both new image variables in `.env`, starting from `.env.example`.
+3. Prepare a trusted existing cache or let the backend fetch the configured UN sources. Its persistent volume includes `metadata.json`, processed CSVs and `precomputed_agreement_data.pkl`. Existing compatible 1.4 caches remain valid; the filename compatibility update does not change their formulas or force a rebuild.
+4. Verify the new stack on an unused local port, for example `POLICY_PULSE_PORT=18050 docker compose -p policy-pulse-candidate up -d`. With published images use `--no-build` after `docker compose pull`; for a local source build use `--build`.
+5. Wait for `/health/ready` to return HTTP 200. Check `/api/v1/overview` against the trusted snapshot and inspect representative resolution, map, timeline, subject, multilateral and profile results. Run the opt-in live integration suite against the same source/cache where feasible.
+6. Point the existing HTTPS reverse proxy at the candidate frontend only after these checks pass. Keep the old stack and its data until the new release is accepted.
 
----
+As of 2026-09-07, source-file listings were reachable from development, but direct UN file downloads returned empty HTTP 202 responses. Ingestion now rejects those responses explicitly. A successful warm-up using real data from the VM or an existing trusted cache is a required release gate; synthetic browser/container fixtures do not establish live-source readiness.
 
-## What Happens on Deploy
-
-When we push to `main`:
-1. The current container is removed
-2. A new container starts with the updated code
-3. The app redownloads and preprocesses all data from scratch
-4. **Site is unavailable for ~5 minutes** because of refetching and processing data
-
----
-
-## Checking Status
-
-Everything runs with Docker. To see what's happening on the VM:
+## Operations
 
 ```bash
-cd /opt/dash-app
+# Build and start locally; React is served through Nginx
+# Run from the repository root.
+docker compose up --build -d
 
-# View logs for the app
-docker compose logs -f app
+# The process can be alive while its dataset is still loading.
+curl --fail http://127.0.0.1:8050/health/live
+curl --fail http://127.0.0.1:8050/health/ready
+curl --fail http://127.0.0.1:8050/api/v1/overview
 
-# View logs for everything
-docker compose logs -f
+docker compose logs --tail=100 backend
+docker compose logs --tail=100 frontend
+docker compose ps
 ```
 
----
+The initial warm-up may take several minutes. Subsequent restarts reuse the data volume. `docker compose down` preserves named volumes; do not add `-v` to normal restart or rollback commands.
 
-## Code Requirement
+Both containers run as non-root. The Python image does not include Dash, notebooks, test fixtures, or frontend build tools. The browser makes same-origin API requests; a separate-origin installation must explicitly set `POLICY_PULSE_CORS_ORIGINS`. Keep TLS termination on the existing external reverse proxy. Nginx returns the SPA shell for application deep links and returns 404 for missing hashed assets. API responses are never cached as static files.
 
-Your Dash app must expose the server object for Gunicorn:
-```python
-app = dash.Dash(__name__)
-server = app.server  # ← Required for deployment
+There is one API worker by default, with bounded concurrency. Each additional process/replica loads its own snapshot; measure memory before increasing workers. Startup initialization is serialized using a file lock. Readiness stays false if data is unavailable or inconsistent. Monitor readiness externally; Docker health status alone does not automatically restart an unhealthy process.
+
+## Refreshing data
+
+Data is a versioned deployment input. To update it without damaging the active cache:
+
+1. Build and validate a fresh snapshot in a separate directory/volume using `POLICY_PULSE_DATA_DIR=/absolute/new-snapshot .venv/bin/python -m backend.provider` from a network environment with source-file access.
+2. Review changes in date coverage, counts, country authority names and subject metadata, and run scientific parity tests.
+3. Start the candidate API against that snapshot and verify readiness.
+4. Roll out the candidate with both matching image versions. Keep the previous snapshot for rollback.
+
+The API exposes no administrative or public refresh endpoint. Source selection is controlled by `config/data_sources.yaml`; scientific definition changes require a separate review.
+
+## Rollback
+
+Restore both previous image tags/digests and the previous compatible data snapshot, start them on the candidate port, confirm readiness, then restore the proxy target. A cache copied from an unknown source is unsafe because the legacy scientific cache contains a pickle; accept only trusted project snapshots.
+
+## Isolated container smoke test
+
+This test uses labeled synthetic records and does not exercise the UN network:
+
+```bash
+.venv/bin/python -m tests.support.export_cache /tmp/policy-pulse-smoke-data
+chmod -R a+rwX /tmp/policy-pulse-smoke-data
+POLICY_PULSE_TEST_CACHE=/tmp/policy-pulse-smoke-data POLICY_PULSE_PORT=18050 \
+  docker compose -p policy-pulse-smoke -f compose.yaml -f compose.test.yaml up --build --wait
+.venv/bin/python -m tests.support.smoke_stack http://127.0.0.1:18050
+POLICY_PULSE_TEST_CACHE=/tmp/policy-pulse-smoke-data POLICY_PULSE_PORT=18050 \
+  docker compose -p policy-pulse-smoke -f compose.yaml -f compose.test.yaml down
 ```
 
-Without this line, the deployment will fail.
-
----
-
-## File Locations
-
-All Docker configuration lives on the VM at:
-```
-/opt/dash-app/
-```
-
----
-
-## Next Steps
-
-- [ ] Add SSL/HTTPS for security
-- [ ] Configure firewall
+Never use `compose.test.yaml` or the generated synthetic cache in a real deployment.

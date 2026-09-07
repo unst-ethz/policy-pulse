@@ -1,12 +1,29 @@
 import logging
 import re
+from io import BytesIO
 from typing import Optional
 
+import pandas as pd
 import requests
 
 UNDL_API_URL = "https://digitallibrary.un.org/api/v1/file"
 
 logger = logging.getLogger(__name__)
+
+
+def download_bytes(url: str) -> bytes:
+    """Reject empty/challenge responses before treating them as scientific data."""
+    response = requests.get(url, timeout=(10, 120))
+    response.raise_for_status()
+    if response.status_code != 200 or not response.content:
+        raise ValueError(f"Source download did not return a data file (HTTP {response.status_code}): {url}")
+    if "text/html" in response.headers.get("Content-Type", "").lower():
+        raise ValueError(f"Source returned HTML instead of a data file: {url}")
+    return response.content
+
+
+def read_csv_source(url: str) -> pd.DataFrame:
+    return pd.read_csv(BytesIO(download_bytes(url)))
 
 def fetch_latest_file_url_from_api(recid: str, file_name_pattern: str, file_format: str) -> Optional[str]:
     """
@@ -30,7 +47,7 @@ def fetch_latest_file_url_from_api(recid: str, file_name_pattern: str, file_form
     params = {'recid': recid}
 
     try:
-        response = requests.get(UNDL_API_URL, params=params)
+        response = requests.get(UNDL_API_URL, params=params, timeout=(10, 60))
         response.raise_for_status()
         
         files_list = response.json()

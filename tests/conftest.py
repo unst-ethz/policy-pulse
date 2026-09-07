@@ -1,18 +1,7 @@
 import pytest
-import socket
+import os
 import pandas as pd
 import numpy as np
-
-def is_internet_available(host="8.8.8.8", port=53, timeout=3):
-    """
-    Check if there is an internet connection by trying to connect to Google's public DNS.
-    """
-    try:
-        socket.setdefaulttimeout(timeout)
-        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
-        return True
-    except socket.error:
-        return False
 
 def pytest_configure(config):
     config.addinivalue_line(
@@ -20,10 +9,10 @@ def pytest_configure(config):
     )
 
 def pytest_collection_modifyitems(config, items):
-    if is_internet_available():
+    if os.getenv("POLICY_PULSE_LIVE_TESTS") == "1":
         return
 
-    skip_internet = pytest.mark.skip(reason="No internet connection available")
+    skip_internet = pytest.mark.skip(reason="Live-source tests are opt-in: POLICY_PULSE_LIVE_TESTS=1")
     for item in items:
         if "needs_internet" in item.keywords:
             item.add_marker(skip_internet)

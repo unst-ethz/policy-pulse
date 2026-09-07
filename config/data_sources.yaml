@@ -3,8 +3,8 @@
 # Note:
 #    The library API's 'name' field stores the raw name of a data asset WITHOUT the format
 #    suffix (e.g., ".csv"), which is instead stored in a separate 'format' field.
-version: "1.4" # Increment this version to bust local caches
-last_updated: "2026-05-02" # Add member_states authority list (multi-language country names)
+version: "1.4" # Filename compatibility does not change or invalidate existing snapshots
+last_updated: "2026-09-07" # Support current UN source filenames as well as older names
 debug: true
 logs: true
 
@@ -31,7 +31,7 @@ data_sources:
     source_type: "dynamic_api_file"
     recid: "4075456"
     file_name_pattern: |
-      unbist-.*_2$
+      (?:unbist-.*|\d{4}_\d{2}_\d{2}_thesaurus)_2$
     format: ".ttl"
 
   member_states:
@@ -39,7 +39,7 @@ data_sources:
     source_type: "dynamic_api_file"
     recid: "4082085"
     file_name_pattern: |
-      member_states_auths_.*
+      (?:member_states_auths_.*|\d{4}_\d{2}_\d{2}_unms_names)
     format: ".csv"
 
 paths:

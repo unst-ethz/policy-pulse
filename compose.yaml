@@ -1,0 +1,36 @@
+services:
+  backend:
+    image: ${POLICY_PULSE_BACKEND_IMAGE:-policy-pulse-backend:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    volumes:
+      - policy-pulse-data:/var/lib/policy-pulse/data
+      - policy-pulse-logs:/var/lib/policy-pulse/logs
+    expose:
+      - "8000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+  frontend:
+    image: ${POLICY_PULSE_FRONTEND_IMAGE:-policy-pulse-frontend:local}
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${POLICY_PULSE_BIND:-127.0.0.1}:${POLICY_PULSE_PORT:-8050}:8080"
+    depends_on:
+      backend:
+        condition: service_started
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+volumes:
+  policy-pulse-data:
+  policy-pulse-logs:

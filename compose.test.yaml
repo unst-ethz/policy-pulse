@@ -1,0 +1,10 @@
+# Isolated container smoke tests only; the cache contains labeled synthetic records.
+services:
+  backend:
+    volumes:
+      - type: bind
+        source: ${POLICY_PULSE_TEST_CACHE:?Set the absolute synthetic test cache directory}
+        target: /var/lib/policy-pulse/data
+    restart: "no"
+  frontend:
+    restart: "no"

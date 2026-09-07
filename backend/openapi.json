@@ -1,0 +1,2637 @@
+{
+  "components": {
+    "schemas": {
+      "AgreementResult": {
+        "properties": {
+          "consensus_midpoint": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consensus Midpoint"
+          },
+          "country": {
+            "title": "Country",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgreementRow"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "reference_longitude": {
+            "title": "Reference Longitude",
+            "type": "number"
+          },
+          "resolution_count": {
+            "title": "Resolution Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "country",
+          "resolution_count",
+          "reference_longitude",
+          "consensus_midpoint",
+          "items"
+        ],
+        "title": "AgreementResult",
+        "type": "object"
+      },
+      "AgreementRow": {
+        "properties": {
+          "country": {
+            "title": "Country",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "shared_votes": {
+            "title": "Shared Votes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "country",
+          "score",
+          "shared_votes"
+        ],
+        "title": "AgreementRow",
+        "type": "object"
+      },
+      "Country": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "m49": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "M49"
+          },
+          "membership_end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Membership End"
+          },
+          "membership_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Membership Start"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "region": {
+            "title": "Region",
+            "type": "string"
+          },
+          "search_terms": {
+            "title": "Search Terms",
+            "type": "string"
+          },
+          "subregion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subregion"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "display_name",
+          "search_terms",
+          "region",
+          "subregion",
+          "m49",
+          "membership_start",
+          "membership_end"
+        ],
+        "title": "Country",
+        "type": "object"
+      },
+      "CountryPreset": {
+        "properties": {
+          "countries": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Countries",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "countries"
+        ],
+        "title": "CountryPreset",
+        "type": "object"
+      },
+      "Era": {
+        "properties": {
+          "end": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "start": {
+            "title": "Start",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "start",
+          "end"
+        ],
+        "title": "Era",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "Metadata": {
+        "properties": {
+          "countries": {
+            "items": {
+              "$ref": "#/components/schemas/Country"
+            },
+            "title": "Countries",
+            "type": "array"
+          },
+          "country_presets": {
+            "items": {
+              "$ref": "#/components/schemas/CountryPreset"
+            },
+            "title": "Country Presets",
+            "type": "array"
+          },
+          "dataset_version": {
+            "title": "Dataset Version",
+            "type": "string"
+          },
+          "earliest_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest Date"
+          },
+          "eras": {
+            "items": {
+              "$ref": "#/components/schemas/Era"
+            },
+            "title": "Eras",
+            "type": "array"
+          },
+          "languages": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Languages",
+            "type": "array"
+          },
+          "latest_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Date"
+          },
+          "subjects": {
+            "items": {
+              "$ref": "#/components/schemas/Subject"
+            },
+            "title": "Subjects",
+            "type": "array"
+          },
+          "word_modes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Word Modes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "countries",
+          "subjects",
+          "eras",
+          "country_presets",
+          "earliest_date",
+          "latest_date",
+          "dataset_version",
+          "languages",
+          "word_modes"
+        ],
+        "title": "Metadata",
+        "type": "object"
+      },
+      "Methodology": {
+        "properties": {
+          "definitions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Definitions",
+            "type": "object"
+          },
+          "formula": {
+            "title": "Formula",
+            "type": "string"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "thresholds": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Thresholds",
+            "type": "object"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "vote_encoding": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Vote Encoding",
+            "type": "object"
+          }
+        },
+        "required": [
+          "version",
+          "scope",
+          "vote_encoding",
+          "formula",
+          "definitions",
+          "thresholds",
+          "limitations",
+          "sources"
+        ],
+        "title": "Methodology",
+        "type": "object"
+      },
+      "MultilateralResult": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MultilateralRow"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "mean_alignment": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Alignment"
+          },
+          "minimum_votes": {
+            "title": "Minimum Votes",
+            "type": "integer"
+          },
+          "resolution_count": {
+            "title": "Resolution Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "resolution_count",
+          "minimum_votes",
+          "mean_alignment",
+          "items"
+        ],
+        "title": "MultilateralResult",
+        "type": "object"
+      },
+      "MultilateralRow": {
+        "properties": {
+          "abstention_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Abstention Rate"
+          },
+          "country": {
+            "title": "Country",
+            "type": "string"
+          },
+          "multilateral_alignment": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Multilateral Alignment"
+          },
+          "no_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "No Rate"
+          },
+          "participation_count": {
+            "title": "Participation Count",
+            "type": "integer"
+          },
+          "yes_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yes Rate"
+          }
+        },
+        "required": [
+          "country",
+          "multilateral_alignment",
+          "yes_rate",
+          "no_rate",
+          "abstention_rate",
+          "participation_count"
+        ],
+        "title": "MultilateralRow",
+        "type": "object"
+      },
+      "Overview": {
+        "properties": {
+          "countries": {
+            "title": "Countries",
+            "type": "integer"
+          },
+          "earliest_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest Date"
+          },
+          "latest_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Date"
+          },
+          "recent": {
+            "items": {
+              "$ref": "#/components/schemas/Resolution"
+            },
+            "title": "Recent",
+            "type": "array"
+          },
+          "resolutions": {
+            "title": "Resolutions",
+            "type": "integer"
+          },
+          "subject_links": {
+            "title": "Subject Links",
+            "type": "integer"
+          },
+          "subjects": {
+            "title": "Subjects",
+            "type": "integer"
+          },
+          "votes": {
+            "$ref": "#/components/schemas/VoteCounts"
+          }
+        },
+        "required": [
+          "resolutions",
+          "countries",
+          "subjects",
+          "subject_links",
+          "earliest_date",
+          "latest_date",
+          "votes",
+          "recent"
+        ],
+        "title": "Overview",
+        "type": "object"
+      },
+      "Profile": {
+        "properties": {
+          "alignment": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alignment"
+          },
+          "country": {
+            "$ref": "#/components/schemas/Country"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "least_aligned": {
+            "items": {
+              "$ref": "#/components/schemas/AgreementRow"
+            },
+            "title": "Least Aligned",
+            "type": "array"
+          },
+          "minimum_shared_votes": {
+            "title": "Minimum Shared Votes",
+            "type": "integer"
+          },
+          "most_aligned": {
+            "items": {
+              "$ref": "#/components/schemas/AgreementRow"
+            },
+            "title": "Most Aligned",
+            "type": "array"
+          },
+          "opposed_high_consensus": {
+            "items": {
+              "$ref": "#/components/schemas/Resolution"
+            },
+            "title": "Opposed High Consensus",
+            "type": "array"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "ranked_countries": {
+            "title": "Ranked Countries",
+            "type": "integer"
+          },
+          "resolution_count": {
+            "title": "Resolution Count",
+            "type": "integer"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "supported_low_consensus": {
+            "items": {
+              "$ref": "#/components/schemas/Resolution"
+            },
+            "title": "Supported Low Consensus",
+            "type": "array"
+          },
+          "votes": {
+            "$ref": "#/components/schemas/VoteCounts"
+          },
+          "yearly": {
+            "items": {
+              "$ref": "#/components/schemas/YearPoint"
+            },
+            "title": "Yearly",
+            "type": "array"
+          }
+        },
+        "required": [
+          "country",
+          "start_date",
+          "end_date",
+          "resolution_count",
+          "votes",
+          "alignment",
+          "rank",
+          "ranked_countries",
+          "minimum_shared_votes",
+          "most_aligned",
+          "least_aligned",
+          "yearly",
+          "opposed_high_consensus",
+          "supported_low_consensus"
+        ],
+        "title": "Profile",
+        "type": "object"
+      },
+      "Resolution": {
+        "properties": {
+          "consensus": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consensus"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/VoteCounts"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "session": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "votes": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "Y",
+                    "N",
+                    "A",
+                    "X"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Votes",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "symbol",
+          "title",
+          "date",
+          "session",
+          "source_url",
+          "consensus",
+          "counts",
+          "votes"
+        ],
+        "title": "Resolution",
+        "type": "object"
+      },
+      "ResolutionDetail": {
+        "properties": {
+          "consensus": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consensus"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/VoteCounts"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "session": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "subjects": {
+            "items": {
+              "$ref": "#/components/schemas/Subject"
+            },
+            "title": "Subjects",
+            "type": "array"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "votes": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "Y",
+                    "N",
+                    "A",
+                    "X"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Votes",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "symbol",
+          "title",
+          "date",
+          "session",
+          "source_url",
+          "consensus",
+          "counts",
+          "votes",
+          "subjects"
+        ],
+        "title": "ResolutionDetail",
+        "type": "object"
+      },
+      "ResolutionPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Resolution"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "offset",
+          "limit"
+        ],
+        "title": "ResolutionPage",
+        "type": "object"
+      },
+      "Subject": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "parents": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Parents",
+            "type": "array"
+          },
+          "top_level": {
+            "title": "Top Level",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "parents",
+          "top_level"
+        ],
+        "title": "Subject",
+        "type": "object"
+      },
+      "SubjectResult": {
+        "properties": {
+          "comparison": {
+            "title": "Comparison",
+            "type": "string"
+          },
+          "country": {
+            "title": "Country",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SubjectScore"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "minimum_shared_votes": {
+            "title": "Minimum Shared Votes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "country",
+          "comparison",
+          "minimum_shared_votes",
+          "items"
+        ],
+        "title": "SubjectResult",
+        "type": "object"
+      },
+      "SubjectScore": {
+        "properties": {
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "shared_votes": {
+            "title": "Shared Votes",
+            "type": "integer"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "subject_label": {
+            "title": "Subject Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject_id",
+          "subject_label",
+          "score",
+          "shared_votes"
+        ],
+        "title": "SubjectScore",
+        "type": "object"
+      },
+      "TimelinePoint": {
+        "properties": {
+          "scores": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Scores",
+            "type": "object"
+          },
+          "session": {
+            "title": "Session",
+            "type": "string"
+          },
+          "shared_votes": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Shared Votes",
+            "type": "object"
+          },
+          "special": {
+            "title": "Special",
+            "type": "boolean"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          }
+        },
+        "required": [
+          "session",
+          "year",
+          "special",
+          "scores",
+          "shared_votes"
+        ],
+        "title": "TimelinePoint",
+        "type": "object"
+      },
+      "TimelineResult": {
+        "properties": {
+          "comparisons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Comparisons",
+            "type": "array"
+          },
+          "country": {
+            "title": "Country",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TimelinePoint"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "minimum_shared_votes": {
+            "title": "Minimum Shared Votes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "country",
+          "comparisons",
+          "minimum_shared_votes",
+          "items"
+        ],
+        "title": "TimelineResult",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "VoteCounts": {
+        "properties": {
+          "abstain": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Abstain"
+          },
+          "no": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "No"
+          },
+          "not_voting": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Not Voting"
+          },
+          "yes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yes"
+          }
+        },
+        "required": [
+          "yes",
+          "no",
+          "abstain",
+          "not_voting"
+        ],
+        "title": "VoteCounts",
+        "type": "object"
+      },
+      "Word": {
+        "properties": {
+          "consensus": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consensus"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "subject_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Subject Ids",
+            "type": "array"
+          },
+          "term": {
+            "title": "Term",
+            "type": "string"
+          }
+        },
+        "required": [
+          "term",
+          "count",
+          "consensus",
+          "subject_ids"
+        ],
+        "title": "Word",
+        "type": "object"
+      },
+      "WordResult": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Word"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "mode": {
+            "enum": [
+              "default",
+              "geopolitical",
+              "thematic",
+              "action",
+              "category"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "resolution_count": {
+            "title": "Resolution Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "mode",
+          "available",
+          "resolution_count",
+          "items"
+        ],
+        "title": "WordResult",
+        "type": "object"
+      },
+      "YearPoint": {
+        "properties": {
+          "scores": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Scores",
+            "type": "object"
+          },
+          "year": {
+            "title": "Year",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "year",
+          "scores"
+        ],
+        "title": "YearPoint",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Read-only access to adopted UN General Assembly resolutions and the existing Policy Pulse methodology. Scores are 0\u20131; unavailable observations are null.",
+    "title": "Policy Pulse API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/analysis/agreement/{country}": {
+      "get": {
+        "operationId": "agreement_api_v1_analysis_agreement__country__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "country",
+            "required": true,
+            "schema": {
+              "title": "Country",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "description": "Date between 1678-01-01 and 2261-12-31, inclusive.",
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "description": "Date between 1678-01-01 and 2261-12-31, inclusive.",
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subject",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 100,
+              "title": "Subject",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_descendants",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Include Descendants",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "country",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Country"
+            }
+          },
+          {
+            "in": "query",
+            "name": "country_mode",
+            "required": false,
+            "schema": {
+              "default": "none",
+              "enum": [
+                "none",
+                "voted",
+                "member"
+              ],
+              "title": "Country Mode",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "keyword",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 300,
+              "title": "Keyword",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgreementResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Agreement",
+        "tags": [
+          "Analysis"
+        ]
+      }
+    },
+    "/api/v1/analysis/multilateral": {
+      "get": {
+        "operationId": "multilateral_api_v1_analysis_multilateral_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "description": "Date between 1678-01-01 and 2261-12-31, inclusive.",
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "description": "Date between 1678-01-01 and 2261-12-31, inclusive.",
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subject",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 100,
+              "title": "Subject",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_descendants",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Include Descendants",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "country",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Country"
+            }
+          },
+          {
+            "in": "query",
+            "name": "country_mode",
+            "required": false,
+            "schema": {
+              "default": "none",
+              "enum": [
+                "none",
+                "voted",
+                "member"
+              ],
+              "title": "Country Mode",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "keyword",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 300,
+              "title": "Keyword",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultilateralResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Multilateral",
+        "tags": [
+          "Analysis"
+        ]
+      }
+    },
+    "/api/v1/analysis/subjects/{country}/{comparison}": {
+      "get": {
+        "operationId": "subjects_api_v1_analysis_subjects__country___comparison__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "country",
+            "required": true,
+            "schema": {
+              "title": "Country",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "comparison",
+            "required": true,
+            "schema": {
+              "title": "Comparison",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "description": "Date between 1678-01-01 and 2261-12-31, inclusive.",
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "description": "Date between 1678-01-01 and 2261-12-31, inclusive.",
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "parent",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Parent"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Subjects",
+        "tags": [
+          "Analysis"
+        ]
+      }
+    },
+    "/api/v1/analysis/timeline/{country}": {
+      "get": {
+        "description": "Full-history session means. Date/subject filters intentionally do not apply.",
+        "operationId": "timeline_api_v1_analysis_timeline__country__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "country",
+            "required": true,
+            "schema": {
+              "title": "Country",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "compare",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 50,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Compare"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_special",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Special",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Timeline",
+        "tags": [
+          "Analysis"
+        ]
+      }
+    },
+    "/api/v1/analysis/words/{mode}": {
+      "get": {
+        "operationId": "words_api_v1_analysis_words__mode__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "mode",
+            "required": true,
+            "schema": {
+              "enum": [
+                "default",
+                "geopolitical",
+                "thematic",
+                "action",
+                "category"
+              ],
+              "title": "Mode",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "description": "Date between 1678-01-01 and 2261-12-31, inclusive.",
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "description": "Date between 1678-01-01 and 2261-12-31, inclusive.",
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subject",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 100,
+              "title": "Subject",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_descendants",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Include Descendants",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "country",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Country"
+            }
+          },
+          {
+            "in": "query",
+            "name": "country_mode",
+            "required": false,
+            "schema": {
+              "default": "none",
+              "enum": [
+                "none",
+                "voted",
+                "member"
+              ],
+              "title": "Country Mode",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "keyword",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 300,
+              "title": "Keyword",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WordResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Words",
+        "tags": [
+          "Analysis"
+        ]
+      }
+    },
+    "/api/v1/countries/{country}/profile": {
+      "get": {
+        "operationId": "profile_api_v1_countries__country__profile_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "country",
+            "required": true,
+            "schema": {
+              "title": "Country",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "description": "Date between 1678-01-01 and 2261-12-31, inclusive.",
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "description": "Date between 1678-01-01 and 2261-12-31, inclusive.",
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "compare",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 50,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Compare"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Profile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Profile",
+        "tags": [
+          "Countries"
+        ]
+      }
+    },
+    "/api/v1/metadata": {
+      "get": {
+        "operationId": "metadata_api_v1_metadata_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "default": "en",
+              "enum": [
+                "en",
+                "fr",
+                "es",
+                "ar",
+                "zh",
+                "ru"
+              ],
+              "title": "Language",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Metadata"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Metadata",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/api/v1/methodology": {
+      "get": {
+        "operationId": "methodology_api_v1_methodology_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Methodology"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Methodology",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/api/v1/overview": {
+      "get": {
+        "operationId": "overview_api_v1_overview_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Overview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Overview",
+        "tags": [
+          "Resolutions"
+        ]
+      }
+    },
+    "/api/v1/resolutions": {
+      "get": {
+        "operationId": "resolutions_api_v1_resolutions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "description": "Date between 1678-01-01 and 2261-12-31, inclusive.",
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "description": "Date between 1678-01-01 and 2261-12-31, inclusive.",
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subject",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 100,
+              "title": "Subject",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_descendants",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Include Descendants",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "country",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Country"
+            }
+          },
+          {
+            "in": "query",
+            "name": "country_mode",
+            "required": false,
+            "schema": {
+              "default": "none",
+              "enum": [
+                "none",
+                "voted",
+                "member"
+              ],
+              "title": "Country Mode",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "keyword",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 300,
+              "title": "Keyword",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "compare",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 50,
+              "title": "Compare",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vote",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "Y",
+                    "N",
+                    "A",
+                    "X"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Vote"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agreement",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "AGREED",
+                    "DISAGREED",
+                    "STRONGLY_DISAGREED"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agreement"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "date_desc",
+              "enum": [
+                "date_desc",
+                "date_asc",
+                "consensus_desc",
+                "consensus_asc"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 1000000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolutionPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolutions",
+        "tags": [
+          "Resolutions"
+        ]
+      }
+    },
+    "/api/v1/resolutions/export.csv": {
+      "get": {
+        "operationId": "export_resolutions_api_v1_resolutions_export_csv_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "description": "Date between 1678-01-01 and 2261-12-31, inclusive.",
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "description": "Date between 1678-01-01 and 2261-12-31, inclusive.",
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subject",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 100,
+              "title": "Subject",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_descendants",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Include Descendants",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "country",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Country"
+            }
+          },
+          {
+            "in": "query",
+            "name": "country_mode",
+            "required": false,
+            "schema": {
+              "default": "none",
+              "enum": [
+                "none",
+                "voted",
+                "member"
+              ],
+              "title": "Country Mode",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "keyword",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 300,
+              "title": "Keyword",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "compare",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 50,
+              "title": "Compare",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vote",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "Y",
+                    "N",
+                    "A",
+                    "X"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Vote"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agreement",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "AGREED",
+                    "DISAGREED",
+                    "STRONGLY_DISAGREED"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agreement"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "date_desc",
+              "enum": [
+                "date_desc",
+                "date_asc",
+                "consensus_desc",
+                "consensus_asc"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 1000000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/csv": {}
+            },
+            "description": "All matching resolutions, using exactly the list's filters and ordering (pagination is ignored)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Resolutions",
+        "tags": [
+          "Resolutions"
+        ]
+      }
+    },
+    "/api/v1/resolutions/{resolution_id}": {
+      "get": {
+        "operationId": "resolution_detail_api_v1_resolutions__resolution_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resolution_id",
+            "required": true,
+            "schema": {
+              "title": "Resolution Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolutionDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolution Detail",
+        "tags": [
+          "Resolutions"
+        ]
+      }
+    },
+    "/health/live": {
+      "get": {
+        "operationId": "live_health_live_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Live",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "ready_health_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Ready",
+        "tags": [
+          "Health"
+        ]
+      }
+    }
+  }
+}

@@ -23,3 +23,17 @@ closure_table.csv
 
 .vscode
 .python-version
+
+# React and test outputs
+frontend/node_modules/
+frontend/dist/
+frontend/playwright-report/
+frontend/test-results/
+*.tsbuildinfo
+.pytest_cache/
+.ruff_cache/
+/logs/
+.env
+.env.*
+!.env.example
+coverage/

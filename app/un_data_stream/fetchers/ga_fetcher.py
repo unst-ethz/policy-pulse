@@ -7,6 +7,7 @@ This module handles fetching raw GA resolution data from external sources.
 import pandas as pd
 
 from ..core.abstractions import DatasetFetcher
+from ..core.web_utils import read_csv_source
 
 
 class GAResolutionFetcher(DatasetFetcher):
@@ -15,7 +16,7 @@ class GAResolutionFetcher(DatasetFetcher):
     def _fetch_and_parse(self, url: str) -> pd.DataFrame:
         """Fetch GA resolution data from URL."""
         
-        df = pd.read_csv(url)
+        df = read_csv_source(url)
         self.logger.info(f"Successfully fetched {len(df)} GA resolution records")
         
         df['session'] = df['session'].astype(str) # Ensure session is consistent

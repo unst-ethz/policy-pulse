@@ -36,7 +36,7 @@ def test_fetch_latest_file_url_success():
         url = fetch_latest_file_url_from_api(recid, pattern, '.csv')
         
         assert url == "https://digitallibrary.un.org/record/4060887/files/2026_01_01_ga_voting.csv"
-        mock_get.assert_called_with("https://digitallibrary.un.org/api/v1/file", params={'recid': '4060887'})
+        mock_get.assert_called_with("https://digitallibrary.un.org/api/v1/file", params={'recid': '4060887'}, timeout=(10, 60))
 
 def test_fetch_latest_file_url_not_found():
     """Test when no matching file is found."""

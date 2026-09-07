@@ -31,6 +31,9 @@ EXPECTED_COLUMNS = {
 
 
 def _data_available() -> bool:
+    import os
+    if os.getenv("POLICY_PULSE_LIVE_TESTS") != "1":
+        return False
     try:
         from app import data as app_data
         return not app_data.query_engine.query_resolutions().empty

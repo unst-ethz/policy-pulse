@@ -1,0 +1,61 @@
+name: Validate
+on:
+  pull_request:
+  workflow_call:
+  push:
+    branches-ignore: [main, stable]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --require-hashes -r backend/requirements-dev.txt
+          npm ci --prefix frontend
+      - name: Backend tests and lint
+        run: |
+          .venv/bin/python -m pytest --strict-markers -q
+          .venv/bin/ruff check backend tests/api tests/support scripts/add_requirement_hashes.py
+      - name: Verify API schema and generated client types
+        run: |
+          .venv/bin/python -m backend.export_openapi
+          npm run api:generate --prefix frontend
+          git diff --exit-code -- backend/openapi.json frontend/src/api/schema.ts
+      - name: Frontend tests and production build
+        working-directory: frontend
+        run: |
+          npm test
+          npm run format:check
+          npm run build
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+      - name: Build production images and test startup with an isolated synthetic cache
+        env:
+          POLICY_PULSE_TEST_CACHE: ${{ runner.temp }}/policy-pulse-test-cache
+          POLICY_PULSE_PORT: '18050'
+        run: |
+          .venv/bin/python -m tests.support.export_cache "$POLICY_PULSE_TEST_CACHE"
+          chmod -R a+rwX "$POLICY_PULSE_TEST_CACHE"
+          docker compose -p policy-pulse-ci -f compose.yaml -f compose.test.yaml up --build --wait --wait-timeout 120
+          .venv/bin/python -m tests.support.smoke_stack http://127.0.0.1:18050
+          docker compose -p policy-pulse-ci -f compose.yaml -f compose.test.yaml down
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-test-results
+          path: frontend/test-results/

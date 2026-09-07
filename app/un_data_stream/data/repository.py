@@ -24,7 +24,7 @@ from .processor import DataProcessor
 class DataRepository:
     """Handles storage and retrieval of processed UN data."""
     
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str, *, data_dir: str | None = None, log_dir: str | None = None):
         self.config_path = config_path
         
         # Initialize data attributes
@@ -36,6 +36,10 @@ class DataRepository:
 
         # Load configuration
         self._load_config()
+        if data_dir is not None:
+            self.config['paths']['data'] = data_dir
+        if log_dir is not None:
+            self.config['paths']['logs'] = log_dir
 
         # Initialize Logging
         self._setup_logging()
@@ -133,7 +137,7 @@ class DataRepository:
         )
 
         log_dir = Path(self.config['paths']['logs'])
-        log_dir.mkdir(exist_ok=True)
+        log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / 'un_resolution_analyzer.log'
 
         file_handler = logging.FileHandler(log_file)
@@ -283,7 +287,7 @@ class DataRepository:
     def _load_cached_data(self):
         """Load cached data files into DataFrames."""
         data_path = Path(self.config['paths']['data'])
-        data_path.mkdir(exist_ok=True)
+        data_path.mkdir(parents=True, exist_ok=True)
 
         # Load CSV files
         self.logger.info("Loading resolution table")
@@ -311,21 +315,10 @@ class DataRepository:
                 f.seek(0)
                 uncompressed = f.read()
 
-                # Migrate to compressed data
-                self.logger.info("Migrating to compressed data format.")
-                compressed = blosc2.compress(uncompressed, typesize=1)
-                assert isinstance(compressed, bytes), "Compressed data is not bytes"
-                f.seek(0)
-                f.write(compressed)
-                f.truncate()
+                # Legacy uncompressed caches remain readable. Never write to this
+                # read-only handle or mutate a cache during a read operation.
 
             agreement_data = pickle.loads(uncompressed)
-
-        # If old agreement_matrices.pkl exists, remove it
-        old_pkl_path = data_path / 'agreement_matrices.pkl'
-        if old_pkl_path.exists():
-            old_pkl_path.unlink()
-            self.logger.info("Removed old agreement_matrices.pkl to save space")
 
         if 'multilateral_scores' not in agreement_data or 'vote_bool_arrays' not in agreement_data:
             raise KeyError("Cached pkl is stale (missing multilateral_scores or vote_bool_arrays) — rebuild required.")
@@ -337,7 +330,12 @@ class DataRepository:
     def _save_cached_data(self):
         """Save data files into DataFrames."""
         data_path = Path(self.config['paths']['data'])
-        data_path.mkdir(exist_ok=True)
+        data_path.mkdir(parents=True, exist_ok=True)
+
+        # Metadata is the commit marker. A failed write must not appear complete
+        # on the next startup. API workers hold the shared data-directory lock.
+        metadata_path = data_path / 'metadata.json'
+        metadata_path.unlink(missing_ok=True)
 
         # Save the tables in the defined folder
         self.resolution_table.to_csv(data_path / 'resolution_table.csv', index=False)

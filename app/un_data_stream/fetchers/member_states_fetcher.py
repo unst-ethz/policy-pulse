@@ -9,13 +9,14 @@ Digital Library and returns it as a cleaned DataFrame.
 import pandas as pd
 
 from ..core.abstractions import DatasetFetcher
+from ..core.web_utils import read_csv_source
 
 
 class MemberStatesFetcher(DatasetFetcher):
     """Fetches the UN member-state authority list."""
 
     def _fetch_and_parse(self, url: str) -> pd.DataFrame:
-        df = pd.read_csv(url)
+        df = read_csv_source(url)
 
         # Drop the synthetic "Unknown" row (NaN ISO Code) and any other
         # rows missing the ISO code, since ISO is our join key everywhere.
