@@ -306,7 +306,8 @@ def parse_outcome(record_id, raw: dict) -> dict:
         "total_abstentions": _int(tally.get("d")),
         "total_non_voting": _int(tally.get("e")),
         "total_ms": _int(tally.get("f")),
-        "undl_link": f"https://digitallibrary.un.org/record/{record_id}",
+        # undl_link intentionally not stored -- https://digitallibrary.un.org/record/{undl_id},
+        # reconstructed on the fly, see plan doc's "Derived URL columns" decision
         "title": title or None,
         "session": _int(first_subfield(raw.get("791"), "c")),
         "committee_report": first_subfield(raw.get("993"), "a", ind1="3"),
@@ -606,7 +607,7 @@ def _():
     OUTCOME_COLUMNS = [
         "undl_id", "source_dataset", "resolution", "date", "modality", "draft", "meeting",
         "subjects", "vote_note", "total_yes", "total_no", "total_abstentions", "total_non_voting",
-        "total_ms", "undl_link", "title", "session", "committee_report", "amended_draft",
+        "total_ms", "title", "session", "committee_report", "amended_draft",
         "related_documents", "agenda_title", "description", "agenda", "source_updated_at",
     ]
     return (OUTCOME_COLUMNS,)

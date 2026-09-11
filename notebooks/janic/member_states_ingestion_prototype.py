@@ -4,6 +4,8 @@
 #     "marimo",
 #     "pandas==2.3.3",
 #     "requests==2.32.5",
+#     "psycopg[binary]==3.3.5",
+#     "python-dotenv==1.2.3",
 # ]
 # ///
 
@@ -857,7 +859,6 @@ def _(pd, reference_comparison_df):
     # founding_member: ours is bool, reference is the string "True"/"False"
     _founding_match = _matched["founding_member"].astype(str) == _matched["founding_member_ref"].astype(str)
     field_comparison_results["founding_member"] = f"{_founding_match.sum()} / {len(_matched)} match"
-
     return (field_comparison_results,)
 
 
@@ -866,6 +867,214 @@ def _(field_comparison_results, mo):
     mo.md(
         "\n".join(f"- `{field}`: {result}" for field, result in field_comparison_results.items())
     )
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+    ## Load into Postgres
+
+    Writes `member_states_clean_df` into the `member_states` table set up per
+    `notebooks/janic/postgres/` (`Dockerfile` + `schema.sql`) -- same connection pattern, same
+    `to_pg_value()` converter, same wipe-and-reinsert reload strategy, same verification-cell shape
+    as `ingestion_prototype.py`'s own load section (the template for this one). Connection info
+    comes from a gitignored `.env` at the repo root (`PGHOST`/`PGPORT`/`PGDATABASE`/`PGUSER`/
+    `PGPASSWORD`).
+
+    **Reload strategy: wipe and re-insert on every run**, not upsert -- same reasoning as
+    `ingestion_prototype.py`: this notebook is currently the only writer, and each run's fetch may
+    not overlap the last, so a partial `ON CONFLICT DO UPDATE` wouldn't actually be idempotent by
+    itself. Real upsert logic is deferred to the eventual production ingestion job.
+    """)
+    return
+
+
+@app.cell
+def _():
+    import psycopg
+    from dotenv import load_dotenv, find_dotenv
+
+    # usecwd=True -- load_dotenv()'s default search is stack-frame based (walks up from the
+    # *calling file's* directory), not cwd, so it silently finds nothing when this notebook isn't
+    # run from the repo root. Bit ingestion_prototype.py for real, see its own comment on this.
+    load_dotenv(find_dotenv(usecwd=True))
+    return (psycopg,)
+
+
+@app.cell
+def _(mo, psycopg):
+    conn = psycopg.connect()
+    mo.md(
+        f"Connected to `{conn.info.dbname}` at `{conn.info.host}:{conn.info.port}` "
+        f"as `{conn.info.user}`."
+    )
+    return (conn,)
+
+
+@app.cell
+def _():
+    # Matches member_states' column order in notebooks/janic/postgres/schema.sql exactly
+    # (inserted_at is DB-generated via DEFAULT now(), not provided here). unms_ontology_link is
+    # deliberately excluded -- not stored, see plan doc's "Derived URL columns" decision; kept in
+    # member_states_clean_df itself since the reference-CSV cross-check above still needs it.
+    MEMBER_STATES_COLUMNS = [
+        "record_id", "iso_code", "m49_code", "record_type", "name_en", "name_fr", "name_es",
+        "name_ar", "name_zh", "name_ru", "other_names", "coverage_periods", "founding_member",
+        "membership_resolution", "scope_note", "earlier_names", "later_names", "subject_xref_id",
+        "source_updated_at",
+    ]
+    return (MEMBER_STATES_COLUMNS,)
+
+
+@app.function
+def to_pg_value(v):
+    """Convert one DataFrame cell into a plain value psycopg can adapt directly.
+
+    Copied from ingestion_prototype.py, not redefined differently -- needed because DataFrame
+    cells built from parse_member_state() come back as numpy scalars (int64/float64, incl. the
+    nullable Int64 `subject_xref_id`) or pandas Timestamps, not builtin Python types.
+    """
+    if v is None or v != v:  # v != v catches float NaN and pandas NaT (both fail self-equality)
+        return None
+    if hasattr(v, "to_pydatetime"):  # pandas Timestamp -> datetime.datetime
+        return v.to_pydatetime()
+    if hasattr(v, "item"):  # numpy scalar (int64, float64, ...) -> native Python int/float
+        return v.item()
+    return v
+
+
+@app.function
+def wipe_member_states(conn):
+    """Clear member_states so this notebook is safely re-runnable.
+
+    No FK children to worry about -- member_states isn't referenced by any other table yet
+    (subject_xref_id is an unenforced plain column, not a FK, see the plan doc).
+    """
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM member_states")
+    conn.commit()
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+    Writing is intentionally the only thing this cell does -- verifying it worked is a separate
+    step below.
+    """)
+    return
+
+
+@app.cell
+def _(MEMBER_STATES_COLUMNS, conn, member_states_clean_df, mo):
+    member_states_rows = [
+        tuple(to_pg_value(v) for v in row)
+        for row in member_states_clean_df[MEMBER_STATES_COLUMNS].itertuples(index=False, name=None)
+    ]
+
+    # Not `with conn:` -- psycopg3's connection context manager commits/rolls back *and closes*
+    # the connection on exit (unlike psycopg2), which would break the verification cells below
+    # that reuse this same `conn`. Explicit commit/rollback instead, connection stays open.
+    try:
+        wipe_member_states(conn)
+        with conn.cursor() as _cur:
+            _cols_sql = ", ".join(MEMBER_STATES_COLUMNS)
+            _placeholders = ", ".join(["%s"] * len(MEMBER_STATES_COLUMNS))
+            _cur.executemany(
+                f"INSERT INTO member_states ({_cols_sql}) VALUES ({_placeholders})",
+                member_states_rows,
+            )
+    except Exception:
+        conn.rollback()
+        raise
+    else:
+        conn.commit()
+
+    mo.md(f"Inserted **{len(member_states_rows)}** member-state rows.")
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+    ### Verify the load
+
+    Row counts match what was sent, plus a spot check on one row to catch column-order/type bugs a
+    count alone wouldn't.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(conn, mo):
+    _df = mo.sql(
+        f"""
+        SELECT * FROM resolution_outcomes
+        """,
+        engine=conn
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(conn, mo):
+    _df = mo.sql(
+        f"""
+        SELECT * FROM member_states
+        """,
+        engine=conn
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(conn, mo):
+    _df = mo.sql(
+        f"""
+        SELECT * FROM subject
+        --WHERE record_id IS NULL
+        """,
+        engine=conn
+    )
+    return
+
+
+@app.cell
+def _(conn, member_states_clean_df, mo):
+    with conn.cursor() as _cur:
+        _cur.execute("SELECT COUNT(*) FROM member_states")
+        db_member_states_count = _cur.fetchone()[0]
+
+    _ok = db_member_states_count == len(member_states_clean_df)
+    mo.md(
+        f"`member_states`: **{db_member_states_count}** in DB vs "
+        f"**{len(member_states_clean_df)}** in the DataFrame -- {'OK' if _ok else 'MISMATCH'}"
+    )
+    return
+
+
+@app.cell
+def _(conn, member_states_clean_df, mo):
+    _sample_id = member_states_clean_df.iloc[0]["record_id"]
+    with conn.cursor() as _cur:
+        _cur.execute(
+            "SELECT iso_code, name_en, founding_member, source_updated_at "
+            "FROM member_states WHERE record_id = %s",
+            (_sample_id,),
+        )
+        db_row = _cur.fetchone()
+
+    _df_row = member_states_clean_df.loc[
+        member_states_clean_df["record_id"] == _sample_id,
+        ["iso_code", "name_en", "founding_member", "source_updated_at"],
+    ].iloc[0]
+
+    mo.md(f"""
+    Spot check for `{_sample_id}`:
+
+    - DB row: `{db_row}`
+    - DataFrame row: `{tuple(_df_row)}`
+    """)
     return
 
 
@@ -896,16 +1105,17 @@ def _(mo):
       populated correctly).
     - **Cross-check against the reference CSV** (see section above) is the actual test of whether
       these fixes landed right, and after the `680` fix, every compared field now matches
-      243/243 with a clean 243/243 join (zero rows on either side unmatched). If everything still
-      lines up on your own review, per your steer this is the point to start designing the actual
-      `member_states` Postgres table.
-    - Natural columns for that table based on this notebook's current shape: `record_id` (PK),
-      `iso_code`, `m49_code`, `record_type`, `name_en/fr/es/ar/zh/ru`, `other_names`,
+      243/243 with a clean 243/243 join (zero rows on either side unmatched).
+    - **`member_states` Postgres table designed and loaded** (see "Load into Postgres" above and
+      `plans/intermediate_storage_layer_plan.md`'s "Postgres Schema (member states)"): `record_id`
+      (PK), `iso_code`, `m49_code`, `record_type`, `name_en/fr/es/ar/zh/ru`, `other_names`,
       `coverage_periods`, `founding_member`, `membership_resolution`, `scope_note`,
-      `earlier_names`, `later_names`, `subject_xref_id` (nullable until `subject` exists — could
-      become a real FK once it does), `unms_ontology_link`, `source_updated_at`.
-      `_undirected_names` is discovery/QA-only, not a candidate column — matches the pattern
-      `ingestion_prototype.py` already uses for its own `_modality_check`/`_raw_modality` fields.
+      `earlier_names`, `later_names`, `subject_xref_id` (landed as an unenforced nullable raw
+      record id, not resolved to `subject.subject_id` — a real FK was rejected for now, see the
+      plan doc's writeup), `unms_ontology_link`, `source_updated_at`. 243/243 rows loaded and
+      verified (row count + spot check). `_undirected_names` is discovery/QA-only, not a table
+      column — matches the pattern `ingestion_prototype.py` already uses for its own
+      `_modality_check`/`_raw_modality` fields.
     - `app/data.py`'s `_build_name_index` reconstruction (group by `iso_code`, pick the "active"
       row) needs a real rewrite against this shape, not a column-rename shim — it currently parses
       comma-separated `Start date`/`End date` strings from the old CSV schema, not the

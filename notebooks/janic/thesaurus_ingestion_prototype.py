@@ -4,6 +4,8 @@
 #     "marimo",
 #     "pandas==2.3.3",
 #     "requests==2.32.5",
+#     "psycopg[binary]==3.3.5",
+#     "python-dotenv==1.2.3",
 # ]
 # ///
 
@@ -188,7 +190,7 @@ def _(mo):
 
     | Tag/subfield | Meaning | → |
     |---|---|---|
-    | `035$a` (the `http://...` entry — this field also carries a parallel `T`-prefixed internal id, e.g. `T0010188`) | thesaurus concept URI | `subject_id` |
+    | `035$a` (the `http://...` entry — this field also carries a parallel `T`-prefixed internal id, e.g. `T0010188`) | thesaurus concept URI | `subject_id` -- only the URI's trailing id is kept (e.g. `1006488`), not the full URI; see `THESAURUS_URI_PREFIX` below |
     | `150$a` | English preferred term | `label_en` |
     | `993`–`997` `$a` | localized preferred terms | `label_fr` / `label_es` / `label_ar` / `label_zh` / `label_ru` — same tag numbering convention confirmed for member states' `name_fr`..`name_ru` |
     | `450$a` (repeated) | non-preferred/variant terms (English) | `alt_labels_en`, semicolon-joined. **Known gap**: MARC's non-English alt-label field wasn't conclusively identified — one case (`497`, Russian) was spotted once during exploration but not confirmed as a systematic per-language pattern the way `993`-`997` are for preferred labels, so `alt_labels_fr/es/ar/zh/ru` aren't populated here (the TTL export's `ThesaurusProcessor` does have them, from SKOS `altLabel` triples with language tags) |
@@ -237,6 +239,24 @@ def thesaurus_uri(entries_035):
     return None
 
 
+# Every subject in this notebook's output (concepts, domains, micro-thesauri, the root) lives
+# under this one constant prefix -- confirmed live, 0 exceptions across 463 loaded rows. subject_id
+# stores only the trailing id (see plan doc's "Derived URL columns" decision), not the full URI.
+THESAURUS_URI_PREFIX = "http://metadata.un.org/thesaurus/"
+
+
+@app.function
+def bare_thesaurus_id(uri):
+    """Full thesaurus URI -> its trailing id (what actually gets stored as subject_id)."""
+    return uri.rsplit("/", 1)[-1] if uri else None
+
+
+@app.function
+def thesaurus_url(subject_id):
+    """subject_id -> the full thesaurus URI, reconstructed on the fly. Inverse of bare_thesaurus_id."""
+    return THESAURUS_URI_PREFIX + subject_id if subject_id else None
+
+
 @app.function
 def parse_related_terms(entries):
     """Split 550 entries by direction: $w='g' -> broader (parent), $w='h' -> narrower (child),
@@ -270,7 +290,7 @@ def parse_thesaurus_concept(record_id, raw: dict) -> dict:
     """One subject_table-shaped row."""
     return {
         "record_id": str(record_id),
-        "subject_id": thesaurus_uri(raw.get("035")),
+        "subject_id": bare_thesaurus_id(thesaurus_uri(raw.get("035"))),
         "label_en": first_subfield(raw.get("150"), "a"),
         "label_fr": first_subfield(raw.get("993"), "a"),
         "label_es": first_subfield(raw.get("994"), "a"),
@@ -317,22 +337,26 @@ def _(mo):
 
 @app.cell
 def _(pd, raw_records: dict):
-    id_to_uri = {rid: thesaurus_uri(raw.get("035")) for rid, raw in raw_records.items()}
+    # record_id -> subject_id (bare id, not the full URI -- parent_id/child_id below store the
+    # same representation as subject_table's own subject_id column).
+    id_to_subject_id = {
+        rid: bare_thesaurus_id(thesaurus_uri(raw.get("035"))) for rid, raw in raw_records.items()
+    }
 
     broader_rows = []
     related_counts = []
     for _record_id, _raw in raw_records.items():
-        _self_uri = id_to_uri[_record_id]
+        _self_id = id_to_subject_id[_record_id]
         _broader, _narrower, _related = parse_related_terms(_raw.get("550"))
         related_counts.append({"record_id": _record_id, "related_count": len(_related)})
         for _name, _xref in _narrower:
-            _child_uri = id_to_uri.get(str(_xref)) if _xref is not None else None
+            _child_id = id_to_subject_id.get(str(_xref)) if _xref is not None else None
             broader_rows.append(
                 {
-                    "parent_id": _self_uri,
+                    "parent_id": _self_id,
                     "child_name": _name,
                     "child_record_id": str(_xref) if _xref is not None else None,
-                    "child_id": _child_uri,
+                    "child_id": _child_id,
                 }
             )
 
@@ -440,17 +464,17 @@ def _(mo):
 @app.cell
 def _(broader_table, mo, subject_table_df):
     _by_id = subject_table_df.set_index("record_id")
-    _macedonia_uri = _by_id.loc["275600", "subject_id"]
-    _southern_europe_uri = _by_id.loc["275568", "subject_id"]
+    _macedonia_id = _by_id.loc["275600", "subject_id"]
+    _southern_europe_id = _by_id.loc["275568", "subject_id"]
 
     _macedonia_is_child_of_southern_europe = (
-        (broader_table["parent_id"] == _southern_europe_uri)
-        & (broader_table["child_id"] == _macedonia_uri)
+        (broader_table["parent_id"] == _southern_europe_id)
+        & (broader_table["child_id"] == _macedonia_id)
     ).any()
 
     mo.md(f"""
-    - NORTH MACEDONIA `subject_id`: `{_macedonia_uri}`
-    - SOUTHERN EUROPE `subject_id`: `{_southern_europe_uri}`
+    - NORTH MACEDONIA `subject_id`: `{_macedonia_id}`
+    - SOUTHERN EUROPE `subject_id`: `{_southern_europe_id}`
     - `broader_table` contains the edge SOUTHERN EUROPE → NORTH MACEDONIA (parent → child): **{_macedonia_is_child_of_southern_europe}**
     """)
     return
@@ -599,7 +623,7 @@ def _(domain_uris, fetch_skosmos, mo):
             domain_rows.append(
                 {
                     "record_id": None,
-                    "subject_id": _uri,
+                    "subject_id": bare_thesaurus_id(_uri),
                     "label_en": _labels.get("en"),
                     "label_fr": _labels.get("fr"),
                     "label_es": _labels.get("es"),
@@ -608,7 +632,7 @@ def _(domain_uris, fetch_skosmos, mo):
                     "label_ru": _labels.get("ru"),
                     "alt_labels_en": alt_labels_en_of(_node),
                     "domain_code": None,
-                    "node_type": "root" if _uri.rsplit("/", 1)[-1] == "00" else "scheme",
+                    "node_type": "root" if bare_thesaurus_id(_uri) == "00" else "scheme", # TODO: Probably we need to call it domain, but it's alright for now
                     "source_updated_at": None,
                 }
             )
@@ -662,7 +686,7 @@ def _(
             microthesaurus_rows.append(
                 {
                     "record_id": None,
-                    "subject_id": _stub["mt_uri"],
+                    "subject_id": bare_thesaurus_id(_stub["mt_uri"]),
                     "label_en": _labels.get("en"),
                     "label_fr": _labels.get("fr"),
                     "label_es": _labels.get("es"),
@@ -703,12 +727,12 @@ def _(domain_mismatches, mo):
 
 @app.cell
 def _(domain_rows, mo):
-    _by_id = {r["subject_id"].rsplit("/", 1)[-1]: r["subject_id"] for r in domain_rows}
-    root_uri = _by_id["00"]
+    # domain_rows' subject_id is already the bare id (e.g. "00" for root, "01".."18" for domains).
+    root_id = next(r["subject_id"] for r in domain_rows if r["subject_id"] == "00")
     bootstrap_broader_rows = [
-        {"parent_id": root_uri, "child_id": r["subject_id"]}
+        {"parent_id": root_id, "child_id": r["subject_id"]}
         for r in domain_rows
-        if r["subject_id"] != root_uri
+        if r["subject_id"] != root_id
     ]
     mo.md(f"Root → domain edges: **{len(bootstrap_broader_rows)}** (expect 18).")
     return (bootstrap_broader_rows,)
@@ -716,8 +740,11 @@ def _(domain_rows, mo):
 
 @app.cell
 def _(bootstrap_broader_rows, microthesaurus_rows):
+    # r["_parent_domain_uri"] is still the full Skosmos URI (needed for the fetch calls above) --
+    # bare it here to match bootstrap_broader_rows/subject_table's id-only representation.
     bootstrap_broader_rows_all = bootstrap_broader_rows + [
-        {"parent_id": r["_parent_domain_uri"], "child_id": r["subject_id"]} for r in microthesaurus_rows
+        {"parent_id": bare_thesaurus_id(r["_parent_domain_uri"]), "child_id": r["subject_id"]}
+        for r in microthesaurus_rows
     ]
     return (bootstrap_broader_rows_all,)
 
@@ -737,8 +764,9 @@ def _(mo):
     mo.md("""
     ### Concept → micro-thesaurus edges (derived from `domain_code`)
 
-    Reconstructs each concept's micro-thesaurus URI from its own `domain_code` (strip the dots,
-    e.g. `"17.04.00"` → `170400`) and checks it against the micro-thesaurus set just fetched --
+    Reconstructs each concept's micro-thesaurus id from its own `domain_code` (strip the dots,
+    e.g. `"17.04.00"` → `170400`, already the bare id -- no URL prefix needed) and checks it
+    against the micro-thesaurus set just fetched --
     not assumed from the single EUROPE example found while evaluating this approach. A concept
     with more than one `domain_code` (the ~9% polyhierarchy case, see the QA section above) gets
     one edge per resolved code -- genuinely belongs under more than one micro-thesaurus at once.
@@ -757,9 +785,9 @@ def _(bootstrap_subject_df, mo, subject_table_df):
     unresolved_domain_codes = []
     for _, _row in _codes_by_concept.iterrows():
         for _code in _row["domain_code"].split("; "):
-            _mt_uri = "http://metadata.un.org/thesaurus/" + _code.replace(".", "")
-            if _mt_uri in _known_mt_ids:
-                concept_microthesaurus_edges.append({"parent_id": _mt_uri, "child_id": _row["subject_id"]})
+            _mt_id = _code.replace(".", "")  # e.g. "17.04.00" -> "170400", already bare
+            if _mt_id in _known_mt_ids:
+                concept_microthesaurus_edges.append({"parent_id": _mt_id, "child_id": _row["subject_id"]})
             else:
                 unresolved_domain_codes.append({"subject_id": _row["subject_id"], "domain_code": _code})
 
@@ -799,7 +827,7 @@ def _(bootstrap_subject_df, mo, pd, subject_table_df):
     _dupes = subject_table_all["subject_id"][subject_table_all["subject_id"].duplicated()]
     mo.md(f"""
     - Combined `subject_table`: **{len(subject_table_all)}** rows ({subject_table_all['node_type'].value_counts().to_dict()})
-    - Duplicate `subject_id` across the combined table (should be 0 -- concept URIs and domain/micro-thesaurus URIs use disjoint formats): **{len(_dupes)}**
+    - Duplicate `subject_id` across the combined table (should be 0 -- concept ids and domain/micro-thesaurus codes use disjoint id ranges, confirmed live): **{len(_dupes)}**
     """)
     return (subject_table_all,)
 
@@ -892,6 +920,223 @@ def _(
 @app.cell
 def _(mo):
     mo.md("""
+    ## Load into Postgres
+
+    Writes `subject_table_all` / `broader_table_all` / `closure_table` into the `subject` /
+    `subject_broader` / `subject_closure` tables set up per `notebooks/janic/postgres/`
+    (`Dockerfile` + `schema.sql`) -- same connection pattern, same `to_pg_value()` converter, same
+    wipe-and-reinsert reload strategy, same verification-cell shape as `ingestion_prototype.py`'s
+    own load section (the template for this one). Connection info comes from a gitignored `.env`
+    at the repo root (`PGHOST`/`PGPORT`/`PGDATABASE`/`PGUSER`/`PGPASSWORD`).
+
+    **Insert order matters here** (unlike the other two notebooks' single/independent tables):
+    `subject` first, then `subject_broader`/`subject_closure`, since both have a `REFERENCES
+    subject(subject_id)` FK. Confirmed safe for a sampled run: `broader_table` already drops any
+    edge whose `child_id` didn't resolve inside this fetch (see the "`broader_table` resolution
+    check" above), and `closure_table` is built by BFS purely over `broader_table_all`, so every
+    `ancestor_id`/`descendant_id` it produces is already a `subject_id` present in
+    `subject_table_all` -- no FK violations expected even from a `SAMPLE_SIZE`-limited run.
+
+    **Reload strategy: wipe and re-insert on every run**, not upsert -- same reasoning as
+    `ingestion_prototype.py`. Wipe order is child-before-parent (`subject_closure`,
+    `subject_broader`, then `subject`), the reverse of insert order.
+    """)
+    return
+
+
+@app.cell
+def _():
+    import psycopg
+    from dotenv import load_dotenv, find_dotenv
+
+    # usecwd=True -- see ingestion_prototype.py's own comment on this; load_dotenv()'s default
+    # search is stack-frame based, not cwd, and silently finds nothing otherwise.
+    load_dotenv(find_dotenv(usecwd=True))
+    return (psycopg,)
+
+
+@app.cell
+def _(mo, psycopg):
+    conn = psycopg.connect()
+    mo.md(
+        f"Connected to `{conn.info.dbname}` at `{conn.info.host}:{conn.info.port}` "
+        f"as `{conn.info.user}`."
+    )
+    return (conn,)
+
+
+@app.cell
+def _():
+    # Column order matches subject/subject_broader/subject_closure in
+    # notebooks/janic/postgres/schema.sql exactly. alt_labels_{es,fr,ar,ru,zh} aren't in this
+    # notebook's output at all (see plan doc) -- omitted here so they land NULL via the DDL, same
+    # as inserted_at being DB-generated for member_states/resolution_outcomes.
+    SUBJECT_COLUMNS = [
+        "subject_id", "record_id", "label_en", "label_es", "label_fr", "label_ar", "label_ru",
+        "label_zh", "alt_labels_en", "domain_code", "node_type", "source_updated_at",
+    ]
+    SUBJECT_BROADER_COLUMNS = ["parent_id", "child_id"]
+    SUBJECT_CLOSURE_COLUMNS = ["ancestor_id", "descendant_id", "depth"]
+    return (SUBJECT_BROADER_COLUMNS, SUBJECT_CLOSURE_COLUMNS, SUBJECT_COLUMNS)
+
+
+@app.function
+def to_pg_value(v):
+    """Convert one DataFrame cell into a plain value psycopg can adapt directly.
+
+    Copied from ingestion_prototype.py, not redefined differently -- needed because DataFrame
+    cells here come back as numpy scalars (int64 `depth`) or pandas Timestamps
+    (`source_updated_at`), not builtin Python types.
+    """
+    if v is None or v != v:  # v != v catches float NaN and pandas NaT (both fail self-equality)
+        return None
+    if hasattr(v, "to_pydatetime"):  # pandas Timestamp -> datetime.datetime
+        return v.to_pydatetime()
+    if hasattr(v, "item"):  # numpy scalar (int64, float64, ...) -> native Python int/float
+        return v.item()
+    return v
+
+
+@app.function
+def wipe_subject_tables(conn):
+    """Clear subject/subject_broader/subject_closure so this notebook is safely re-runnable.
+
+    Child-before-parent order: subject_broader/subject_closure both have a
+    REFERENCES subject(subject_id) FK.
+    """
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM subject_closure")
+        cur.execute("DELETE FROM subject_broader")
+        cur.execute("DELETE FROM subject")
+    conn.commit()
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+    Writing is intentionally the only thing this cell does -- verifying it worked is a separate
+    step below.
+    """)
+    return
+
+
+@app.cell
+def _(
+    SUBJECT_BROADER_COLUMNS,
+    SUBJECT_CLOSURE_COLUMNS,
+    SUBJECT_COLUMNS,
+    broader_table_all,
+    closure_table,
+    conn,
+    mo,
+    subject_table_all,
+):
+    subject_rows = [
+        tuple(to_pg_value(v) for v in row)
+        for row in subject_table_all[SUBJECT_COLUMNS].itertuples(index=False, name=None)
+    ]
+    subject_broader_rows = [
+        tuple(to_pg_value(v) for v in row)
+        for row in broader_table_all[SUBJECT_BROADER_COLUMNS].itertuples(index=False, name=None)
+    ]
+    subject_closure_rows = [
+        tuple(to_pg_value(v) for v in row)
+        for row in closure_table[SUBJECT_CLOSURE_COLUMNS].itertuples(index=False, name=None)
+    ]
+
+    # Not `with conn:` -- psycopg3's connection context manager commits/rolls back *and closes*
+    # the connection on exit (unlike psycopg2), which would break the verification cells below
+    # that reuse this same `conn`. Explicit commit/rollback instead, connection stays open.
+    try:
+        wipe_subject_tables(conn)
+        with conn.cursor() as _cur:
+            _cols_sql = ", ".join(SUBJECT_COLUMNS)
+            _placeholders = ", ".join(["%s"] * len(SUBJECT_COLUMNS))
+            _cur.executemany(
+                f"INSERT INTO subject ({_cols_sql}) VALUES ({_placeholders})", subject_rows
+            )
+            _cur.executemany(
+                "INSERT INTO subject_broader (parent_id, child_id) VALUES (%s, %s)",
+                subject_broader_rows,
+            )
+            _cur.executemany(
+                "INSERT INTO subject_closure (ancestor_id, descendant_id, depth) VALUES (%s, %s, %s)",
+                subject_closure_rows,
+            )
+    except Exception:
+        conn.rollback()
+        raise
+    else:
+        conn.commit()
+
+    mo.md(
+        f"Inserted **{len(subject_rows)}** subjects, **{len(subject_broader_rows)}** broader "
+        f"edges, **{len(subject_closure_rows)}** closure rows."
+    )
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+    ### Verify the load
+
+    Row counts match what was sent, plus a spot check on one row to catch column-order/type bugs a
+    count alone wouldn't.
+    """)
+    return
+
+
+@app.cell
+def _(broader_table_all, closure_table, conn, mo, subject_table_all):
+    with conn.cursor() as _cur:
+        _cur.execute("SELECT COUNT(*) FROM subject")
+        db_subject_count = _cur.fetchone()[0]
+        _cur.execute("SELECT COUNT(*) FROM subject_broader")
+        db_broader_count = _cur.fetchone()[0]
+        _cur.execute("SELECT COUNT(*) FROM subject_closure")
+        db_closure_count = _cur.fetchone()[0]
+
+    _subject_ok = db_subject_count == len(subject_table_all)
+    _broader_ok = db_broader_count == len(broader_table_all)
+    _closure_ok = db_closure_count == len(closure_table)
+
+    mo.md(f"""
+    - `subject`: **{db_subject_count}** in DB vs **{len(subject_table_all)}** in the DataFrame -- {"OK" if _subject_ok else "MISMATCH"}
+    - `subject_broader`: **{db_broader_count}** in DB vs **{len(broader_table_all)}** in the DataFrame -- {"OK" if _broader_ok else "MISMATCH"}
+    - `subject_closure`: **{db_closure_count}** in DB vs **{len(closure_table)}** in the DataFrame -- {"OK" if _closure_ok else "MISMATCH"}
+    """)
+    return
+
+
+@app.cell
+def _(conn, mo, subject_table_all):
+    _sample_id = subject_table_all.iloc[0]["subject_id"]
+    with conn.cursor() as _cur:
+        _cur.execute(
+            "SELECT label_en, node_type, domain_code, source_updated_at "
+            "FROM subject WHERE subject_id = %s",
+            (_sample_id,),
+        )
+        db_row = _cur.fetchone()
+
+    _df_row = subject_table_all.loc[
+        subject_table_all["subject_id"] == _sample_id,
+        ["label_en", "node_type", "domain_code", "source_updated_at"],
+    ].iloc[0]
+
+    mo.md(f"""
+    Spot check for `{_sample_id}`:
+
+    - DB row: `{db_row}`
+    - DataFrame row: `{tuple(_df_row)}`
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""
     ## Next steps
 
     - This notebook's fetch mechanism (MARC `150:*` search + per-record detail, **plus** a static
@@ -924,12 +1169,20 @@ def _(mo):
       (`' PERSONAL DATA FILES'`, leading space) — worth a defensive `.strip()` if this notebook's
       alt-label handling gets reused elsewhere; not fixed here since it's cosmetic and didn't
       affect anything downstream in this notebook.
-    - No Postgres schema/load yet for `subject`/`subject_broader`/`subject_closure` — deliberately
-      deferred, same scope limit as the other two prototype notebooks. The existing DDL in the plan
-      doc already matches this notebook's column names directly (`broader_table`'s
-      `parent_id`/`child_id`, `closure_table`'s `ancestor_id`/`descendant_id`/`depth`), so no
-      schema changes look needed there — `node_type` has no `CHECK` constraint in the DDL, so the
-      new `'micro_thesaurus'`/`'root'` values need no migration either.
+    - **`subject`/`subject_broader`/`subject_closure` Postgres tables designed and loaded** (see
+      "Load into Postgres" above and `plans/intermediate_storage_layer_plan.md`'s "Postgres Schema
+      (subject hierarchy)"): `broader_table`'s `parent_id`/`child_id` and `closure_table`'s
+      `ancestor_id`/`descendant_id`/`depth` needed no renaming, but `subject`'s DDL gained three
+      columns beyond the original draft (`record_id`, `domain_code`, `source_updated_at`, all
+      nullable) to keep what this notebook already produces instead of dropping it at load time.
+      `node_type` still has no `CHECK` constraint, so `'micro_thesaurus'`/`'root'` needed no
+      migration.
+    - **`subject_id` switched from storing the full thesaurus URI to just its trailing id**
+      (`bare_thesaurus_id()`/`thesaurus_url()` below, `THESAURUS_URI_PREFIX` holds the one constant
+      prefix every row shares — confirmed live, 0 exceptions across 463 loaded rows, 0 id
+      collisions across `node_type`s). Every `parent_id`/`child_id`/`ancestor_id`/`descendant_id`
+      shrinks along with it since they all reference `subject.subject_id`. See plan doc's "Derived
+      URL columns" decision.
     - A full (non-sampled) run would need `SAMPLE_SIZE` raised to cover all ~8,523 concepts —
       untested at that scale here; the resolution-rate/timing implications of a true full fetch
       aren't validated by this notebook's 300-record sample. The domain/micro-thesaurus bootstrap
