@@ -1,8 +1,13 @@
 """
-Data processing orchestrator.
+Vote-agreement precomputation.
 
-This module orchestrates processing of individual datasets using
-registered processors for different dataset types.
+Turns the wide resolution table into the compact arrays every agreement/alignment query
+broadcasts over: a per-resolution consensus score, a (resolutions x countries) multilateral
+alignment matrix, and four boolean vote-type arrays.
+
+This module used to also orchestrate per-dataset fetch/processing via a registry of
+`DatasetProcessor` implementations. That work moved to the `undl-ingest` repo, which writes the
+already-normalized tables the app now reads.
 """
 
 import time
@@ -15,93 +20,13 @@ from typing import Dict, Any, List, Tuple
 from app.un_data_stream.data.progress import progressbar
 
 
-from ..processors.ga_processor import GAResolutionProcessor
-from ..processors.sc_processor import SCResolutionProcessor
-from ..processors.thesaurus_processor import ThesaurusProcessor
-from ..core.abstractions import DatasetProcessor
-
-
 class DataProcessor:
-    """Orchestrates processing of individual datasets."""
-    
+    """Precomputes the vote-agreement arrays the query engine broadcasts over."""
+
     def __init__(self, config: Dict[str, Any], logger: logging.Logger):
         self.config = config
         self.logger = logger
-        
-        # Registry of dataset processors
-        self._dataset_processors: Dict[str, DatasetProcessor] = {}
-        self._register_default_processors()
-        
-        # Thesaurus processor (separate from datasets)
-        self.thesaurus_processor = ThesaurusProcessor(logger)
-    
-    def _register_default_processors(self):
-        """Register default dataset processors."""
-        ga_processor = GAResolutionProcessor(self.logger)
-        self._dataset_processors[ga_processor.get_dataset_type()] = ga_processor
-        
-        # Future processors can be added here:
-        sc_processor = SCResolutionProcessor(self.logger)
-        self._dataset_processors[sc_processor.get_dataset_type()] = sc_processor
-    
-    def register_processor(self, processor: DatasetProcessor):
-        """Register a new dataset processor."""
-        self._dataset_processors[processor.get_dataset_type()] = processor
-    
-    def process_resolutions(self, raw_datasets: Dict[str, pd.DataFrame], **kwargs) -> Dict[str, pd.DataFrame]:
-        """Process individual resolution datasets."""
-        processed_datasets = {}
-        
-        for dataset_type, raw_data in raw_datasets.items():
-            if dataset_type in self._dataset_processors:
-                processor = self._dataset_processors[dataset_type]
-                processed_data = processor.process(raw_data, **kwargs)
-                processed_datasets.update(processed_data)
-            else:
-                self.logger.warning(f"No processor registered for dataset type: {dataset_type}")
-        
-        return processed_datasets
-    
-    def process_thesaurus(self, thesaurus_graph) -> Dict[str, pd.DataFrame]:
-        """Process thesaurus data."""
-        return self.thesaurus_processor.process(thesaurus_graph)
-    
-    def normalize_resolutions(self, resolutions_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-        """
-        Normalize the resolutions dataframe into separate tables.
-        
-        Args:
-            resolutions_df : pd.DataFrame
-                DataFrame with one row per resolution-subject pair, containing
-                resolution metadata and subject_id column
-            
-        Returns:
-            tuple of (resolutions_normalized_df, resolution_subjects_df)
-                - resolutions_normalized_df: One row per resolution with metadata
-                - resolution_subjects_df: Resolution-subject pairs mapping table
-        """
-        
-        # Identify columns that belong to resolution metadata vs subject mapping
-        subject_columns = ['subjects', 'subject_id']
-        resolution_columns = [col for col in resolutions_df.columns if col not in subject_columns]
-        
-        # 1. Create normalized resolutions table (one row per resolution)
-        resolutions_normalized_df = resolutions_df[resolution_columns].drop_duplicates()
-        
-        # 2. Create resolution-subject mapping table
-        # Only keep rows with valid subject_ids
-        valid_mappings = resolutions_df[resolutions_df['subject_id'].notna()]
-        resolution_subjects_df = valid_mappings[['undl_id', 'subject_id']].copy()
-        
-        # Remove duplicates (in case same subject appears multiple times for a resolution)
-        resolution_subjects_df = resolution_subjects_df.drop_duplicates()
-        
-        # Check for resolutions without subjects
-        resolutions_without_subjects = set(resolutions_normalized_df['undl_id']) - set(resolution_subjects_df['undl_id'])
-        if resolutions_without_subjects:
-            self.logger.info(f"\nWarning: {len(resolutions_without_subjects)} resolutions have no mapped subjects")
-        
-        return resolutions_normalized_df, resolution_subjects_df
+
     
     def calculate_agreement_data(
             self,

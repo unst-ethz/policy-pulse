@@ -1,57 +1,22 @@
 """
-UN Data Stream - Modular data processing pipeline for UN resolution data.
+UN Data Stream - the app's data layer.
 
-This package provides a flexible, extensible architecture for fetching, processing,
-and analyzing UN resolution data from multiple sources (GA, SC, HRC, etc.).
+Loads the normalized UN resolution tables out of Postgres (written by the `undl-ingest` jobs),
+precomputes the agreement/alignment arrays, and answers queries over them in memory.
+
+This package used to fetch from the UN Digital Library and process raw exports itself; that work
+now lives in the `undl-ingest` repo, and the app is a read-only consumer of the storage layer.
 """
 
-# Core abstractions
-from .core.abstractions import DatasetFetcher, DatasetProcessor
-
-# Fetchers
-from .fetchers.ga_fetcher import GAResolutionFetcher
-from .fetchers.sc_fetcher import SCResolutionFetcher
-from .fetchers.thesaurus_fetcher import ThesaurusFetcher
-
-# Processors
-from .processors.ga_processor import GAResolutionProcessor
-from .processors.sc_processor import SCResolutionProcessor
-from .processors.thesaurus_processor import ThesaurusProcessor
-
-# Data orchestration
-from .data.fetcher import DataFetcher
+from .analysis.query_engine import ResolutionQueryEngine
 from .data.processor import DataProcessor
-from .data.merger import DataMerger
 from .data.repository import DataRepository
 
-# Analysis tools
-from .analysis.query_engine import ResolutionQueryEngine
-from .analysis.analyzer import ResolutionAnalyzer
-
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 __author__ = "UN-ETH Project Team"
 
-# Public API - main classes that users will interact with
 __all__ = [
-    # Main entry points
     'DataRepository',
-    'DataFetcher', 
     'DataProcessor',
-    'DataMerger',
-    
-    # Analysis tools
     'ResolutionQueryEngine',
-    'ResolutionAnalyzer',
-    
-    # Abstract base classes (for extending)
-    'DatasetFetcher',
-    'DatasetProcessor',
-    
-    # Concrete implementations
-    'GAResolutionFetcher',
-    'GAResolutionProcessor',
-    'SCResolutionFetcher', 
-    'SCResolutionProcessor',
-    'ThesaurusFetcher',
-    'ThesaurusProcessor'
 ]

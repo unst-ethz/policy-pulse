@@ -1,54 +1,29 @@
 """
-General Assembly resolution data processor.
+GA subject-string matching.
 
-This module handles processing GA resolution data from country-per-row to 
-resolution-per-row format, including subject parsing and ID matching.
+Matches a resolution's raw subject strings (MARC `991.d`, flattened into the `subjects` column)
+against the UNBIS thesaurus, producing resolution -> subject_id pairs.
+
+INTERIM: this is the app's last piece of source-data processing and belongs in the ingestion job,
+which sees the raw repeated `991.d` fields rather than the flattened column, and can log unmatched
+strings as a QA finding. See T11 in plans/app_postgres_migration_plan.md — when that lands, this
+module goes away.
+
+This class used to also pivot the bulk CSV export from country-per-row to resolution-per-row
+(`process()`), and to declare a dataset type for a processor registry. Both went with the export
+and the registry; only the matching grammar below is still used.
 """
 
 import logging
 import pandas as pd
-from typing import Dict
-
-from ..core.abstractions import DatasetProcessor
 
 
-class GAResolutionProcessor(DatasetProcessor):
-    """Processes General Assembly resolution data."""
-    
+class GAResolutionProcessor:
+    """Matches GA resolution subject strings to thesaurus subject ids."""
+
     def __init__(self, logger: logging.Logger):
         self.logger = logger
-    
-    def process(self, raw_data: pd.DataFrame, **kwargs) -> Dict[str, pd.DataFrame]:
-        """Transform GA data from country-per-row to resolution-per-row format."""
-        self.logger.info("Processing GA resolution data")
-        
-        # GA-specific index columns
-        ga_index_columns = [
-            "undl_id", "date", "session", "resolution", "draft", 
-            "committee_report", "meeting", "title", "agenda_title", 
-            "subjects", "total_yes", "total_no", "total_abstentions", 
-            "total_non_voting", "total_ms", "undl_link"
-        ]
-        
-        # Transform to resolution-per-row format
-        transformed_df = raw_data.pivot(
-            index=ga_index_columns, 
-            columns='ms_code', 
-            values='ms_vote'
-        ).reset_index()
-        transformed_df.columns.name = None
-        
-        self.logger.info(f"Transformed {len(transformed_df)} GA resolutions")
-        
-        # Parse subjects using GA-specific logic
-        subject_table = kwargs.get('subject_table')
-        if subject_table is not None and not subject_table.empty:
-            parsed_df = self._parse_subjects(transformed_df, subject_table)
-            self.logger.info(f"Processed {len(parsed_df)} GA resolutions with parsed subjects")
-            return {"ga_resolutions": parsed_df}
-        else:
-            self.logger.warning("No subject_table provided, skipping subject parsing")
-            return {"ga_resolutions": transformed_df}
+
     
     def _parse_subjects(self, df: pd.DataFrame, subject_table: pd.DataFrame) -> pd.DataFrame:
         """
@@ -149,6 +124,3 @@ class GAResolutionProcessor(DatasetProcessor):
                 self.logger.info(f"  - '{subject}'")
         
         return resolution_df
-    
-    def get_dataset_type(self) -> str:
-        return "ga_resolutions"

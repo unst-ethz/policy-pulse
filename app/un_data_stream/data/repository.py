@@ -64,8 +64,8 @@ VOTE_DTYPE = pd.CategoricalDtype(categories=["Y", "N", "A", "X"], ordered=False)
 # treat them as "look it up" links, never as guaranteed single-hit record links.
 UNDL_SEARCH_URL = "https://digitallibrary.un.org/search?p="
 
-# Preferred: the resolution symbol, MARC field 791 — e.g. 791:"A/RES/80/311".
-UNDL_SYMBOL_QUERY = '791:"{}"'
+# Preferred: the resolution symbol. Can be with or without MARC field 791 — e.g. 791:"A/RES/80/311".
+UNDL_SYMBOL_QUERY = '"{}"'#'791:"{}"' Default without for now for more extensive search
 
 # Fallback: match on field 035, which carries our own undl_id. `resolution` is nullable
 # in the schema (currently populated on every row, but not guaranteed), and a row without a
