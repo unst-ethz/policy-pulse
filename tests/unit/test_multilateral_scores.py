@@ -16,6 +16,7 @@ Tests use hard-coded expected values derived by hand for each scenario.
 """
 
 import time
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -72,9 +73,7 @@ test_cases = [
     test_cases,
     ids=[c[0] for c in test_cases],
 )
-def test_multilateral_scores(
-    data_processor, test_name, votes, expected_multilateral
-):
+def test_multilateral_scores(data_processor, test_name, votes, expected_multilateral):
     """Per-country multilateral scores must match expected values for each scenario."""
     country_cols = list(votes.keys())
     df = pd.DataFrame([{"undl_id": "TEST/1", **votes}])
@@ -98,12 +97,10 @@ def test_multilateral_scores(
 
 def test_calculate_agreement_data_performance(data_processor, random_un_votes_dataframe):
     """calculate_agreement_data must complete within a reasonable time budget."""
-    countries = [
-        c for c in random_un_votes_dataframe.columns if c.startswith("Member_State_")
-    ]
+    countries = [c for c in random_un_votes_dataframe.columns if c.startswith("Member_State_")]
     start = time.perf_counter()
-    c_scores, multilateral_scores, vote_bool_arrays = (
-        data_processor.calculate_agreement_data(random_un_votes_dataframe, countries)
+    c_scores, multilateral_scores, vote_bool_arrays = data_processor.calculate_agreement_data(
+        random_un_votes_dataframe, countries
     )
     elapsed = time.perf_counter() - start
 

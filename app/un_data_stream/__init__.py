@@ -16,7 +16,7 @@ __version__ = "2.0.0"
 __author__ = "UN-ETH Project Team"
 
 __all__ = [
-    'DataRepository',
-    'DataProcessor',
-    'ResolutionQueryEngine',
+    "DataRepository",
+    "DataProcessor",
+    "ResolutionQueryEngine",
 ]

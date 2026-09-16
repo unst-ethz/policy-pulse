@@ -8,12 +8,12 @@ import urllib.parse
 
 import feffery_antd_components as fac
 import pandas as pd
-from dash import Input, Output, State, callback, html, dcc, ctx, no_update
+from dash import Input, Output, State, callback, ctx, dcc, html, no_update
 
-from .country_utils import _load_joining_dates, get_un_membership_years
-from .wordcloud_interactive import get_keyword_matched_ids
 from .. import data
 from . import data_store
+from .country_utils import _load_joining_dates, get_un_membership_years
+from .wordcloud_interactive import get_keyword_matched_ids
 
 prefix = "filter-component"
 ids = {
@@ -109,8 +109,12 @@ ERA_PRESETS = {
 # Ordered sequence of the six institutional eras for ◀ ▶ navigation
 # Excludes the two cross-cutting presets (until_1991, since_1992)
 ERA_SEQUENCE = [
-    "un_founding", "decolonization", "nieo_period",
-    "post_bipolarity", "mdg_era", "sdg_era",
+    "un_founding",
+    "decolonization",
+    "nieo_period",
+    "post_bipolarity",
+    "mdg_era",
+    "sdg_era",
 ]
 
 _TABS_WITHOUT_COUNTRY_FILTER = {"wordcloud"}
@@ -163,9 +167,7 @@ def parse_page_query_params(page_query_params):
     if keyword != "":
         parsed_filters["keyword"] = keyword
 
-    parsed_filters["country2"] = parse_query_list_value(
-        page_query_params.get("country2", "")
-    )
+    parsed_filters["country2"] = parse_query_list_value(page_query_params.get("country2", ""))
     subject_ids = parse_query_list_value(page_query_params.get("subject_ids", ""))
     parsed_filters["subject_ids"] = subject_ids if subject_ids else None
 
@@ -185,7 +187,11 @@ def register_callbacks():
     def step_era(prev_clicks, next_clicks, current_era):
         if current_era in ERA_SEQUENCE:
             idx = ERA_SEQUENCE.index(current_era)
-            new_idx = max(0, idx - 1) if ctx.triggered_id == ids["era_prev_btn"] else min(len(ERA_SEQUENCE) - 1, idx + 1)
+            new_idx = (
+                max(0, idx - 1)
+                if ctx.triggered_id == ids["era_prev_btn"]
+                else min(len(ERA_SEQUENCE) - 1, idx + 1)
+            )
         else:
             new_idx = 0 if ctx.triggered_id == ids["era_next_btn"] else len(ERA_SEQUENCE) - 1
         return ERA_SEQUENCE[new_idx]
@@ -195,7 +201,7 @@ def register_callbacks():
         Output(ids["era_prev_btn"], "disabled", allow_duplicate=True),
         Output(ids["era_next_btn"], "disabled", allow_duplicate=True),
         Input(ids["era_preset"], "value"),
-        prevent_initial_call='initial_duplicate',
+        prevent_initial_call="initial_duplicate",
     )
     def update_era_nav_state(current_era):
         if current_era not in ERA_SEQUENCE:
@@ -377,7 +383,6 @@ def register_callbacks():
     # Callback: Query data when filters change
     # Tabs where country1 is disabled or highlight-only — participation filter must not apply
 
-
     @callback(
         Output(ids["data_store"], "data"),
         Input(ids["filter_store"], "data"),
@@ -425,8 +430,18 @@ def register_callbacks():
                 df = df[df["undl_id"].isin(matched_ids)]
 
             # Build column list: base columns + undl_link + vote columns when countries selected
-            base_cols = ["undl_id", "resolution", "session", "date", "title", "consensus_score",
-                         "total_yes", "total_no", "total_abstentions", "modality"]
+            base_cols = [
+                "undl_id",
+                "resolution",
+                "session",
+                "date",
+                "title",
+                "consensus_score",
+                "total_yes",
+                "total_no",
+                "total_abstentions",
+                "modality",
+            ]
             if "undl_link" in df.columns:
                 base_cols.append("undl_link")
 
@@ -564,7 +579,7 @@ def layout(page_query_params: dict[str, str] | None = None):
             html.P(
                 "Use the controls below to narrow down the resolutions by keyword, country, year range, or subject area. "
                 "Select a main country to enable voting agreement analysis across the tabs.",
-                style={"color": "#7f8c8d", "marginBottom": "20px"}
+                style={"color": "#7f8c8d", "marginBottom": "20px"},
             ),
             # Filters container
             html.Div(
@@ -579,9 +594,7 @@ def layout(page_query_params: dict[str, str] | None = None):
                                         [
                                             html.Label(
                                                 [
-                                                    html.Span(
-                                                        "🌍", style={"marginRight": "5px"}
-                                                    ),
+                                                    html.Span("🌍", style={"marginRight": "5px"}),
                                                     "Main Country",
                                                 ],
                                                 style={
@@ -627,7 +640,10 @@ def layout(page_query_params: dict[str, str] | None = None):
                                             dcc.RadioItems(
                                                 id=ids["country_filter_mode"],
                                                 options=[
-                                                    {"label": " Voted on resolution", "value": "voted"},
+                                                    {
+                                                        "label": " Voted on resolution",
+                                                        "value": "voted",
+                                                    },
                                                     {"label": " Was UN member", "value": "member"},
                                                     {"label": " No filter", "value": "none"},
                                                 ],
@@ -933,9 +949,7 @@ def layout(page_query_params: dict[str, str] | None = None):
                                         [
                                             html.Label(
                                                 [
-                                                    html.Span(
-                                                        "🔍", style={"marginRight": "5px"}
-                                                    ),
+                                                    html.Span("🔍", style={"marginRight": "5px"}),
                                                     "Keyword Search",
                                                 ],
                                                 style={

@@ -3,6 +3,15 @@ from typing import Any
 
 import pandas as pd
 
+# Re-exported, not used here: the feature modules reach these through `app.data`
+# (`data.get_country_region(...)` in multilateral_scatter.py, profile_page.py) rather than
+# importing app.features.country_utils themselves. noqa: F401 keeps a linter from removing an
+# import whose only purpose is the re-export — doing so breaks those call sites at *callback*
+# time, not at import time, so nothing catches it until the tab is opened.
+from .features.country_utils import (  # noqa: F401
+    get_country_region,
+    get_country_subregion,
+)
 from .un_data_stream import DataRepository, ResolutionQueryEngine
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -43,6 +52,7 @@ _LEGACY_VOTING_CODES: dict[str, dict[str, Any]] = {
         },
     },
 }
+
 
 # TODO: quick check that the years make sense? Also i feel like this code is fragile
 def _coverage_years(coverage_periods: Any) -> tuple[list[int], list[int]]:
@@ -216,6 +226,7 @@ def get_region_tree_data() -> list[dict]:
     Each node has: key, title, value, and children (list of child nodes).
     """
     from .features.country_utils import _load_m49
+
     df = _load_m49()
 
     # Collect nodes by code for deduplication and parent lookup
@@ -244,7 +255,11 @@ def get_region_tree_data() -> list[dict]:
         # Sub-region
         sr_code = str(int(float(row["Sub-region Code"]))).zfill(3)
         if sr_code not in sub_regions:
-            sub_regions[sr_code] = {"key": sr_code, "title": row["Sub-region Name"], "value": sr_code}
+            sub_regions[sr_code] = {
+                "key": sr_code,
+                "title": row["Sub-region Name"],
+                "value": sr_code,
+            }
             sub_to_region[sr_code] = r_code
 
         # Intermediate region (optional)
@@ -253,7 +268,11 @@ def get_region_tree_data() -> list[dict]:
         if isinstance(ir_raw, float) and not pd.isna(ir_raw):
             ir_code = str(int(ir_raw)).zfill(3)
             if ir_code not in inter_regions:
-                inter_regions[ir_code] = {"key": ir_code, "title": row["Intermediate Region Name"], "value": ir_code}
+                inter_regions[ir_code] = {
+                    "key": ir_code,
+                    "title": row["Intermediate Region Name"],
+                    "value": ir_code,
+                }
                 inter_to_sub[ir_code] = sr_code
             parent_code = ir_code
 
@@ -282,13 +301,15 @@ def get_region_tree_data() -> list[dict]:
 
     # Use joining_dates.csv as the authoritative source for countries with voting data
     from .features.country_utils import _load_joining_dates
+
     valid = set(_load_joining_dates()["country"].tolist())
 
     for parent_dict in [inter_regions, sub_regions]:
         for code, node in parent_dict.items():
             if "children" in node:
                 node["children"] = [
-                    c for c in node["children"]
+                    c
+                    for c in node["children"]
                     if "children" in c or c["value"] in valid  # keep groups, filter leaves
                 ]
 
@@ -330,7 +351,9 @@ def get_region_tree_data() -> list[dict]:
             "value": "historical",
             "children": historical_children,
         }
-        print(f"Region tree: {len(m49_codes)} current + {len(historical_children)} historical countries")
+        print(
+            f"Region tree: {len(m49_codes)} current + {len(historical_children)} historical countries"
+        )
         return [world, historical_node]
 
     print(f"Region tree: {len(m49_codes)} current countries, no historical found")
@@ -339,18 +362,16 @@ def get_region_tree_data() -> list[dict]:
 
 REGION_TREE_DATA = get_region_tree_data()
 
-# TODO: is it a good pattern to import it here just to import it in another file again?
-from .features.country_utils import get_country_region, get_country_subregion
-
 # Top-level subjects: the thesaurus's 18 domains (`node_type == 'scheme'`).
 TOP_LEVEL_SUBJECTS = set(
-    repo.get_data()["subject"]
-    .loc[lambda df: df["node_type"] == "scheme", "subject_id"]
-    .tolist()
+    repo.get_data()["subject"].loc[lambda df: df["node_type"] == "scheme", "subject_id"].tolist()
 )
 
 # Map subject IDs to labels TODO: If we want to add multiple languages just add the other languages here
-SUBJECT_ID_TO_LABEL_MAP = {row["subject_id"]: row["label_en"] for _, row in repo.get_data()["subject"].iterrows()}
+SUBJECT_ID_TO_LABEL_MAP = {
+    row["subject_id"]: row["label_en"] for _, row in repo.get_data()["subject"].iterrows()
+}
+
 
 def available_subjects() -> list[dict[str, Any]]:
     data = repo.get_data()

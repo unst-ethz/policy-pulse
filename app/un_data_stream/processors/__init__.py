@@ -7,4 +7,4 @@ MARC `991.d` fields. See T11 in plans/app_postgres_migration_plan.md.
 
 from .ga_processor import GAResolutionProcessor
 
-__all__ = ['GAResolutionProcessor']
+__all__ = ["GAResolutionProcessor"]

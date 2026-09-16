@@ -30,9 +30,7 @@ def make_adaptive_colorscale_plotly(
 
 
 def _compute_scale_params(
-        scores: pd.Series,
-        lo: float = None,
-        hi: float = None
+    scores: pd.Series, lo: float = None, hi: float = None
 ) -> tuple[float, float, float, float]:
     """Compute colour-scale parameters from a consensus-score series.
 

@@ -60,14 +60,16 @@ def random_un_votes_dataframe():
     undl_ids = [f"A/RES/78/{i}" for i in range(n_resolutions)]
 
     data = {
-        'undl_id': undl_ids,
-        'date': pd.date_range(start='2024-01-01', periods=n_resolutions),
-        'title': [f"Resolution Topic {i}" for i in range(n_resolutions)]
+        "undl_id": undl_ids,
+        "date": pd.date_range(start="2024-01-01", periods=n_resolutions),
+        "title": [f"Resolution Topic {i}" for i in range(n_resolutions)],
     }
 
     # Fill country columns with random Y, N, A, or NaN (Missing)
     for country in countries:
-        data[country] = np.random.choice(['Y', 'N', 'A', np.nan], n_resolutions, p=[0.4, 0.2, 0.3, 0.1])
+        data[country] = np.random.choice(
+            ["Y", "N", "A", np.nan], n_resolutions, p=[0.4, 0.2, 0.3, 0.1]
+        )
 
     return pd.DataFrame(data)
 
@@ -79,12 +81,10 @@ def data_processor(caplog):
     The 'caplog' fixture is included to allow testing of log output.
     """
     import logging
+
     from app.un_data_stream.data.processor import DataProcessor
 
     # Using a dedicated test logger to avoid polluting main logs
     logger = logging.getLogger("un_data_test")
-    config = {
-        "env": "test",
-        "threshold": 0.5
-    }
+    config = {"env": "test", "threshold": 0.5}
     return DataProcessor(config, logger)

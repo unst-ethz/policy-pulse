@@ -19,32 +19,42 @@ layout = html.Div(
                         html.P(html.Strong("Features")),
                         html.Ul(
                             [
-                                html.Li([
-                                    html.Strong("Resolution List: "),
-                                    "Browse every UN General Assembly (UNGA) resolution alongside the selected countries votes. "
-                                    "Sort by date, filter by vote type (Yes, No, Abstain), and search by keyword or subject area.",
-                                ]),
-                                html.Li([
-                                    html.Strong("Agreement Map: "),
-                                    "A world map showing how closely every other UN member has voted with your selected country.",
-                                ]),
-                                html.Li([
-                                    html.Strong("Agreement Timeline: "),
-                                    "A timeline tracking how the voting alignment between two countries "
-                                    "has evolved session by session — especially useful for spotting the temporal divergence between member states based on political shifts or major world events.",
-                                ]),
-                                html.Li([
-                                    html.Strong("Alignment by Subject: "),
-                                    "Breaks down the agreement aligment between two countries by UN subject area, "
-                                    "revealing which topics they reliably agree on and where they diverge.",
-                                ]),
-                                html.Li([
-                                    html.Strong("Word Cloud: "),
-                                    "Visualises the most frequent terms in resolution titles for the current filter selection, "
-                                    "giving a quick sense (or ",
-                                    html.Em("pulse"),
-                                    ") of which themes dominate the agenda.",
-                                ]),
+                                html.Li(
+                                    [
+                                        html.Strong("Resolution List: "),
+                                        "Browse every UN General Assembly (UNGA) resolution alongside the selected countries votes. "
+                                        "Sort by date, filter by vote type (Yes, No, Abstain), and search by keyword or subject area.",
+                                    ]
+                                ),
+                                html.Li(
+                                    [
+                                        html.Strong("Agreement Map: "),
+                                        "A world map showing how closely every other UN member has voted with your selected country.",
+                                    ]
+                                ),
+                                html.Li(
+                                    [
+                                        html.Strong("Agreement Timeline: "),
+                                        "A timeline tracking how the voting alignment between two countries "
+                                        "has evolved session by session — especially useful for spotting the temporal divergence between member states based on political shifts or major world events.",
+                                    ]
+                                ),
+                                html.Li(
+                                    [
+                                        html.Strong("Alignment by Subject: "),
+                                        "Breaks down the agreement aligment between two countries by UN subject area, "
+                                        "revealing which topics they reliably agree on and where they diverge.",
+                                    ]
+                                ),
+                                html.Li(
+                                    [
+                                        html.Strong("Word Cloud: "),
+                                        "Visualises the most frequent terms in resolution titles for the current filter selection, "
+                                        "giving a quick sense (or ",
+                                        html.Em("pulse"),
+                                        ") of which themes dominate the agenda.",
+                                    ]
+                                ),
                             ]
                         ),
                     ]
@@ -63,9 +73,7 @@ layout = html.Div(
                                     "Subject areas with many more resolutions "
                                     "can have an outsized effect on the overall agreement figure."
                                 ),
-                                html.Li(
-                                    "To be completed ..."
-                                ),
+                                html.Li("To be completed ..."),
                             ]
                         ),
                     ]

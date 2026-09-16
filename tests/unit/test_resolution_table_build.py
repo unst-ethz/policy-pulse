@@ -25,31 +25,35 @@ from app.un_data_stream.data.repository import (
 @pytest.fixture
 def outcomes() -> pd.DataFrame:
     """Three resolutions as `resolution_outcomes` hands them over (column names included)."""
-    return pd.DataFrame({
-        "undl_id": ["100", "200", "300"],
-        "resolution": ["A/RES/80/1", "A/RES/13(I)", "A/RES/80/3"],
-        "date": ["2025-09-04", "1947-11-13", "2025-09-05"],
-        "session_label": ["80", "2", "80"],
-        "title": ["First", "Second", "Third"],
-        "agenda_title": ["a", "b", "c"],
-        "subjects": ["PEACE", None, "HEALTH | UN"],
-        "draft": [None, None, None],
-        "total_yes": [100, 50, None],
-        "total_no": [2, 1, None],
-        "total_abstentions": [3, 0, None],
-        "total_non_voting": [1, 2, None],
-        "total_ms": [106, 53, None],
-    })
+    return pd.DataFrame(
+        {
+            "undl_id": ["100", "200", "300"],
+            "resolution": ["A/RES/80/1", "A/RES/13(I)", "A/RES/80/3"],
+            "date": ["2025-09-04", "1947-11-13", "2025-09-05"],
+            "session_label": ["80", "2", "80"],
+            "title": ["First", "Second", "Third"],
+            "agenda_title": ["a", "b", "c"],
+            "subjects": ["PEACE", None, "HEALTH | UN"],
+            "draft": [None, None, None],
+            "total_yes": [100, 50, None],
+            "total_no": [2, 1, None],
+            "total_abstentions": [3, 0, None],
+            "total_non_voting": [1, 2, None],
+            "total_ms": [106, 53, None],
+        }
+    )
 
 
 @pytest.fixture
 def votes() -> pd.DataFrame:
     """Votes for two of the three resolutions; '300' was adopted without a vote."""
-    return pd.DataFrame({
-        "undl_id": ["100", "100", "100", "200", "200"],
-        "country_code": ["USA", "CHN", "FRA", "USA", "CHN"],
-        "vote": ["Y", "N", "A", "Y", "Y"],
-    })
+    return pd.DataFrame(
+        {
+            "undl_id": ["100", "100", "100", "200", "200"],
+            "country_code": ["USA", "CHN", "FRA", "USA", "CHN"],
+            "vote": ["Y", "N", "A", "Y", "Y"],
+        }
+    )
 
 
 def test_pivot_produces_one_column_per_country(outcomes, votes):
@@ -99,12 +103,23 @@ def test_session_comes_from_session_label_as_string(outcomes, votes):
 
 
 def test_special_session_labels_survive():
-    outcomes = pd.DataFrame({
-        "undl_id": ["1"], "resolution": ["A/RES/S-10/2"], "date": ["1978-06-30"],
-        "session_label": ["10sp"], "title": ["t"], "agenda_title": [None],
-        "subjects": [None], "draft": [None], "total_yes": [None], "total_no": [None],
-        "total_abstentions": [None], "total_non_voting": [None], "total_ms": [None],
-    })
+    outcomes = pd.DataFrame(
+        {
+            "undl_id": ["1"],
+            "resolution": ["A/RES/S-10/2"],
+            "date": ["1978-06-30"],
+            "session_label": ["10sp"],
+            "title": ["t"],
+            "agenda_title": [None],
+            "subjects": [None],
+            "draft": [None],
+            "total_yes": [None],
+            "total_no": [None],
+            "total_abstentions": [None],
+            "total_non_voting": [None],
+            "total_ms": [None],
+        }
+    )
     votes = pd.DataFrame({"undl_id": ["1"], "country_code": ["USA"], "vote": ["Y"]})
 
     table, _ = DataRepository._build_resolution_table(outcomes, votes)
@@ -122,6 +137,7 @@ def test_dates_are_parsed(outcomes, votes):
 # UN Digital Library links
 # ---------------------------------------------------------------------------
 
+
 def test_symbol_search_link_is_percent_encoded():
     """`undl_id` has no digitallibrary equivalent, so links are searches on the symbol.
 
@@ -136,11 +152,14 @@ def test_symbol_search_link_is_percent_encoded():
     assert "A%2FRES%2F80%2F311" in link, "the symbol's slashes must be encoded"
 
 
-@pytest.mark.parametrize("symbol, must_contain", [
-    ("A/RES/13(I)", "%28I%29"),          # parentheses, early sessions
-    ("A/RES/71/101[B]", "%5BB%5D"),      # bracketed parts
-    ("A/RES/2/1", "A%2FRES%2F2%2F1"),    # plain slashes
-])
+@pytest.mark.parametrize(
+    "symbol, must_contain",
+    [
+        ("A/RES/13(I)", "%28I%29"),  # parentheses, early sessions
+        ("A/RES/71/101[B]", "%5BB%5D"),  # bracketed parts
+        ("A/RES/2/1", "A%2FRES%2F2%2F1"),  # plain slashes
+    ],
+)
 def test_awkward_symbols_are_encoded(symbol, must_contain):
     (link,) = _undl_search_links(pd.Series([symbol]), pd.Series(["1"]))
 

@@ -1,13 +1,12 @@
-from dash import get_relative_path, html, dcc, register_page
+from dash import dcc, get_relative_path, html, register_page
 
 from ..features import (
+    case_study,
     feature_description,
     general_stats_panel,
     recent_resolutions_panel,
     wordcloud_viz,
-    case_study,
 )
-
 
 register_page(__name__, path="/", title="Policy Pulse: Homepage")
 

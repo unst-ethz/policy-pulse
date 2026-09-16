@@ -21,9 +21,7 @@ server = app.server
 
 # Features must be imported after app is initialized, so they can use
 # get_relative_path to resolve links based on the app's base path.
-from .features import navbar  # noqa: E402
-from .features import footer  # noqa: E402
-from .features import breadcrumb  # noqa: E402
+from .features import breadcrumb, footer, navbar  # noqa: E402
 
 app.layout = html.Div(
     [
@@ -46,5 +44,15 @@ app.layout = html.Div(
 )
 breadcrumb.register_callbacks()
 
-if __name__ == "__main__":
+
+def main() -> None:
+    """Run the local development server (`uv run start-app`).
+
+    Development only: it enables Dash's debug mode and binds to localhost. Production serves the
+    `server` object above through gunicorn instead — see the Dockerfile.
+    """
     app.run(debug=True, port=8050, host="127.0.0.1")
+
+
+if __name__ == "__main__":
+    main()

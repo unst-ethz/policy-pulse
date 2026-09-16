@@ -11,6 +11,7 @@ stored column matches the reference for a sample of resolutions.
 """
 
 import warnings
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -29,9 +30,11 @@ pytestmark = pytest.mark.needs_postgres
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="module")
 def engine():
     from app import data as app_data
+
     return app_data.query_engine
 
 
@@ -53,6 +56,7 @@ def sample_rows(resolution_table):
 # ---------------------------------------------------------------------------
 # Reference implementation
 # ---------------------------------------------------------------------------
+
 
 def _reference_consensus_score(row: pd.Series, country_columns: list) -> float:
     """Ground-truth consensus score derived from raw vote strings.
@@ -77,6 +81,7 @@ def _reference_consensus_score(row: pd.Series, country_columns: list) -> float:
 # Schema / range tests
 # ---------------------------------------------------------------------------
 
+
 def test_consensus_score_column_present(resolution_table):
     assert "consensus_score" in resolution_table.columns
 
@@ -91,6 +96,7 @@ def test_consensus_score_in_range(resolution_table):
 # Correctness test
 # ---------------------------------------------------------------------------
 
+
 def test_consensus_scores_match_reference(sample_rows, country_columns):
     """Stored consensus scores must match the reference implementation to 1e-4."""
     for _, row in sample_rows.iterrows():
@@ -98,11 +104,8 @@ def test_consensus_scores_match_reference(sample_rows, country_columns):
         actual = row["consensus_score"]
 
         if np.isnan(expected):
-            assert pd.isna(actual), (
-                f"Resolution {row['undl_id']}: expected NaN, got {actual}"
-            )
+            assert pd.isna(actual), f"Resolution {row['undl_id']}: expected NaN, got {actual}"
         else:
             assert abs(float(actual) - expected) < 1e-4, (
-                f"Resolution {row['undl_id']}: "
-                f"expected {expected:.6f}, got {float(actual):.6f}"
+                f"Resolution {row['undl_id']}: expected {expected:.6f}, got {float(actual):.6f}"
             )

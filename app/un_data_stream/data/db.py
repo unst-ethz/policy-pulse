@@ -88,9 +88,7 @@ def connect_or_explain(engine: Engine, logger: logging.Logger | None = None):
         raise RuntimeError(f"{detail}\n{hint}") from exc
 
 
-def read_table(
-    conn: Connection, table_name: str, columns: list[str] | None = None
-) -> pd.DataFrame:
+def read_table(conn: Connection, table_name: str, columns: list[str] | None = None) -> pd.DataFrame:
     """
     Read one table into a DataFrame, optionally only `columns`.
     """

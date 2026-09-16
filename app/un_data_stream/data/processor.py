@@ -10,12 +10,13 @@ This module used to also orchestrate per-dataset fetch/processing via a registry
 already-normalized tables the app now reads.
 """
 
-import time
 import logging
+import time
 import warnings
+from typing import Any, Dict, List, Tuple
+
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, List, Tuple
 
 from app.un_data_stream.data.progress import progressbar
 
@@ -27,11 +28,8 @@ class DataProcessor:
         self.config = config
         self.logger = logger
 
-    
     def calculate_agreement_data(
-            self,
-            resolutions_df: pd.DataFrame,
-            country_columns: List[str]
+        self, resolutions_df: pd.DataFrame, country_columns: List[str]
     ) -> Tuple[Dict[str, float], np.ndarray, Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
         """
         For each resolution, compute the consensus score (scalar) and per-country
@@ -78,33 +76,33 @@ class DataProcessor:
         multilateral_rows = []
 
         for idx, row in progressbar(resolutions_df.iterrows(), total=len(resolutions_df)):
-            undl_id = row['undl_id']
+            undl_id = row["undl_id"]
             agreement_matrix = self._calculate_single_resolution_matrix(row, country_columns)
             consensus_scores[undl_id] = self._calculate_single_consensus_score(agreement_matrix)
 
             # Per-country multilateral score: mean agreement with every *other* voting country.
             # Diagonal is masked to nan so self-agreement (always 1.0) does not inflate the mean.
             mat_no_diag = np.where(off_diag_mask, agreement_matrix, np.nan)  # (C, C)
-            num_valid = np.sum(~np.isnan(mat_no_diag), axis=1)               # (C,) — voting partners per country
-            row_means = np.full(n, np.nan)                                   # (C,) — default nan for non-voters
-            row_agreement_sums = np.nansum(mat_no_diag, axis=1)              # (C,)
+            num_valid = np.sum(~np.isnan(mat_no_diag), axis=1)  # (C,) — voting partners per country
+            row_means = np.full(n, np.nan)  # (C,) — default nan for non-voters
+            row_agreement_sums = np.nansum(mat_no_diag, axis=1)  # (C,)
             # out= / where= writes results directly into row_means, leaving nan where num_valid == 0
             np.divide(row_agreement_sums, num_valid, out=row_means, where=num_valid > 0)
             multilateral_rows.append(row_means)
 
-        multilateral_scores = np.array(multilateral_rows, dtype=np.float32)  # float32 saves disk space when pickling
+        multilateral_scores = np.array(
+            multilateral_rows, dtype=np.float32
+        )  # float32 saves disk space when pickling
 
         # Compute boolean arrays with vote-type indicators. By pickling these arrays,
         # the query engine will not have to re-parse vote columns on every startup.
         vote_str = (
-            resolutions_df[country_columns]
-            .astype(str)
-            .apply(lambda s: s.str.strip().str.upper())
+            resolutions_df[country_columns].astype(str).apply(lambda s: s.str.strip().str.upper())
         )
-        vote_yes       = (vote_str == "Y").to_numpy(dtype=bool)
-        vote_no        = (vote_str == "N").to_numpy(dtype=bool)
+        vote_yes = (vote_str == "Y").to_numpy(dtype=bool)
+        vote_no = (vote_str == "N").to_numpy(dtype=bool)
         vote_abstained = (vote_str == "A").to_numpy(dtype=bool)
-        vote_voted     = vote_yes | vote_no | vote_abstained
+        vote_voted = vote_yes | vote_no | vote_abstained
 
         elapsed_time = time.time() - start_time
         n_res = len(consensus_scores)
@@ -122,8 +120,7 @@ class DataProcessor:
 
     @staticmethod
     def _calculate_single_resolution_matrix(
-            resolution_row: pd.Series,
-            country_columns: List[str]
+        resolution_row: pd.Series, country_columns: List[str]
     ) -> np.ndarray:
         """
         Quickly calculate the full vote-agreement matrix for a single resolution.
@@ -143,7 +140,9 @@ class DataProcessor:
 
         # Extract the country votes as a NumPy array (floats to accommodate NaN)
         # Using .get() for safety, defaulting to np.nan
-        votes = np.array([vote_mapping.get(resolution_row[c], np.nan) for c in country_columns], dtype=np.float32)
+        votes = np.array(
+            [vote_mapping.get(resolution_row[c], np.nan) for c in country_columns], dtype=np.float32
+        )
 
         # broadcast (C,1) vs (1,C): all pairwise vote differences in one operation
         abs_diff_mat = np.abs(votes[:, np.newaxis] - votes[np.newaxis, :])  # (C, C)

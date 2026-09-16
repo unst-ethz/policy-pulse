@@ -23,6 +23,7 @@ YEAR_RANGE = re.compile(r"\((\d{4})–(\d{4})\)")
 @pytest.fixture(scope="module")
 def data():
     from app import data as app_data
+
     return app_data
 
 

@@ -52,11 +52,11 @@ C2 = "CHN"
 
 # Time budgets in seconds (vectorised implementation targets)
 TIME_BUDGETS = {
-    "choropleth_full":     0.5,   # 5'000+ resolutions, average=True
-    "choropleth_post2000": 0.2,   # 2'000+ resolutions, average=True
-    "choropleth_decade":   0.1,   #  ~800 resolutions, average=True
-    "bilateral_full":      0.75,  # 5'000+ resolutions, average=False
-    "bilateral_post2000":  0.25,  # 2'000+ resolutions, average=False
+    "choropleth_full": 0.5,  # 5'000+ resolutions, average=True
+    "choropleth_post2000": 0.2,  # 2'000+ resolutions, average=True
+    "choropleth_decade": 0.1,  #  ~800 resolutions, average=True
+    "bilateral_full": 0.75,  # 5'000+ resolutions, average=False
+    "bilateral_post2000": 0.25,  # 2'000+ resolutions, average=False
 }
 
 
@@ -71,9 +71,11 @@ pytestmark = pytest.mark.needs_postgres
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="module")
 def engine():
     from app import data as app_data
+
     return app_data.query_engine
 
 
@@ -115,6 +117,7 @@ def _reference_agreement(resolution_table: pd.DataFrame, c1: str, c2: str, ids) 
 # ---------------------------------------------------------------------------
 # Correctness tests
 # ---------------------------------------------------------------------------
+
 
 def test_result_is_dataframe_with_undl_id(engine, sample_res_ids):
     result = engine.query_agreement_between_countries(
@@ -183,7 +186,9 @@ def test_matches_reference_computation(engine, resolution_table, sample_res_ids)
     e_vals = ref.loc[common]
 
     pd.testing.assert_series_equal(
-        r_vals.isna(), e_vals.isna(), check_names=False,
+        r_vals.isna(),
+        e_vals.isna(),
+        check_names=False,
         obj=f"NaN pattern mismatch for {C1}–{C2}",
     )
 
@@ -240,6 +245,7 @@ def test_pre_membership_resolutions_are_nan(engine):
 # resolution_table dtype tests
 # ---------------------------------------------------------------------------
 
+
 def test_vote_columns_are_categorical(engine):
     """Vote columns must be loaded as CategoricalDtype, not object.
 
@@ -248,6 +254,7 @@ def test_vote_columns_are_categorical(engine):
     object-array overhead.
     """
     import pandas as pd
+
     rt = engine.resolution_table
     vote_cols = engine.country_columns
     assert vote_cols, "No vote columns found in resolution_table"
@@ -269,14 +276,13 @@ def test_vote_values_in_expected_set(engine):
     for col in vote_cols:
         observed = set(rt[col].dropna().unique())
         unexpected = observed - allowed
-        assert not unexpected, (
-            f"Column '{col}' contains unexpected vote values: {unexpected}"
-        )
+        assert not unexpected, f"Column '{col}' contains unexpected vote values: {unexpected}"
 
 
 # ---------------------------------------------------------------------------
 # Performance tests
 # ---------------------------------------------------------------------------
+
 
 def test_choropleth_full_within_budget(engine, all_res_ids):
     t0 = time.perf_counter()
@@ -358,9 +364,7 @@ def test_summary(engine, all_res_ids, post2000_res_ids, decade_res_ids, capsys):
 
     for label, ids, avg, budget in scenarios:
         t0 = time.perf_counter()
-        engine.query_agreement_between_countries(
-            country_code=C1, resolution_ids=ids, average=avg
-        )
+        engine.query_agreement_between_countries(country_code=C1, resolution_ids=ids, average=avg)
         elapsed = time.perf_counter() - t0
         ok = "YES" if elapsed < budget else "NO"
         lines.append(

@@ -32,7 +32,8 @@ def _country_to_subregion() -> dict[str, str]:
     return {
         row["ISO-alpha3 Code"].strip(): row["Sub-region Name"].strip()
         for _, row in _load_m49().iterrows()
-        if isinstance(row.get("ISO-alpha3 Code"), str) and isinstance(row.get("Sub-region Name"), str)
+        if isinstance(row.get("ISO-alpha3 Code"), str)
+        and isinstance(row.get("Sub-region Name"), str)
     }
 
 

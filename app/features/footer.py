@@ -1,6 +1,6 @@
-from dash import html
-
 import os
+
+from dash import html
 
 build_commit = os.getenv("BUILD_COMMIT", "unknown")
 build_date = os.getenv("BUILD_DATE", "unknown")

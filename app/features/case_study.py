@@ -1,21 +1,25 @@
-from dash import get_relative_path, html, dcc
+from dash import dcc, get_relative_path, html
 
 
-_share_step = lambda n: html.Div([
-    html.H3(f"Step {n}: Share, export, or start over"),
-    html.P(
+def _share_step(n):
+    return html.Div(
         [
-            "Found something interesting? The URL in your browser always reflects your current filters — "
-            "copy and paste it to share the exact view with someone else. "
-            "You can also hit ",
-            html.Strong("Download CSV"),
-            " (top right of the filter panel) to export the matching resolutions for further analysis in Excel, Python, or any other tool. "
-            "When you want to start fresh, ",
-            html.Strong("Reset Filters"),
-            " (next to the download button) clears everything back to the default view.",
+            html.H3(f"Step {n}: Share, export, or start over"),
+            html.P(
+                [
+                    "Found something interesting? The URL in your browser always reflects your current filters — "
+                    "copy and paste it to share the exact view with someone else. "
+                    "You can also hit ",
+                    html.Strong("Download CSV"),
+                    " (top right of the filter panel) to export the matching resolutions for further analysis in Excel, Python, or any other tool. "
+                    "When you want to start fresh, ",
+                    html.Strong("Reset Filters"),
+                    " (next to the download button) clears everything back to the default view.",
+                ]
+            ),
         ]
-    ),
-])
+    )
+
 
 _tip = html.P(
     [
@@ -95,7 +99,7 @@ layout = html.Div(
                                         "the dataset. Filtering them out can reveal patterns that would otherwise be hidden. "
                                         "You can also use the ",
                                         html.Strong("Keyword Search"),
-                                        " to find resolutions by title (e.g., searching \"disarmament\" or \"climate\").",
+                                        ' to find resolutions by title (e.g., searching "disarmament" or "climate").',
                                     ]
                                 ),
                                 html.H3("Step 4: See who agrees with Switzerland"),
@@ -183,7 +187,9 @@ layout = html.Div(
                         html.Div(
                             [
                                 _tip,
-                                html.H2("Diving Deeper: Tracing a Political Transition Through Votes"),
+                                html.H2(
+                                    "Diving Deeper: Tracing a Political Transition Through Votes"
+                                ),
                                 html.P(
                                     [
                                         "Now that you have mastered the basics, let's attempt to explore some more detailed analysis: this case study compares the voting records of ",
@@ -268,7 +274,9 @@ layout = html.Div(
                                     ]
                                 ),
                                 # html.H3("Step 4: Coming soon"),
-                                html.H3("Step 4: Trace the transition through Political & Legal Questions"),
+                                html.H3(
+                                    "Step 4: Trace the transition through Political & Legal Questions"
+                                ),
                                 html.P(
                                     [
                                         "The subject area where the transition is most visible is ",
@@ -281,12 +289,34 @@ layout = html.Div(
                                         " filter to step through consecutive five-year windows around Bulgaria's political transition:",
                                     ]
                                 ),
-                                html.Ul([
-                                    html.Li([html.Strong("1980–1985: "), "95% agreement (217 votes)"]),
-                                    html.Li([html.Strong("1985–1990: "), "94% agreement (387 votes) — the transition begins"]),
-                                    html.Li([html.Strong("1990–1995: "), "67% agreement (151 votes) — post transition dip"]),
-                                    html.Li([html.Strong("1995–2000: "), "71% agreement (159 votes)"]),
-                                ]),
+                                html.Ul(
+                                    [
+                                        html.Li(
+                                            [
+                                                html.Strong("1980–1985: "),
+                                                "95% agreement (217 votes)",
+                                            ]
+                                        ),
+                                        html.Li(
+                                            [
+                                                html.Strong("1985–1990: "),
+                                                "94% agreement (387 votes) — the transition begins",
+                                            ]
+                                        ),
+                                        html.Li(
+                                            [
+                                                html.Strong("1990–1995: "),
+                                                "67% agreement (151 votes) — post transition dip",
+                                            ]
+                                        ),
+                                        html.Li(
+                                            [
+                                                html.Strong("1995–2000: "),
+                                                "71% agreement (159 votes)",
+                                            ]
+                                        ),
+                                    ]
+                                ),
                                 html.P(
                                     [
                                         "The drop from ",

@@ -1,13 +1,14 @@
-from dash import dcc, Input, Output, callback, html
-import plotly.graph_objects as go
-import pandas as pd
-import numpy as np
 from io import StringIO
-import  plotly.express as px
+
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from dash import Input, Output, callback, dcc, html
+
 from ..data import get_country_name
 
-
-_SPECIAL_SESSION_COLOUR = 'black'
+_SPECIAL_SESSION_COLOUR = "black"
 
 
 def register_callbacks():
@@ -56,10 +57,12 @@ def register_callbacks():
             special_c = is_special.loc[mask]
             country_color = colors[i % len(colors)]
 
-            hover_data = np.column_stack([
-                df_c["session"].values,
-                df_c[n_col].values if n_col in df_c.columns else np.zeros(len(df_c)),
-            ])
+            hover_data = np.column_stack(
+                [
+                    df_c["session"].values,
+                    df_c[n_col].values if n_col in df_c.columns else np.zeros(len(df_c)),
+                ]
+            )
 
             # per-point marker colors
             marker_colors = [_SPECIAL_SESSION_COLOUR if s else country_color for s in special_c]
@@ -101,28 +104,31 @@ def register_callbacks():
             style={"color": "#7f8c8d", "fontSize": "14px", "padding": "4px 0"},
         )
 
-        note_msg = html.P([
-            html.Strong("Details: "),
-            f"The chart shows the average pairwise vote agreement between {country1_name} "
-            "and the selected comparison countries per UN General Assembly session. "
-            "Each point represents the mean agreement score across all resolutions in that session "
-            "where both countries voted. An agreement score of 1 means identical votes on all resolutions; "
-            '0 means complete disagreement (Yes vs. No). '
-            "Only sessions with at least 3 shared votes are shown. "
-            "Black dots indicate special and emergency sessions; excluded by default "
-            "(use the checkbox above to include them). "
-            "The data only covers GA resolutions that were passed."
-        ], style={
-            "maxWidth": "100%",
-            "margin": "0 0 0 0",
-            "paddingLeft": "2%",
-            "paddingTop": "10px",
-            "color": "#7f8c8d",
-            "fontSize": "16px",
-            "lineHeight": "1.6",
-            "textAlign": "left",
-            "borderTop": "1px solid #eee"
-        })
+        note_msg = html.P(
+            [
+                html.Strong("Details: "),
+                f"The chart shows the average pairwise vote agreement between {country1_name} "
+                "and the selected comparison countries per UN General Assembly session. "
+                "Each point represents the mean agreement score across all resolutions in that session "
+                "where both countries voted. An agreement score of 1 means identical votes on all resolutions; "
+                "0 means complete disagreement (Yes vs. No). "
+                "Only sessions with at least 3 shared votes are shown. "
+                "Black dots indicate special and emergency sessions; excluded by default "
+                "(use the checkbox above to include them). "
+                "The data only covers GA resolutions that were passed.",
+            ],
+            style={
+                "maxWidth": "100%",
+                "margin": "0 0 0 0",
+                "paddingLeft": "2%",
+                "paddingTop": "10px",
+                "color": "#7f8c8d",
+                "fontSize": "16px",
+                "lineHeight": "1.6",
+                "textAlign": "left",
+                "borderTop": "1px solid #eee",
+            },
+        )
 
         return fig, status_msg, note_msg
 
@@ -133,7 +139,9 @@ layout = [
             html.Div(
                 dcc.Checklist(
                     id="special-sessions-radio",
-                    options=[{"label": " Include special / emergency sessions", "value": "include"}],
+                    options=[
+                        {"label": " Include special / emergency sessions", "value": "include"}
+                    ],
                     value=[],
                     style={"fontSize": "14px", "color": "#555"},
                 ),

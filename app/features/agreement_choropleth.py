@@ -1,13 +1,12 @@
-from dash import dcc, Input, Output, callback, html
-import plotly.graph_objects as go
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+from dash import Input, Output, callback, dcc, html
 
 from .. import data
-
-from .country_utils import get_country_longitude
-from .color_utils import make_adaptive_colorscale_plotly
 from . import data_store
+from .color_utils import make_adaptive_colorscale_plotly
+from .country_utils import get_country_longitude
 
 
 def register_callbacks(query_engine):
@@ -37,9 +36,7 @@ def register_callbacks(query_engine):
 
         country1 = filter_store.get("country1_alpha3")
         if country1 is None:
-            status_msg = html.Div(
-                [html.Div([html.Strong("Please select a primary country")])]
-            )
+            status_msg = html.Div([html.Div([html.Strong("Please select a primary country")])])
             return go.Figure(), status_msg, ""
 
         agreement_data = query_engine.query_agreement_between_countries(
@@ -49,23 +46,32 @@ def register_callbacks(query_engine):
         )
 
         # Clean the returned agreement data
-        agreement_data.drop(columns=['source_country', 'resolution_count'], inplace=True)
+        agreement_data.drop(columns=["source_country", "resolution_count"], inplace=True)
         agreement_data = agreement_data.T.reset_index()
         agreement_data.columns = ["three_letter_country", "agreement_score"]
         agreement_data["Country"] = agreement_data["three_letter_country"].apply(
             data.get_country_display_name
         )
         agreement_data["Agreement"] = agreement_data["agreement_score"].apply(
-            lambda x: f"{x:.2f} with {data.get_country_display_name(country1)}"
-            if pd.notna(x) else "No shared vote"
+            lambda x: (
+                f"{x:.2f} with {data.get_country_display_name(country1)}"
+                if pd.notna(x)
+                else "No shared vote"
+            )
         )
 
         # Set up colour scale based on the distribution of consensus scores
         # Crucial: We need to restrict to resolutions where country1 actually voted
         # since these are the only ones that can contribute to any bilateral agreement
         # score on the Choropleth map.
-        country1_resolutions = all_resolutions.dropna(subset=[country1]) if country1 in all_resolutions.columns else all_resolutions
-        has_consensus = "consensus_score" in all_resolutions.columns and not country1_resolutions.empty
+        country1_resolutions = (
+            all_resolutions.dropna(subset=[country1])
+            if country1 in all_resolutions.columns
+            else all_resolutions
+        )
+        has_consensus = (
+            "consensus_score" in all_resolutions.columns and not country1_resolutions.empty
+        )
         use_adaptive = adaptive_colour_scale and has_consensus
         if use_adaptive:
             colorscale, lo, avg, hi = make_adaptive_colorscale_plotly(
@@ -228,9 +234,19 @@ layout = [
             html.Div(id="agreement-choropleth-status"),
             dcc.Checklist(
                 id="choropleth-color-mode",
-                options=[{"label": " Centre colour scale on average consensus score", "value": "adaptive"}],
+                options=[
+                    {
+                        "label": " Centre colour scale on average consensus score",
+                        "value": "adaptive",
+                    }
+                ],
                 value=[],
-                style={"fontSize": "14px", "color": "#555", "marginBottom": "8px", "paddingLeft": "2%"},
+                style={
+                    "fontSize": "14px",
+                    "color": "#555",
+                    "marginBottom": "8px",
+                    "paddingLeft": "2%",
+                },
             ),
             dcc.Loading(
                 children=[

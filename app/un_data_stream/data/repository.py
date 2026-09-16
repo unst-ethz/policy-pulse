@@ -63,13 +63,13 @@ VOTE_DTYPE = pd.CategoricalDtype(categories=["Y", "N", "A", "X"], ordered=False)
 # These are deliberately *search* links, not record links. `undl_id` identifies a
 # metadata.un.org MARC bib record — the source of truth these tables are ingested from — and
 # digitallibrary.un.org keeps its own, different ids for the same resolution, with no mapping
-# published between the two systems. Linking to a search lands the user on a results page 
-# listing the documents for that resolution, which is the best available behaviour; 
+# published between the two systems. Linking to a search lands the user on a results page
+# listing the documents for that resolution, which is the best available behaviour;
 # treat them as "look it up" links, never as guaranteed single-hit record links.
 UNDL_SEARCH_URL = "https://digitallibrary.un.org/search?p="
 
 # Preferred: the resolution symbol. Can be with or without MARC field 791 — e.g. 791:"A/RES/80/311".
-UNDL_SYMBOL_QUERY = '"{}"'#'791:"{}"' Default without for now for more extensive search
+UNDL_SYMBOL_QUERY = '"{}"'  #'791:"{}"' Default without for now for more extensive search
 
 # Fallback: match on field 035, which carries our own undl_id. `resolution` is nullable
 # in the schema (currently populated on every row, but not guaranteed), and a row without a
@@ -131,53 +131,51 @@ class DataRepository:
             vote_bool_arrays    — 4-tuple of (R x C) bool arrays (yes, no, abstained, voted)
         """
         return {
-            'resolution': self.resolution_table,
-            'resolution_subject': self.resolution_subject_table,
-            'subject': self.subject_table,
-            'closure': self.closure_table,
-            'broader': self.broader_table,
-            'country_columns': self.country_columns,
-            'member_states': self.member_states_table,
-            'multilateral_scores': self.multilateral_scores,
-            'vote_bool_arrays': self.vote_bool_arrays,
+            "resolution": self.resolution_table,
+            "resolution_subject": self.resolution_subject_table,
+            "subject": self.subject_table,
+            "closure": self.closure_table,
+            "broader": self.broader_table,
+            "country_columns": self.country_columns,
+            "member_states": self.member_states_table,
+            "multilateral_scores": self.multilateral_scores,
+            "vote_bool_arrays": self.vote_bool_arrays,
         }
 
     def _load_config(self):
         """Load configuration from YAML file."""
-        with open(self.config_path, 'r') as file:
+        with open(self.config_path, "r") as file:
             self.config = yaml.safe_load(file)
 
         # Resolve relative paths in config relative to project root (parent of config dir)
         project_root = Path(self.config_path).resolve().parent.parent
-        for key, val in self.config.get('paths', {}).items():
+        for key, val in self.config.get("paths", {}).items():
             if not Path(val).is_absolute():
-                self.config['paths'][key] = str(project_root / val)
+                self.config["paths"][key] = str(project_root / val)
 
     def _setup_logging(self):
         """Setup logging configuration with file and console handlers."""
         # Create logger
-        self.logger = logging.getLogger('UNResolutionAnalyzer')
+        self.logger = logging.getLogger("UNResolutionAnalyzer")
 
-        if not self.config['logs']:
+        if not self.config["logs"]:
             self.logger.disabled = True
             return
 
-        self.logger.setLevel(logging.DEBUG if self.config['debug'] else logging.INFO)
+        self.logger.setLevel(logging.DEBUG if self.config["debug"] else logging.INFO)
 
         # Clear any existing handlers
         self.logger.handlers.clear()
 
         # Create formatters
         detailed_formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s'
+            "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s"
         )
-        simple_formatter = logging.Formatter(
-            '%(levelname)s - %(message)s'
-        )
+        simple_formatter = logging.Formatter("%(levelname)s - %(message)s")
 
-        log_dir = Path(self.config['paths']['logs'])
+        log_dir = Path(self.config["paths"]["logs"])
         log_dir.mkdir(exist_ok=True)
-        log_file = log_dir / 'un_resolution_analyzer.log'
+        log_file = log_dir / "un_resolution_analyzer.log"
 
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(logging.DEBUG)
@@ -185,7 +183,7 @@ class DataRepository:
         self.logger.addHandler(file_handler)
 
         # Console handler
-        if self.config['debug']:
+        if self.config["debug"]:
             console_handler = logging.StreamHandler(sys.stdout)
             console_handler.setLevel(logging.DEBUG)
             console_handler.setFormatter(simple_formatter)
@@ -236,15 +234,16 @@ class DataRepository:
         ) = processor.calculate_agreement_data(self.resolution_table, self.country_columns)
 
         # Add consensus scores to the resolution table
-        self.resolution_table['consensus_score'] = self.resolution_table['undl_id'].map(consensus_scores)
+        self.resolution_table["consensus_score"] = self.resolution_table["undl_id"].map(
+            consensus_scores
+        )
 
         self.resolution_subject_table = self._build_resolution_subject_table()
         self._prune_unused_subjects()
 
     @staticmethod
     def _build_resolution_table(
-            outcomes: pd.DataFrame,
-            votes: pd.DataFrame
+        outcomes: pd.DataFrame, votes: pd.DataFrame
     ) -> Tuple[pd.DataFrame, List[str]]:
         """Turn the normalized outcome/vote tables into the wide one-row-per-resolution frame.
 
@@ -261,9 +260,9 @@ class DataRepository:
         """
         rename = {source: app_facing for app_facing, source in RESOLUTION_COLUMNS.items()}
         meta = outcomes.rename(columns=rename)
-        meta['date'] = pd.to_datetime(meta['date'])
-        meta['session'] = meta['session'].astype(str)
-        meta['undl_link'] = _undl_search_links(meta['resolution'], meta['undl_id'])
+        meta["date"] = pd.to_datetime(meta["date"])
+        meta["session"] = meta["session"].astype(str)
+        meta["undl_link"] = _undl_search_links(meta["resolution"], meta["undl_id"])
 
         votes_wide = votes.pivot(index="undl_id", columns="country_code", values="vote")
         votes_wide.columns.name = None
@@ -317,9 +316,9 @@ class DataRepository:
         ].unique()
 
         before = len(self.subject_table)
-        self.subject_table = self.subject_table[self.subject_table['subject_id'].isin(used_ids)]
-        self.closure_table = self.closure_table[self.closure_table['ancestor_id'].isin(used_ids)]
-        self.broader_table = self.broader_table[self.broader_table['parent_id'].isin(used_ids)]
+        self.subject_table = self.subject_table[self.subject_table["subject_id"].isin(used_ids)]
+        self.closure_table = self.closure_table[self.closure_table["ancestor_id"].isin(used_ids)]
+        self.broader_table = self.broader_table[self.broader_table["parent_id"].isin(used_ids)]
         self.logger.info(
             f"Pruned subject table from {before} to {len(self.subject_table)} subjects "
             f"reachable from the {len(matched_ids)} matched by a resolution"
@@ -335,13 +334,10 @@ class DataRepository:
             ("Broader Table", self.broader_table),
             ("Member States Table", self.member_states_table),
         ):
-            self.logger.info(
-                f"{name}: {table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
-            )
+            self.logger.info(f"{name}: {table.memory_usage(index=True).sum() / (1024**2):.2f} MB")
         self.logger.info(
             f"Multilateral Scores: {self.multilateral_scores.nbytes / (1024**2):.2f} MB"
         )
         self.logger.info(
-            "Vote Bool Arrays: "
-            f"{sum(a.nbytes for a in self.vote_bool_arrays) / (1024**2):.2f} MB"
+            f"Vote Bool Arrays: {sum(a.nbytes for a in self.vote_bool_arrays) / (1024**2):.2f} MB"
         )
