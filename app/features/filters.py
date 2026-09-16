@@ -426,7 +426,7 @@ def register_callbacks():
 
             # Build column list: base columns + undl_link + vote columns when countries selected
             base_cols = ["undl_id", "resolution", "session", "date", "title", "consensus_score",
-                         "total_yes", "total_no", "total_abstentions"]
+                         "total_yes", "total_no", "total_abstentions", "modality"]
             if "undl_link" in df.columns:
                 base_cols.append("undl_link")
 

@@ -1,32 +1,51 @@
-import pytest
-import socket
-import pandas as pd
-import numpy as np
+import functools
 
-def is_internet_available(host="8.8.8.8", port=53, timeout=3):
-    """
-    Check if there is an internet connection by trying to connect to Google's public DNS.
+import numpy as np
+import pandas as pd
+import pytest
+
+
+@functools.lru_cache(maxsize=1)
+def postgres_unavailable() -> str | None:
+    """Return why Postgres can't be reached, or None if it can.
+
+    The app reads every table from Postgres at import time, so anything touching `app.data` needs
+    a live database. Checked once per session, with a real connection rather than a port probe —
+    wrong credentials or a missing database should skip these tests just as cleanly as a stopped
+    server, and say which it was.
     """
     try:
-        socket.setdefaulttimeout(timeout)
-        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
-        return True
-    except socket.error:
-        return False
+        import sqlalchemy as sa
+
+        from app.un_data_stream.data import db
+
+        db.load_env()
+        engine = db.create_engine()
+        try:
+            with engine.connect() as conn:
+                conn.execute(sa.text("SELECT 1"))
+        finally:
+            engine.dispose()
+    except Exception as exc:
+        return f"{type(exc).__name__}: {exc}"
+    return None
+
 
 def pytest_configure(config):
     config.addinivalue_line(
-        "markers", "needs_internet: mark test as requiring internet access"
+        "markers", "needs_postgres: test requires a reachable Postgres (auto-skipped without one)"
     )
 
+
 def pytest_collection_modifyitems(config, items):
-    if is_internet_available():
+    reason = postgres_unavailable()
+    if reason is None:
         return
 
-    skip_internet = pytest.mark.skip(reason="No internet connection available")
+    skip_postgres = pytest.mark.skip(reason=f"Postgres not reachable ({reason})")
     for item in items:
-        if "needs_internet" in item.keywords:
-            item.add_marker(skip_internet)
+        if "needs_postgres" in item.keywords:
+            item.add_marker(skip_postgres)
 
 
 @pytest.fixture(scope="module")

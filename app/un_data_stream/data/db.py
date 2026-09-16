@@ -5,6 +5,7 @@ The app is a **read-only** consumer of the storage layer: the `undl-ingest` repo
 fetching from UNDL and writing these tables, the app only ever selects from them.
 """
 
+import logging
 import os
 
 import pandas as pd
@@ -59,6 +60,32 @@ def create_engine() -> Engine:
     opens a fresh connection and closing it really closes it.
     """
     return sa.create_engine(_database_url(), poolclass=NullPool)
+
+
+def connect_or_explain(engine: Engine, logger: logging.Logger | None = None):
+    """Connect, turning an unreachable database into a message that says what to fix.
+
+    The app loads its data at import time, so a connection failure here is fatal — and under
+    gunicorn it surfaces in the container log with the worker dying, where SQLAlchemy's own
+    traceback buries the useful part (which host, which database, which user) under driver
+    internals. This states it plainly instead, without the password.
+    """
+    try:
+        return engine.connect()
+    except Exception as exc:
+        url = engine.url
+        detail = (
+            f"Could not connect to Postgres at {url.host}:{url.port} "
+            f"database={url.database!r} user={url.username!r}: {type(exc).__name__}: {exc}"
+        )
+        hint = (
+            "Check the PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD variables (locally: .env, see "
+            ".env.example; in Docker: --env-file or the orchestrator's environment) and that the "
+            "database is reachable from this host."
+        )
+        if logger is not None:
+            logger.error(detail)
+        raise RuntimeError(f"{detail}\n{hint}") from exc
 
 
 def read_table(

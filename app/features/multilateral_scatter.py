@@ -269,13 +269,14 @@ def register_callbacks(query_engine):
                 html.Strong("Details: "),
                 "Each point represents a UN member state, coloured by geographical region. "
                 "The x-axis (Multilateral Vote Agreement) is the average pairwise agreement between a country "
-                "and all other countries that voted on the same resolution, averaged across all selected "
-                f"resolutions. {_Y_AXIS_DETAILS[y_metric]} "
+                "and all other countries that voted on the same resolution, averaged across the selected "
+                f"resolutions on which votes were cast. {_Y_AXIS_DETAILS[y_metric]} "
                 "The dashed vertical line marks the mean multilateral voting agreement across all plotted countries. "
                 "The more a country is located to the left of the mean line, the more often it votes "
                 "against the majority. "
                 f"Countries with fewer than {_MIN_VOTES_THRESHOLD} votes cast are excluded. "
-                "The data only covers GA resolutions that were successfully passed."
+                "The data only covers GA resolutions that were successfully passed; those adopted "
+                "without a recorded vote contribute no votes here."
             ],
             style={
                 "maxWidth": "100%",

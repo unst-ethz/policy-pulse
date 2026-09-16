@@ -31,10 +31,10 @@ _EXCLUDED_TERMS_BY_MODE = {
     "geopolitical": {"peoples", "states", "united nations"},
 }
 _WORDCLOUD_MODES = {
-    "default": {"label": "Default", "source": "undlid_keywords.csv:keywords"},
-    "geopolitical": {"label": "Geopolitical", "source": "undlid_keywords_3d_noun_fixed.csv:Geopolitical"},
-    "thematic": {"label": "Thematic", "source": "undlid_keywords_3d_noun_fixed.csv:Thematic"},
-    "action": {"label": "Action", "source": "undlid_keywords_3d_noun_fixed.csv:Action"},
+    "default": {"label": "Default", "source": "resolution_keywords.csv:keywords"},
+    "geopolitical": {"label": "Geopolitical", "source": "resolution_keywords_3d.csv:Geopolitical"},
+    "thematic": {"label": "Thematic", "source": "resolution_keywords_3d.csv:Thematic"},
+    "action": {"label": "Action", "source": "resolution_keywords_3d.csv:Action"},
     "category": {"label": "Subjects", "source": "query_resolutions():subjects"},
 }
 _CONSENSUS_CMAP_COLORS = ["#ff66cc", "#e6b24b", "#33cc33"]
@@ -53,9 +53,9 @@ def _init_wc_data():
     # Get app directory (parent of features directory)
     app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     try:
-        base_keywords_path = os.path.join(app_dir, "assets", "undlid_keywords.csv")
+        base_keywords_path = os.path.join(app_dir, "assets", "resolution_keywords.csv")
         three_d_keywords_path = os.path.join(
-            app_dir, "assets", "undlid_keywords_3d_noun_fixed.csv"
+            app_dir, "assets", "resolution_keywords_3d.csv"
         )
         resolutions_df = data.query_engine.query_resolutions()
         ignore_words = ["resolution", "general assembly"]
@@ -102,11 +102,13 @@ def _init_wc_data():
         category_term_to_subject_ids = {}
 
         if os.path.exists(base_keywords_path):
-            # undl_id is TEXT in Postgres, but these ids are all digits, so pandas would infer
-            # int64 here and the merge below would fail on mismatched key dtypes.
-            base_keywords_df = pd.read_csv(base_keywords_path, dtype={"undl_id": str})
+            # Keyed on the resolution symbol, not on any UNDL id: these keywords were compiled
+            # against the retired bulk-CSV export, whose `undl_id` was a digitallibrary record id
+            # and does not match the metadata.un.org MARC ids we store. The symbol is the one key
+            # both id spaces agree on. See T14 in plans/app_postgres_migration_plan.md.
+            base_keywords_df = pd.read_csv(base_keywords_path)
             base_data_all = pd.merge(
-                resolutions_df, base_keywords_df, on="undl_id", how="left"
+                resolutions_df, base_keywords_df, on="resolution", how="left"
             )
             (
                 resolution_wc_data_by_mode["default"],
@@ -123,10 +125,9 @@ def _init_wc_data():
             wc_word_undlid_map_by_mode["default"] = {}
 
         if os.path.exists(three_d_keywords_path):
-            three_d_df = pd.read_csv(three_d_keywords_path, dtype={"Original_ID": str})
-            three_d_df = three_d_df.rename(columns={"Original_ID": "undl_id"})
+            three_d_df = pd.read_csv(three_d_keywords_path)
             three_d_data_all = pd.merge(
-                resolutions_df, three_d_df, on="undl_id", how="left"
+                resolutions_df, three_d_df, on="resolution", how="left"
             )
             for mode_key, column_name in [
                 ("geopolitical", "Geopolitical"),

@@ -486,8 +486,23 @@ def update_resolution_count(data_store, active_tab):
         )
     if not data_store:
         return ""
-    n = len(data_store_io.load_resolutions(data_store))
-    return [html.Strong(f"{n:,}"), f" resolution{'s' if n != 1 else ''} match current filters"]
+    df = data_store_io.load_resolutions(data_store)
+    n = len(df)
+    summary = [html.Strong(f"{n:,}"), f" resolution{'s' if n != 1 else ''} match current filters"]
+
+    # Only resolutions with a recorded vote carry per-country votes, so every agreement,
+    # alignment and consensus figure on the other tabs is computed over that subset — which is
+    # a third of the total. Say so rather than letting the larger number imply otherwise.
+    if "modality" in df.columns:
+        voted = int((df["modality"] == "Vote, recorded").sum())
+        if voted != n:
+            summary.append(
+                html.Span(
+                    f" ({voted:,} with recorded votes)",
+                    style={"color": "#6b7280"},
+                )
+            )
+    return summary
 
 
 @callback(

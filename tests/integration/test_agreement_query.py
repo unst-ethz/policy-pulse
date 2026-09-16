@@ -60,17 +60,11 @@ TIME_BUDGETS = {
 }
 
 
-def _data_available() -> bool:
-    try:
-        from app import data as app_data
-        return not app_data.query_engine.query_resolutions().empty
-    except Exception:
-        return False
-
-
-pytestmark = pytest.mark.skipif(
-    not _data_available(), reason="Local resolution data files not available"
-)
+# These exercise the real data layer through `app.data`, which reads every table from Postgres at
+# import time. The marker makes that dependency explicit and auto-skips without a database; the
+# previous gate caught *any* exception from `import app.data`, so a genuinely broken data layer
+# reported as "skipped: data files not available" instead of failing.
+pytestmark = pytest.mark.needs_postgres
 
 
 # ---------------------------------------------------------------------------

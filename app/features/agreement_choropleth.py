@@ -182,7 +182,9 @@ def register_callbacks(query_engine):
             "always voted in opposite ways (Yes vs. No). "
         )
         shared_disclaimer = (
-            "The data only covers GA resolutions that were successfully passed. "
+            "The data only covers GA resolutions that were successfully passed, and agreement is "
+            "computed only over those with a recorded vote — resolutions adopted without a vote, or "
+            "by a non-recorded vote, have no per-country votes to compare. "
             "The map provides a simplified, static overview of political geography. Some smaller nations "
             "and territories are not shown and the map does not reflect historical border changes over time. "
             "The boundaries and names shown and the designations used on this map do not imply official "
@@ -193,7 +195,8 @@ def register_callbacks(query_engine):
         if use_adaptive:
             middle_part = (
                 "The midpoint of the colour scale (yellow) is anchored at the average consensus score "
-                f"across selected resolutions ({avg:.2f}). The consensus score of a resolution is the "
+                f"across the selected resolutions that were voted on ({avg:.2f}). The consensus score "
+                "of a resolution is the "
                 "average pairwise vote agreement across all country pairs that both cast a vote. "
                 f"Countries appearing blue thus agreed with {country1_name} more than the global average; "
                 "those appearing red agreed less. "

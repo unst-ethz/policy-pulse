@@ -45,6 +45,10 @@ RESOLUTION_COLUMNS: Dict[str, str] = {
     "total_abstentions": "total_abstentions",
     "total_non_voting": "total_non_voting",
     "total_ms": "total_ms",
+    # Derived at ingestion time: 'Vote, recorded' | 'Vote, non-recorded' | 'Without a vote'.
+    # Carried because only 'Vote, recorded' resolutions have per-country vote rows, and the UI
+    # needs to say so — every score is computed over that subset even when the filter matches more.
+    "modality": "modality",
 }
 
 VOTE_COLUMNS = ["undl_id", "country_code", "vote"]
@@ -201,7 +205,7 @@ class DataRepository:
         engine = db.create_engine()
         try:
             self.logger.info("Reading tables from Postgres")
-            with engine.connect() as conn:
+            with db.connect_or_explain(engine, self.logger) as conn:
                 outcomes = db.read_table(
                     conn, "resolution_outcomes", columns=list(RESOLUTION_COLUMNS.values())
                 )

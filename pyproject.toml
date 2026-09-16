@@ -1,0 +1,43 @@
+[project]
+name = "policy-pulse"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Janic", email = "jamoser@ethz.ch" }
+]
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "dash==4.0.0rc4",
+    "feffery-antd-components>=0.4.5",
+    "gunicorn>=23,<24",
+    "matplotlib==3.10.7",
+    "numpy==2.3.5",
+    "pandas==2.3.3",
+    "plotly==6.3.0",
+    "psycopg[binary]>=3.3.5",
+    "python-dotenv>=1.2.3",
+    "pyyaml==6.0.3",
+    "rapidfuzz==3.13.0",
+    "sqlalchemy>=2.0.52",
+    "wordcloud==1.9.4",
+]
+
+[project.scripts]
+policy-pulse = "policy_pulse:main"
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-mock>=3.15.1",
+]
+# Exploration tooling for notebooks/, deliberately not a runtime dependency: `uv sync --no-dev`
+# (what the Docker image runs) leaves both out. Install with `uv sync --group notebooks`.
+notebooks = [
+    "altair>=6.2.2",
+    "marimo>=0.24.0",
+]
