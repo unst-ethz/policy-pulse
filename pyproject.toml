@@ -24,16 +24,63 @@ dependencies = [
 ]
 
 [project.scripts]
-policy-pulse = "policy_pulse:main"
+# `uv run start-app` — the local dev server. Production uses gunicorn against
+# `app.__main__:server` (see the Dockerfile), not this.
+start-app = "app.__main__:main"
+# `uv run init-env` — one command from a fresh clone to a local Postgres holding a copy of the
+# production data (docker-compose.yml + the snapshot image). Dev only; see README.
+init-env = "app.dev.init_env:main"
 
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13.0"]
 build-backend = "uv_build"
 
+# The app is a flat `app/` package, not the src/ layout uv_build assumes by default. Declaring it
+# is what makes the console script above importable once the project is installed.
+[tool.uv.build-backend]
+module-name = "app"
+module-root = ""
+
+# Matches undl-ingest's setup so both repos lint and format the same way.
+# `uv run ruff check` / `uv run ruff format`
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# notebooks/ is marimo-generated and intentionally frozen as a record of the ingestion
+# prototyping; formatting it would churn generated code nobody edits by hand.
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+# Pre-existing long lines, as of adopting ruff (2026-09-16). `ruff format` fixed 79 of them; what
+# is left is long prose strings and comments, which the formatter deliberately won't split.
+#
+# This is a ratchet, not a standard: every other file — including all the Postgres data layer and
+# the tests — is clean at 100 columns and stays enforced. Shrink this list when you touch a file;
+# don't add to it. The counts are the debt at adoption time. # TODO: improve this
+[tool.ruff.lint.per-file-ignores]
+"app/features/case_study.py" = ["E501"]              # 54 — long UI copy, one string per step
+"app/features/feature_description.py" = ["E501"]     # 18 — same, feature blurbs
+"app/pages/trends_page.py" = ["E501"]                # 19
+"app/features/agreement_choropleth.py" = ["E501"]    # 9
+"app/features/wordcloud_interactive.py" = ["E501"]   # 8
+"app/features/multilateral_scatter.py" = ["E501"]    # 8
+"app/features/resolution_list.py" = ["E501"]         # 3
+"app/features/agreement_graph.py" = ["E501"]         # 3
+"app/features/filters.py" = ["E501"]                 # 2
+"app/features/agreement_by_subject.py" = ["E501"]    # 2
+"app/pages/profile_page.py" = ["E501"]               # 1
+"app/data.py" = ["E501"]                             # 4
+"app/un_data_stream/processors/ga_processor.py" = ["E501"]   # 4 — deleted by T11 anyway
+"app/un_data_stream/analysis/query_engine.py" = ["E501"]     # 2
+"tests/integration/test_agreement_query.py" = ["E501"]       # 1
+
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
     "pytest-mock>=3.15.1",
+    "ruff>=0.14,<1",
 ]
 # Exploration tooling for notebooks/, deliberately not a runtime dependency: `uv sync --no-dev`
 # (what the Docker image runs) leaves both out. Install with `uv sync --group notebooks`.

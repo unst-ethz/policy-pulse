@@ -1,0 +1,51 @@
+# Local development database, pre-loaded with a recent copy of the production data.
+#
+#   uv run init-env               # does everything below, plus .env and a data check
+#
+# or, by hand:
+#
+#   docker login ghcr.io          # once -- the package is private, see the README
+#   docker compose pull
+#   docker compose up -d
+#
+# Then point the app at localhost:5432 with the credentials below (they match .env.example).
+#
+# This is NOT the app: the app's own image is built from ./Dockerfile and runs against whatever
+# PG* settings it is given. This file only provides the database that .env points at.
+#
+# The image is published weekly by undl-ingest's `undl-snapshot` unit (that repo's
+# deploy/README.md is the source of truth for the publish side). The data is a snapshot, not a
+# live mirror: expect it to be a few days behind the VM, and `docker compose pull` to move to a
+# newer one.
+#
+# To wipe and re-seed from the image: `docker compose down -v && docker compose up -d`. Without
+# the -v the volume survives and the snapshot is NOT re-applied.
+
+services:
+  db:
+    # Pin a dated tag (e.g. :2026-09-15) to freeze the data you develop against.
+    image: ghcr.io/unst-ethz/policy-pulse-db:latest
+    container_name: policy-pulse-db
+    restart: unless-stopped
+    ports:
+      # Loopback only -- never expose a database to the network. Override the host port if you
+      # already have a Postgres on 5432 (you probably do):
+      #   POLICY_PULSE_DB_PORT=55432 docker compose up -d
+      - "127.0.0.1:${POLICY_PULSE_DB_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: policy_pulse
+      POSTGRES_PASSWORD: policy_pulse
+      POSTGRES_DB: policy_pulse
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # The snapshot restore runs *before* the server accepts external connections, so a plain
+      # pg_isready can go green while the tables are still empty. Check for the data itself.
+      test: ["CMD-SHELL", "psql -U policy_pulse -d policy_pulse -c 'select 1 from member_states limit 1' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+volumes:
+  pgdata:
