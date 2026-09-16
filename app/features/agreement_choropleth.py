@@ -7,6 +7,7 @@ from .. import data
 
 from .country_utils import get_country_longitude
 from .color_utils import make_adaptive_colorscale_plotly
+from . import data_store
 
 
 def register_callbacks(query_engine):
@@ -29,7 +30,7 @@ def register_callbacks(query_engine):
         if not filtered_data or not filter_store:
             return go.Figure(), "", ""
 
-        all_resolutions = pd.read_json(filtered_data, orient="split")
+        all_resolutions = data_store.load_resolutions(filtered_data)
         if all_resolutions.empty:
             status_msg = html.Div([html.Div([html.Strong("No resolutions to plot")])])
             return go.Figure(), status_msg, ""

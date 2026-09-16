@@ -11,61 +11,121 @@ query_engine = ResolutionQueryEngine(repo=repo)
 
 available_countries = query_engine.get_available_countries()
 
-# Supported UI languages and their column names in the member-states authority table.
+# Supported UI languages and their column in the member-states authority table.
 SUPPORTED_LANGS = ("en", "fr", "es", "ar", "zh", "ru")
-_LANG_COL = {
-    "en": "Member State",
-    "fr": "French",
-    "es": "Spanish",
-    "ar": "Arabic",
-    "zh": "Chinese",
-    "ru": "Russian",
-}
+_LANG_COL = {lang: f"name_{lang}" for lang in SUPPORTED_LANGS}
 
-# Legacy ISO codes that still appear in UN voting data but have been merged into
-# their successor codes in the authority table. Once GA/SC voting data switches
-# to the canonical codes (GER->DEU, SCG->SRB), these fallback entries can go.
+# ISO codes that appear in UN voting data but have no member_states row of their own. Each maps to
+# the former-state ('fs') record describing the same entity, filed under its successor's ISO code —
+# matched on (iso_code, name_en) because a successor can have several fs rows — plus any
+# translations to patch in.
+#
+# The English name, variant spellings and the membership year range all come from that row, so none
+# of those are hand-maintained any more. The translations still are: former-state authority records
+# carry almost no non-English names (1 of 50 fs rows has any, against all 193 current ones), so
+# without this patch a non-English UI would fall back to English for these two. Once GA/SC voting
+# data switches to the canonical codes (GER->DEU, SCG->SRB), these entries can go.
 _LEGACY_VOTING_CODES: dict[str, dict[str, Any]] = {
     "GER": {  # West Germany; voting records 1973-1990
-        "en": "Germany, Federal Republic of",
-        "fr": "République fédérale d'Allemagne",
-        "es": "República Federal de Alemania",
-        "ru": "Федеративная Республика Германия",
-        "_aliases": ["West Germany", "BRD"],
-        "_year_range": (1973, 1990),
+        "source": ("DEU", "Germany, Federal Republic of"),
+        "names": {
+            "fr": "République fédérale d'Allemagne",
+            "es": "República Federal de Alemania",
+            "ru": "Федеративная Республика Германия",
+        },
     },
     "SCG": {  # Serbia and Montenegro; voting records 2003-2006
-        "en": "Serbia and Montenegro",
-        "fr": "Serbie-et-Monténégro",
-        "es": "Serbia y Montenegro",
-        "ru": "Сербия и Черногория",
-        "_aliases": ["Federal Republic of Yugoslavia"],
-        "_year_range": (2003, 2006),
+        "source": ("SRB", "Serbia and Montenegro"),
+        "names": {
+            "fr": "Serbie-et-Monténégro",
+            "es": "Serbia y Montenegro",
+            "ru": "Сербия и Черногория",
+        },
     },
 }
 
+# TODO: quick check that the years make sense? Also i feel like this code is fragile
+def _coverage_years(coverage_periods: Any) -> tuple[list[int], list[int]]:
+    """Start and end years from a `'start:end|start:end'` coverage_periods value.
 
-def _parse_year(date_str) -> int | None:
-    """Extract the earliest 4-digit year from a possibly comma-separated date string."""
-    if pd.isna(date_str):
-        return None
-    for part in str(date_str).split(","):
-        head = part.strip()[:4]
-        if head.isdigit():
-            return int(head)
-    return None
+    Dates are ISO (`'1955-12-14'`). A period with a blank end is still open and contributes no end
+    year — that's what separates an ongoing membership from a closed one, and it's why a state with
+    several periods (KHM: 1955-1970, 1975-1976, 1990-) reads as current.
+    """
+    if pd.isna(coverage_periods):
+        return [], []
+    starts: list[int] = []
+    ends: list[int] = []
+    for period in str(coverage_periods).split("|"):
+        start, _, end = period.partition(":")
+        if start[:4].isdigit():
+            starts.append(int(start[:4]))
+        if end[:4].isdigit():
+            ends.append(int(end[:4]))
+    return starts, ends
 
 
-def _parse_years(date_str) -> list[int]:
-    """Return all 4-digit years found in a possibly comma-separated date string."""
-    if pd.isna(date_str):
+def _split_names(value: Any) -> list[str]:
+    """Split a ';'-joined authority-record name list (`other_names`) into its entries."""
+    if pd.isna(value):
         return []
-    years: list[int] = []
-    for part in str(date_str).split(","):
-        head = part.strip()[:4]
-        if head.isdigit():
-            years.append(int(head))
-    return years
+    return [name.strip() for name in str(value).split(";") if name.strip()]
+
+
+def _build_name_record(group: pd.DataFrame) -> dict:
+    """Build one ISO's name record from its member_states rows.
+
+    An ISO normally has one current row (`record_type == 'ms'`) plus a former-state row per
+    historical name — MMR is Myanmar + Burma. Ten ISOs are `fs`-only: states that dissolved (SUN,
+    CSK, YUG, DDR, ...), which get a year range appended to their display name.
+    """
+    current = group[group["record_type"] == "ms"]
+    if not current.empty:
+        # Every current member state's final coverage period is open, so `record_type` alone
+        # identifies the canonical row — no date arithmetic needed to tell "still a member".
+        canonical = current.iloc[0]
+        year_range = None
+    else:
+        # Retired ISO: the most recently-ended row holds the name worth showing, and the range
+        # spans every period the entity existed (YMD has two such rows: Southern then Democratic
+        # Yemen).
+        latest_end = group["coverage_periods"].apply(
+            lambda cp: max(_coverage_years(cp)[1], default=0)
+        )
+        canonical = group.loc[latest_end.idxmax()]
+        starts = [y for cp in group["coverage_periods"] for y in _coverage_years(cp)[0]]
+        ends = [y for cp in group["coverage_periods"] for y in _coverage_years(cp)[1]]
+        year_range = (min(starts), max(ends)) if starts and ends else None
+
+    en_name = canonical["name_en"]
+    names: dict[str, str] = {"en": en_name}
+    for lang in SUPPORTED_LANGS:
+        if lang == "en":
+            continue
+        val = canonical.get(_LANG_COL[lang])
+        names[lang] = val if isinstance(val, str) and val.strip() else en_name
+
+    # Display aliases: the group's other rows' own names. These are real predecessor entities
+    # ("Burma" -> "Myanmar"), not variant spellings.
+    display_aliases: list[str] = []
+    for name in group["name_en"]:
+        if isinstance(name, str) and name != en_name and name not in display_aliases:
+            display_aliases.append(name)
+
+    # Search aliases: display aliases plus every `other_names` entry (variant spellings,
+    # translations, abbreviations like "BRD"/"Soviet Union") so search stays permissive.
+    search_aliases: list[str] = list(display_aliases)
+    for other in group["other_names"]:
+        for name in _split_names(other):
+            if name != en_name and name not in search_aliases:
+                search_aliases.append(name)
+
+    return {
+        "names": names,
+        "display_aliases": display_aliases,
+        "search_aliases": search_aliases,
+        "year_range": year_range,
+    }
 
 
 def _build_name_index(member_states_df: pd.DataFrame) -> dict[str, dict]:
@@ -75,87 +135,35 @@ def _build_name_index(member_states_df: pd.DataFrame) -> dict[str, dict]:
         names:           dict[lang, str]        - canonical name per language (English fallback)
         display_aliases: list[str]              - real historical names (predecessor entities) for display
         search_aliases:  list[str]              - display aliases plus variant spellings, translations,
-                                                  abbreviations from the 'Other Names' column
-        year_range:      tuple[int, int] | None - set only for retired ISOs (no active row)
+                                                  abbreviations from the 'other_names' column
+        year_range:      tuple[int, int] | None - set only for retired ISOs (no current row)
     """
-    # A row is "currently active" if either:
-    #  (a) End date is NaN, OR
-    #  (b) it encodes multi-period membership where the final period is open
-    #      (more Start segments than End segments in the comma-separated strings,
-    #      e.g. KHM Cambodia: starts 1955/1975/1990, ends 1970/1976 -> third period is open).
-    def _is_active(row) -> bool:
-        if pd.isna(row["End date"]):
-            return True
-        return len(_parse_years(row["Start date"])) > len(_parse_years(row["End date"]))
-
     index: dict[str, dict] = {}
 
-    for iso, group in member_states_df.groupby("ISO Code"):
+    for iso, group in member_states_df.groupby("iso_code"):
         if not isinstance(iso, str) or not iso.strip():
             continue
+        index[iso] = _build_name_record(group)
 
-        active_mask = group.apply(_is_active, axis=1)
-        active = group[active_mask]
-        if len(active) >= 1:
-            canonical = active.iloc[0]
-            year_range = None
-        else:
-            # Retired ISO: pick row with latest end year as canonical, attach year range
-            with_end = group.assign(_end=group["End date"].apply(_parse_year))
-            canonical = with_end.sort_values("_end").iloc[-1]
-            start_years = [y for s in group["Start date"] for y in _parse_years(s)]
-            end_years = [y for s in group["End date"] for y in _parse_years(s)]
-            year_range = (
-                (min(start_years), max(end_years)) if start_years and end_years else None
-            )
-
-        en_name = canonical["Member State"]
-        names: dict[str, str] = {"en": en_name}
-        for lang in SUPPORTED_LANGS:
-            if lang == "en":
-                continue
-            val = canonical.get(_LANG_COL[lang])
-            names[lang] = val if isinstance(val, str) and val.strip() else en_name
-
-        # Display aliases: only the Member State names of non-canonical rows. These are the
-        # real predecessor entities (e.g. "Burma" -> "Myanmar"), not variant spellings.
-        display_aliases: list[str] = []
-        for _, row in group.iterrows():
-            other_name = row["Member State"]
-            if (
-                other_name != en_name
-                and isinstance(other_name, str)
-                and other_name not in display_aliases
-            ):
-                display_aliases.append(other_name)
-
-        # Search aliases: display aliases plus everything in 'Other Names' (variant spellings,
-        # translations, abbreviations like "FYROM"/"BRD"/"Soviet Union") so search remains permissive.
-        search_aliases: list[str] = list(display_aliases)
-        for other in group["Other Names"].dropna():
-            token = str(other).strip()
-            if token and token != en_name and token not in search_aliases:
-                search_aliases.append(token)
-
-        index[iso] = {
-            "names": names,
-            "display_aliases": display_aliases,
-            "search_aliases": search_aliases,
-            "year_range": year_range,
-        }
-
-    # Merge legacy voting-only codes (see _LEGACY_VOTING_CODES above).
-    for iso, payload in _LEGACY_VOTING_CODES.items():
-        if iso in index:
+    # Merge voting-only codes (see _LEGACY_VOTING_CODES above). Each resolves to a single fs row,
+    # which has no current row and therefore picks up a year range automatically.
+    for legacy_iso, payload in _LEGACY_VOTING_CODES.items():
+        if legacy_iso in index:
             continue
-        names = {lang: payload.get(lang, payload["en"]) for lang in SUPPORTED_LANGS}
-        legacy_aliases = list(payload.get("_aliases", []))
-        index[iso] = {
-            "names": names,
-            "display_aliases": legacy_aliases,
-            "search_aliases": legacy_aliases,
-            "year_range": payload.get("_year_range"),
-        }
+        successor_iso, name_en = payload["source"]
+        rows = member_states_df[
+            (member_states_df["iso_code"] == successor_iso)
+            & (member_states_df["name_en"] == name_en)
+        ]
+        if rows.empty:
+            print(
+                f"Legacy voting code {legacy_iso}: no '{name_en}' row found under "
+                f"{successor_iso}; votes cast under {legacy_iso} will show the bare code"
+            )
+            continue
+        record = _build_name_record(rows)
+        record["names"].update(payload.get("names", {}))
+        index[legacy_iso] = record
 
     return index
 
@@ -331,30 +339,15 @@ def get_region_tree_data() -> list[dict]:
 
 REGION_TREE_DATA = get_region_tree_data()
 
+# TODO: is it a good pattern to import it here just to import it in another file again?
 from .features.country_utils import get_country_region, get_country_subregion
 
-# Top level subjects (level 0 in the hierarchy)
-TOP_LEVEL_SUBJECTS = {
-    'http://metadata.un.org/thesaurus/10', 
-    'http://metadata.un.org/thesaurus/09', 
-    'http://metadata.un.org/thesaurus/16', 
-    'http://metadata.un.org/thesaurus/00', 
-    'http://metadata.un.org/thesaurus/07', 
-    'http://metadata.un.org/thesaurus/04', 
-    'http://metadata.un.org/thesaurus/06', 
-    'http://metadata.un.org/thesaurus/15', 
-    'http://metadata.un.org/thesaurus/05', 
-    'http://metadata.un.org/thesaurus/03', 
-    'http://metadata.un.org/thesaurus/17', 
-    'http://metadata.un.org/thesaurus/11', 
-    'http://metadata.un.org/thesaurus/12', 
-    'http://metadata.un.org/thesaurus/13', 
-    'http://metadata.un.org/thesaurus/14', 
-    'http://metadata.un.org/thesaurus/18', 
-    'http://metadata.un.org/thesaurus/08', 
-    'http://metadata.un.org/thesaurus/01', 
-    'http://metadata.un.org/thesaurus/02'
-}
+# Top-level subjects: the thesaurus's 18 domains (`node_type == 'scheme'`).
+TOP_LEVEL_SUBJECTS = set(
+    repo.get_data()["subject"]
+    .loc[lambda df: df["node_type"] == "scheme", "subject_id"]
+    .tolist()
+)
 
 # Map subject IDs to labels TODO: If we want to add multiple languages just add the other languages here
 SUBJECT_ID_TO_LABEL_MAP = {row["subject_id"]: row["label_en"] for _, row in repo.get_data()["subject"].iterrows()}

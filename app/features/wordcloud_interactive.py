@@ -17,6 +17,7 @@ from wordcloud import WordCloud
 from .color_utils import make_adaptive_colorscale_plotly
 from .resolution_list import create_vote_indicator
 from .. import data
+from . import data_store
 
 # Initialize word cloud data on module load
 _resolution_wc_data_by_mode = {}
@@ -101,7 +102,9 @@ def _init_wc_data():
         category_term_to_subject_ids = {}
 
         if os.path.exists(base_keywords_path):
-            base_keywords_df = pd.read_csv(base_keywords_path)
+            # undl_id is TEXT in Postgres, but these ids are all digits, so pandas would infer
+            # int64 here and the merge below would fail on mismatched key dtypes.
+            base_keywords_df = pd.read_csv(base_keywords_path, dtype={"undl_id": str})
             base_data_all = pd.merge(
                 resolutions_df, base_keywords_df, on="undl_id", how="left"
             )
@@ -120,7 +123,7 @@ def _init_wc_data():
             wc_word_undlid_map_by_mode["default"] = {}
 
         if os.path.exists(three_d_keywords_path):
-            three_d_df = pd.read_csv(three_d_keywords_path)
+            three_d_df = pd.read_csv(three_d_keywords_path, dtype={"Original_ID": str})
             three_d_df = three_d_df.rename(columns={"Original_ID": "undl_id"})
             three_d_data_all = pd.merge(
                 resolutions_df, three_d_df, on="undl_id", how="left"
@@ -609,7 +612,7 @@ def _build_wordcloud(
                 )
             )
 
-        df = pd.read_json(StringIO(filtered_data_json), orient="split")
+        df = data_store.load_resolutions(filtered_data_json)
         if df.empty:
             return _build_empty_wordcloud_figure(
                 _mode_empty_message(
@@ -979,7 +982,7 @@ def register_callbacks():
             return "No data available."
 
         try:
-            df = pd.read_json(StringIO(filtered_data), orient="split")
+            df = data_store.load_resolutions(filtered_data)
             if df.empty:
                 return "No data available."
             if "undl_id" not in df.columns:
@@ -1077,7 +1080,7 @@ def register_callbacks():
             if not word:
                 return html.Div("No word selected.", style={"color": "#7f8c8d"})
 
-            df = pd.read_json(StringIO(filtered_data), orient="split")
+            df = data_store.load_resolutions(filtered_data)
 
             if df.empty:
                 return html.Div("No data available.", style={"color": "#7f8c8d"})

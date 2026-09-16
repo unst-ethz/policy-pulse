@@ -1,6 +1,7 @@
 from dash import callback, Input, Output, State, html, dcc
 import pandas as pd
 from .. import data
+from . import data_store as store
 
 
 _PAGE_SIZE = 10
@@ -302,7 +303,7 @@ def register_callbacks():
         # 1. Load pre-filtered resolutions from the shared data store,
         #    then join vote columns from the resolution table for display.
         try:
-            df = pd.read_json(data_store, orient="split")
+            df = store.load_resolutions(data_store)
 
             # Join vote columns for country1 + comparison countries
             vote_cols_needed = [c for c in ([country1] + comparison_countries) if c]

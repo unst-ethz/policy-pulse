@@ -1,37 +1,107 @@
 """
-Data repository for managing processed UN data.
+Data repository for the app's in-memory copy of the storage layer.
 
-This module handles storage, retrieval, and caching of processed UN data,
-orchestrating the entire data processing pipeline.
+Reads the already-normalized tables out of Postgres (written by the `undl-ingest` jobs), reshapes
+them into the shapes the app's query layer expects, and precomputes the agreement/alignment arrays
+`ResolutionQueryEngine` broadcasts over. The app is a read-only consumer — it does not fetch from
+UNDL, and it does not process raw source data.
 """
 
-import json
 import logging
-import pickle
 import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List, Tuple
+from urllib.parse import quote
 
-import blosc2
 import pandas as pd
 import yaml
 
-from .fetcher import DataFetcher
-from .merger import DataMerger
+from ..processors.ga_processor import GAResolutionProcessor
+from . import db
 from .processor import DataProcessor
+
+# Resolution columns the app actually reads, as {app-facing name: resolution_outcomes column}.
+#
+# Deliberately a subset: `resolution_outcomes` also stores `vote_note`, `meeting`,
+# `committee_report`, `amended_draft`, `related_documents`, `description`, `agenda`, `modality` and
+# `source_dataset`, none of which any feature reads today. Adding one back is a one-line change
+# here and nothing else — the country columns are stated explicitly rather than inferred from
+# "whatever isn't known metadata".
+#
+# `session` is the one real rename: Postgres stores a numeric `session` plus a `session_label`
+# holding the format the app has always used ('10', '10sp', '10emsp'), and special-session
+# detection (`app/features/agreement_graph.py`) depends on the label form.
+RESOLUTION_COLUMNS: Dict[str, str] = {
+    "undl_id": "undl_id",
+    "resolution": "resolution",
+    "date": "date",
+    "session": "session_label",
+    "title": "title",
+    "agenda_title": "agenda_title",
+    "subjects": "subjects",
+    "draft": "draft",
+    "total_yes": "total_yes",
+    "total_no": "total_no",
+    "total_abstentions": "total_abstentions",
+    "total_non_voting": "total_non_voting",
+    "total_ms": "total_ms",
+}
+
+VOTE_COLUMNS = ["undl_id", "country_code", "vote"]
+
+# Vote codes: Yes / No / Abstained / non-voting. Stored as a category rather than object dtype —
+# 19 MB instead of 167 MB for the wide frame, and the same dtype the old CSV cache used.
+VOTE_DTYPE = pd.CategoricalDtype(categories=["Y", "N", "A", "X"], ordered=False)
+
+# Resolution -> UN Digital Library links, built here rather than in each of the five features
+# that read `undl_link`.
+#
+# These are deliberately *search* links, not record links. `undl_id` identifies a
+# metadata.un.org MARC bib record — the source of truth these tables are ingested from — and
+# digitallibrary.un.org keeps its own, different ids for the same resolution, with no mapping
+# published between the two systems. Linking to a search lands the user on a results page 
+# listing the documents for that resolution, which is the best available behaviour; 
+# treat them as "look it up" links, never as guaranteed single-hit record links.
+UNDL_SEARCH_URL = "https://digitallibrary.un.org/search?p="
+
+# Preferred: the resolution symbol, MARC field 791 — e.g. 791:"A/RES/80/311".
+UNDL_SYMBOL_QUERY = '791:"{}"'
+
+# Fallback: match on field 035, which carries our own undl_id. `resolution` is nullable
+# in the schema (currently populated on every row, but not guaranteed), and a row without a
+# symbol would otherwise get no link at all.
+UNDL_ID_QUERY = "035:*{}"
+
+
+def _undl_search_links(symbols: pd.Series, undl_ids: pd.Series) -> List[str]:
+    """Build one UN Digital Library search URL per resolution.
+
+    Percent-encodes the query: symbols carry '/', and some older ones also carry parentheses or
+    brackets ('A/RES/13(I)', 'A/RES/71/101[B]'). ':' and '*' are left literal so the field prefix
+    and the wildcard stay legible in the URL.
+    """
+    links = []
+    for symbol, undl_id in zip(symbols, undl_ids):
+        if isinstance(symbol, str) and symbol.strip():
+            query = UNDL_SYMBOL_QUERY.format(symbol.strip())
+        else:
+            query = UNDL_ID_QUERY.format(undl_id)
+        links.append(UNDL_SEARCH_URL + quote(query, safe=":*"))
+    return links
 
 
 class DataRepository:
-    """Handles storage and retrieval of processed UN data."""
-    
+    """Loads and holds the app's processed UN data, sourced from Postgres."""
+
     def __init__(self, config_path: str):
         self.config_path = config_path
-        
+
         # Initialize data attributes
         self.resolution_table: pd.DataFrame
         self.resolution_subject_table: pd.DataFrame
         self.subject_table: pd.DataFrame
         self.closure_table: pd.DataFrame
+        self.broader_table: pd.DataFrame
         self.member_states_table: pd.DataFrame
 
         # Load configuration
@@ -40,43 +110,12 @@ class DataRepository:
         # Initialize Logging
         self._setup_logging()
 
-        self.logger.info("Initializing UNDataRepository")
+        self.logger.info("Initializing UNDataRepository from Postgres")
 
-        if not self._has_cached_data() or not self._check_data_version():
-            self.logger.info("Initializing from raw data sources.")
-            # Check if configured data sources are valid
-            if not self._resolve_and_validate_data_urls():
-                self.logger.error(
-                    "One or more configured data sources are invalid. "
-                    "Please review settings in data_sources.yaml."
-                )
-                raise ValueError("Failed to resolve one or more data sources. Check logs for details.")
-
-            self._build_data()
-        else:
-            # Cached data found and version matches -> load
-            self.logger.info("Initializing from cached data.")
-            self._load_cached_data()
+        self._load_from_postgres()
 
         self.logger.info("Initialization complete. Below are memory footprints:")
-        self.logger.info(
-            f"Resolution Table: {self.resolution_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
-        )
-        self.logger.info(
-            f"Resolution Subject Table: {self.resolution_subject_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
-        )
-        self.logger.info(
-            f"Subject Table: {self.subject_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
-        )
-        self.logger.info(
-            f"Closure Table: {self.closure_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
-        )
-        self.logger.info(
-            f"Broader Table: {self.broader_table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
-        )
-        self.logger.info(
-            f"Multilateral Scores: {self.multilateral_scores.nbytes / (1024**2):.2f} MB"
-        )
+        self._log_memory_footprints()
 
     def get_data(self) -> Dict[str, Any]:
         """Return all processed data as a dict consumed by ResolutionQueryEngine.
@@ -98,7 +137,7 @@ class DataRepository:
             'multilateral_scores': self.multilateral_scores,
             'vote_bool_arrays': self.vote_bool_arrays,
         }
-    
+
     def _load_config(self):
         """Load configuration from YAML file."""
         with open(self.config_path, 'r') as file:
@@ -114,7 +153,7 @@ class DataRepository:
         """Setup logging configuration with file and console handlers."""
         # Create logger
         self.logger = logging.getLogger('UNResolutionAnalyzer')
-        
+
         if not self.config['logs']:
             self.logger.disabled = True
             return
@@ -150,276 +189,155 @@ class DataRepository:
 
         self.logger.info("Logging setup complete.")
 
-    def _resolve_and_validate_data_urls(self) -> bool:
-        """
-        Check if the data sources in the configuration are valid and reachable.
-        Resolves dynamic URLs via API to ensure files exist.
-        """
-        
-        # We use a temporary DataFetcher to resolve URLs using the registered logic
-        # This can handle both static and dynamic sources.
-        fetcher_orchestrator = DataFetcher(self.config, self.logger)
-        
-        all_valid = True
-        
-        # 1. Check Resolutions
-        resolutions_config = self.config['data_sources'].get('resolutions', {})
-        for dataset_type, source_config in resolutions_config.items():
-            try:
-                # Get the specific fetcher for this dataset type
-                if dataset_type in fetcher_orchestrator._dataset_fetchers:
-                    dataset_fetcher = fetcher_orchestrator._dataset_fetchers[dataset_type]
-                    # Attempt to resolve the URL (this triggers the UNDL's API check for dynamic sources)
-                    url = dataset_fetcher.resolve_url(source_config)
-                    self.logger.info(f"Successfully resolved URL for {dataset_type}: {url}")
-                else:
-                    self.logger.warning(f"No fetcher registered for {dataset_type}, skipping URL check.")
-            except Exception as e:
-                self.logger.error(f"Failed to resolve/check URL for {dataset_type}: {e}")
-                all_valid = False
+    def _load_from_postgres(self):
+        """Read every table the app needs, then derive the in-memory representation.
 
-        # 2. Check Thesaurus
-        thesaurus_config = self.config['data_sources'].get('thesaurus')
-        if thesaurus_config:
-            try:
-                # Thesaurus fetcher is separate in DataFetcher
-                url = fetcher_orchestrator.thesaurus_fetcher.resolve_url(thesaurus_config)
-                self.logger.info(f"Successfully resolved URL for thesaurus: {url}")
-            except Exception as e:
-                self.logger.error(f"Failed to resolve/check URL for thesaurus: {e}")
-                all_valid = False
-
-        # 3. Check Member States
-        member_states_config = self.config['data_sources'].get('member_states')
-        if member_states_config:
-            try:
-                url = fetcher_orchestrator.member_states_fetcher.resolve_url(member_states_config)
-                self.logger.info(f"Successfully resolved URL for member_states: {url}")
-            except Exception as e:
-                self.logger.error(f"Failed to resolve/check URL for member_states: {e}")
-                all_valid = False
-
-        return all_valid
-    
-    def _has_cached_data(self) -> bool:
-        """Check if cached data files exist."""
-        data_path = Path(self.config['paths']['data'])
-        required_files = [
-            'resolution_table.csv',
-            'resolution_subject_table.csv',
-            'subject_table.csv',
-            'closure_table.csv',
-            'broader_table.csv',
-            'member_states_table.csv',
-            'precomputed_agreement_data.pkl'
-        ]
-        all_exist = all((data_path / file).exists() for file in required_files)
-        if all_exist:
-            self.logger.info("Cached Data files found.")
-        else:
-            self.logger.info("Cached Data files not found.")
-        return all_exist
-
-    def _check_data_version(self) -> bool:
+        The connection is opened, drained and closed inside this method. Nothing holds a live
+        connection afterwards: this runs at import time, which under gunicorn's `--preload` is the
+        master process before it forks, and a connection that survived the fork would be shared
+        across workers. See `db.create_engine`.
         """
-        Check if the cached data version matches the config version.
-        
-        Returns:
-             bool: True if versions match, False otherwise.
-        """
-        data_path = Path(self.config['paths']['data'])
-        metadata_file = data_path / 'metadata.json'
-        
-        if not metadata_file.exists():
-            self.logger.warning("No metadata file found for cached data.")
-            return False
-            
+        db.load_env()
+        engine = db.create_engine()
         try:
-            with open(metadata_file, 'r') as f:
-                metadata = json.load(f)
-                
-            cached_version = metadata.get('version')
-            config_version = str(self.config.get('version'))
-            
-            if str(cached_version) == config_version:
-                self.logger.info(f"Data version match: {cached_version}")
-                return True
-            else:
-                self.logger.warning(f"Data version mismatch. Cached: {cached_version}, Config: {config_version}")
-                return False
-        except Exception as e:
-             self.logger.error(f"Error checking data version: {e}")
-             return False
-    
-    # Columns present in resolution_table.csv that are NOT country vote columns.
-    # Used by _read_resolution_table to determine which columns to read as categorical.
-    _RESOLUTION_META_COLS: frozenset = frozenset({
-        'undl_id', 'date', 'session', 'resolution', 'draft',
-        'committee_report', 'meeting', 'title', 'agenda_title',
-        'subjects', 'total_yes', 'total_no', 'total_abstentions',
-        'total_non_voting', 'total_ms', 'undl_link', 'subject_id',
-        'description', 'agenda', 'modality', 'source_dataset', 'consensus_score',
-    })
+            self.logger.info("Reading tables from Postgres")
+            with engine.connect() as conn:
+                outcomes = db.read_table(
+                    conn, "resolution_outcomes", columns=list(RESOLUTION_COLUMNS.values())
+                )
+                votes = db.read_table(conn, "resolution_votes", columns=VOTE_COLUMNS)
+                self.subject_table = db.read_table(conn, "subject")
+                self.closure_table = db.read_table(conn, "subject_closure")
+                self.broader_table = db.read_table(conn, "subject_broader")
+                self.member_states_table = db.read_table(conn, "member_states")
+        finally:
+            engine.dispose()
 
-    @staticmethod
-    def _read_resolution_table(path: Path) -> pd.DataFrame:
-        """Read resolution_table.csv with vote columns as CategoricalDtype.
+        self.logger.info(
+            f"Read {len(outcomes)} resolutions, {len(votes)} votes, "
+            f"{len(self.subject_table)} subjects, {len(self.member_states_table)} member states"
+        )
 
-        Uses a two-pass strategy: the first pass reads only the header row to
-        discover which columns are vote columns; the second pass reads the full
-        file with an explicit dtype map so pandas never allocates the
-        intermediate object arrays.  This reduces both steady-state memory
-        (int8 codes instead of object pointers) and peak memory during load.
-        """
-        vote_dtype = pd.CategoricalDtype(categories=["Y", "N", "A", "X"], ordered=False)
-        header = pd.read_csv(path, nrows=0).columns.tolist()
-        dtype_map = {
-            c: vote_dtype
-            for c in header
-            if c not in DataRepository._RESOLUTION_META_COLS
-        }
-        return pd.read_csv(path, dtype=dtype_map, low_memory=False)
+        self.resolution_table, self.country_columns = self._build_resolution_table(outcomes, votes)
 
-    def _load_cached_data(self):
-        """Load cached data files into DataFrames."""
-        data_path = Path(self.config['paths']['data'])
-        data_path.mkdir(exist_ok=True)
-
-        # Load CSV files
-        self.logger.info("Loading resolution table")
-        self.resolution_table = self._read_resolution_table(data_path / 'resolution_table.csv')
-        self.logger.info("Loading resolution subject table")
-        self.resolution_subject_table = pd.read_csv(data_path / 'resolution_subject_table.csv')
-        self.logger.info("Loading subject table")
-        self.subject_table = pd.read_csv(data_path / 'subject_table.csv')
-        self.logger.info("Loading closure table")
-        self.closure_table = pd.read_csv(data_path / 'closure_table.csv')
-        self.logger.info("Loading broader table")
-        self.broader_table = pd.read_csv(data_path / 'broader_table.csv')
-        self.logger.info("Loading member states table")
-        self.member_states_table = pd.read_csv(data_path / 'member_states_table.csv')
-        self.logger.info("Cached data loaded successfully.")
-
-        self.logger.info("Loading precomputed vote data")
-        pkl_path = data_path / 'precomputed_agreement_data.pkl'
-        with open(pkl_path, 'rb') as f:
-            try:
-                uncompressed = blosc2.decompress(f.read())
-                assert isinstance(uncompressed, bytes), "Decompressed data is not bytes"
-            except RuntimeError as e:
-                self.logger.info(f"Blosc2 decompression failed: {e}. Attempting fallback to no compression.")
-                f.seek(0)
-                uncompressed = f.read()
-
-                # Migrate to compressed data
-                self.logger.info("Migrating to compressed data format.")
-                compressed = blosc2.compress(uncompressed, typesize=1)
-                assert isinstance(compressed, bytes), "Compressed data is not bytes"
-                f.seek(0)
-                f.write(compressed)
-                f.truncate()
-
-            agreement_data = pickle.loads(uncompressed)
-
-        # If old agreement_matrices.pkl exists, remove it
-        old_pkl_path = data_path / 'agreement_matrices.pkl'
-        if old_pkl_path.exists():
-            old_pkl_path.unlink()
-            self.logger.info("Removed old agreement_matrices.pkl to save space")
-
-        if 'multilateral_scores' not in agreement_data or 'vote_bool_arrays' not in agreement_data:
-            raise KeyError("Cached pkl is stale (missing multilateral_scores or vote_bool_arrays) — rebuild required.")
-
-        self.country_columns = agreement_data['country_columns']
-        self.multilateral_scores = agreement_data['multilateral_scores']
-        self.vote_bool_arrays = agreement_data['vote_bool_arrays']
-    
-    def _save_cached_data(self):
-        """Save data files into DataFrames."""
-        data_path = Path(self.config['paths']['data'])
-        data_path.mkdir(exist_ok=True)
-
-        # Save the tables in the defined folder
-        self.resolution_table.to_csv(data_path / 'resolution_table.csv', index=False)
-        self.resolution_subject_table.to_csv(data_path / 'resolution_subject_table.csv', index=False)
-        self.subject_table.to_csv(data_path / 'subject_table.csv', index=False)
-        self.closure_table.to_csv(data_path / 'closure_table.csv', index=False)
-        self.broader_table.to_csv(data_path / 'broader_table.csv', index=False)
-        self.member_states_table.to_csv(data_path / 'member_states_table.csv', index=False)
-
-        pkl_path = data_path / 'precomputed_agreement_data.pkl'
-        with open(pkl_path, 'wb') as f:
-            compressed = blosc2.compress(pickle.dumps({
-                'country_columns': self.country_columns,
-                'multilateral_scores': self.multilateral_scores,
-                'vote_bool_arrays': self.vote_bool_arrays,
-            }), typesize=1)
-            assert isinstance(compressed, bytes), "Compressed data is not bytes"
-            f.write(compressed)
-
-        # Save Metadata (Version)
-        metadata = {
-            'version': self.config.get('version', 'unknown'),
-            'last_updated': self.config.get('last_updated', 'unknown')
-        }
-        with open(data_path / 'metadata.json', 'w') as f:
-            json.dump(metadata, f, indent=4)
-        self.logger.info(f"Saved data metadata (version {metadata['version']})")
-
-    def _build_data(self):
-        """Build processed data tables from raw sources."""
-        
-        # Fetch Data
-        fetcher = DataFetcher(self.config, self.logger)
-        resolutions_raw = fetcher.fetch_resolutions()
-        thesaurus_graph = fetcher.fetch_thesaurus()
-        self.member_states_table = fetcher.fetch_member_states()
-
-        # Process data
+        # Precompute the arrays every agreement/alignment query broadcasts over.
+        # `country_columns` is passed in, not inferred: the query engine turns a country code into
+        # a *column index* into these arrays, so their column order has to be exactly the list the
+        # wide frame was built from.
         processor = DataProcessor(self.config, self.logger)
-        merger = DataMerger(self.logger)
-        
-        # Process thesaurus first (needed for subject matching)
-        thesaurus_tables = processor.process_thesaurus(thesaurus_graph)
-        self.subject_table = thesaurus_tables.get('subject_table', pd.DataFrame())
-        self.closure_table = thesaurus_tables.get('closure_table', pd.DataFrame())
-        self.broader_table = thesaurus_tables.get('broader_table', pd.DataFrame())
-        
-        # Process individual resolution datasets
-        processed_datasets = processor.process_resolutions(resolutions_raw, subject_table=self.subject_table)
-        
-        # Continue with GA for now
-        # unified_resolutions = merger.merge_resolutions(processed_datasets)
-        ga_resolutions = processed_datasets.get('ga_resolutions', pd.DataFrame())
-
-        # Normalize ga_resolutions
-        self.resolution_table, self.resolution_subject_table = processor.normalize_resolutions(ga_resolutions)
-
-        # Calculate consensus scores and compact vote arrays for all resolutions
         (
             consensus_scores,
-            self.country_columns,
             self.multilateral_scores,
             self.vote_bool_arrays,
-        ) = processor.calculate_agreement_data(self.resolution_table)
+        ) = processor.calculate_agreement_data(self.resolution_table, self.country_columns)
 
         # Add consensus scores to the resolution table
         self.resolution_table['consensus_score'] = self.resolution_table['undl_id'].map(consensus_scores)
 
-        
-        expanded_subjects = set()
-        
-        for subject_id in self.resolution_subject_table["subject_id"].unique().tolist():
-            ancestors = self.closure_table[
-                self.closure_table['descendant_id'] == subject_id
-                ]['ancestor_id'].to_list()
-            for i in ancestors:
-                expanded_subjects.add(i)
+        self.resolution_subject_table = self._build_resolution_subject_table()
+        self._prune_unused_subjects()
 
-        expanded_subjects = list(expanded_subjects)
-        self.subject_table = self.subject_table[self.subject_table['subject_id'].isin(expanded_subjects)]
-        self.closure_table = self.closure_table[self.closure_table['ancestor_id'].isin(expanded_subjects)]
-        self.broader_table = self.broader_table[self.broader_table['parent_id'].isin(expanded_subjects)]
+    @staticmethod
+    def _build_resolution_table(
+            outcomes: pd.DataFrame,
+            votes: pd.DataFrame
+    ) -> Tuple[pd.DataFrame, List[str]]:
+        """Turn the normalized outcome/vote tables into the wide one-row-per-resolution frame.
 
-        # Save processed data
-        self._save_cached_data()
+        `resolution_votes` is stored long (one row per resolution x country); the query engine
+        wants one row per resolution with a column per country, so it gets pivoted and joined back
+        onto the resolution metadata.
+
+        Args:
+            outcomes: `resolution_outcomes` rows, restricted to `RESOLUTION_COLUMNS`
+            votes: `resolution_votes` rows (undl_id, country_code, vote)
+
+        Returns:
+            (wide resolution frame, country column names in frame order)
+        """
+        rename = {source: app_facing for app_facing, source in RESOLUTION_COLUMNS.items()}
+        meta = outcomes.rename(columns=rename)
+        meta['date'] = pd.to_datetime(meta['date'])
+        meta['session'] = meta['session'].astype(str)
+        meta['undl_link'] = _undl_search_links(meta['resolution'], meta['undl_id'])
+
+        votes_wide = votes.pivot(index="undl_id", columns="country_code", values="vote")
+        votes_wide.columns.name = None
+        country_columns = sorted(votes_wide.columns)
+
+        resolution_table = meta.merge(votes_wide, on="undl_id", how="left")
+
+        # A resolution with no `resolution_votes` rows at all is one that was never voted on
+        # per-country — adopted without a vote, or adopted by a non-recorded vote. 'X'
+        # (non-voting) is the correct code for every country there, not missing data.
+        resolution_table[country_columns] = (
+            resolution_table[country_columns].fillna("X").astype(VOTE_DTYPE)
+        )
+
+        return resolution_table, country_columns
+
+    def _build_resolution_subject_table(self) -> pd.DataFrame:
+        """Match each resolution's raw subject strings to thesaurus subject ids.
+
+        INTERIM — this is the app's last remaining piece of source-data processing, and it belongs
+        in the ingestion job (task T11 in `plans/app_postgres_migration_plan.md`): the job sees the
+        *raw repeated* MARC `991.d` fields, whereas the flattened `subjects` text column read here
+        has already lost that structure, and only the job can log unmatched strings to
+        `ingestion_runs.issues_detail`. Once `resolution_subject` is a real table, this method
+        becomes a `db.read_table` call and `GAResolutionProcessor` can go.
+
+        Only `undl_id`/`subjects` are handed to the matcher — it explodes one row per subject
+        string, so passing the full 200-column wide frame would balloon it for no reason.
+        """
+        matched = GAResolutionProcessor(self.logger)._parse_subjects(
+            self.resolution_table[["undl_id", "subjects"]], self.subject_table
+        )
+        return (
+            matched[["undl_id", "subject_id"]]
+            .dropna(subset=["subject_id"])
+            .drop_duplicates()
+            .reset_index(drop=True)
+        )
+
+    def _prune_unused_subjects(self):
+        """Drop thesaurus entries no resolution maps to, directly or as an ancestor.
+
+        The filter UI builds its subject tree from these tables, so without this it would offer
+        thousands of subjects that can never match a resolution. Keeping a subject's ancestors is
+        what preserves the path from a top-level domain down to it; `subject_closure` includes
+        depth-0 self-pairs, so the matched subjects themselves are retained too.
+        """
+        matched_ids = self.resolution_subject_table["subject_id"].unique()
+        used_ids = self.closure_table.loc[
+            self.closure_table["descendant_id"].isin(matched_ids), "ancestor_id"
+        ].unique()
+
+        before = len(self.subject_table)
+        self.subject_table = self.subject_table[self.subject_table['subject_id'].isin(used_ids)]
+        self.closure_table = self.closure_table[self.closure_table['ancestor_id'].isin(used_ids)]
+        self.broader_table = self.broader_table[self.broader_table['parent_id'].isin(used_ids)]
+        self.logger.info(
+            f"Pruned subject table from {before} to {len(self.subject_table)} subjects "
+            f"reachable from the {len(matched_ids)} matched by a resolution"
+        )
+
+    def _log_memory_footprints(self):
+        """Log the memory footprint of every table and array held in memory."""
+        for name, table in (
+            ("Resolution Table", self.resolution_table),
+            ("Resolution Subject Table", self.resolution_subject_table),
+            ("Subject Table", self.subject_table),
+            ("Closure Table", self.closure_table),
+            ("Broader Table", self.broader_table),
+            ("Member States Table", self.member_states_table),
+        ):
+            self.logger.info(
+                f"{name}: {table.memory_usage(index=True).sum() / (1024**2):.2f} MB"
+            )
+        self.logger.info(
+            f"Multilateral Scores: {self.multilateral_scores.nbytes / (1024**2):.2f} MB"
+        )
+        self.logger.info(
+            "Vote Bool Arrays: "
+            f"{sum(a.nbytes for a in self.vote_bool_arrays) / (1024**2):.2f} MB"
+        )

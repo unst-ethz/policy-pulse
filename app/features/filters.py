@@ -13,6 +13,7 @@ from dash import Input, Output, State, callback, html, dcc, ctx, no_update
 from .country_utils import _load_joining_dates, get_un_membership_years
 from .wordcloud_interactive import get_keyword_matched_ids
 from .. import data
+from . import data_store
 
 prefix = "filter-component"
 ids = {
@@ -453,7 +454,7 @@ def register_callbacks():
             if country:
                 print(f"   Filtered by country: {country}")
 
-            return result_df.to_json(date_format="iso", orient="split")
+            return data_store.dump_resolutions(result_df)
 
         except Exception as e:
             print(f"\n❌ Error querying data: {e}")

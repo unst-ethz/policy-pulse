@@ -105,8 +105,9 @@ class DataProcessor:
     
     def calculate_agreement_data(
             self,
-            resolutions_df: pd.DataFrame
-    ) -> Tuple[Dict[str, float], List[str], np.ndarray, Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
+            resolutions_df: pd.DataFrame,
+            country_columns: List[str]
+    ) -> Tuple[Dict[str, float], np.ndarray, Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
         """
         For each resolution, compute the consensus score (scalar) and per-country
         multilateral alignment scores.  Also build four compact bool arrays encoding
@@ -122,11 +123,16 @@ class DataProcessor:
             resolutions_df : pd.DataFrame
                 DataFrame with one row per resolution, containing voting columns
                 for each member state and metadata columns
+            country_columns : List[str]
+                The vote columns to treat as countries, in the order the returned arrays should
+                be indexed by. Passed in rather than inferred: the caller knows this exactly
+                (from `resolution_votes.country_code`), and the returned arrays are indexed
+                positionally by it, so inferring it here would silently misattribute every score
+                if the frame ever gained an unrecognised metadata column.
 
         Returns:
             Tuple of:
                 - consensus_scores: Dict mapping undl_id to its consensus score (scalar).
-                - country_columns: List of country columns in the vote data.
                 - multilateral_scores: (R x C) float32 array — per-resolution per-country
                   row-mean alignment score (NaN where country did not vote).
                 - vote_bool_arrays: 4-tuple of (R x C) bool arrays (yes, no, abstained, voted)
@@ -135,26 +141,14 @@ class DataProcessor:
         self.logger.info("Starting consensus and multilateral scores calculation")
         start_time = time.time()
 
-        # Step 1: Identify country columns (exclude metadata)
-        metadata_columns = {
-            'undl_id', 'date', 'session', 'resolution', 'draft',
-            'committee_report', 'meeting', 'title', 'agenda_title',
-            'subjects', 'total_yes', 'total_no', 'total_abstentions',
-            'total_non_voting', 'total_ms', 'undl_link', 'subject_id',
-            'description', 'agenda', 'modality', 'source_dataset'
-        }
-
-        country_columns = [col for col in resolutions_df.columns
-                          if col not in metadata_columns]
-
-        self.logger.info(f"Found {len(country_columns)} country columns")
+        self.logger.info(f"Using {len(country_columns)} country columns")
         self.logger.info(f"Processing {len(resolutions_df)} resolutions")
 
         n = len(country_columns)
         off_diag_mask = ~np.eye(n, dtype=bool)
 
-        # Step 2: For each resolution, compute consensus score and multilateral scores.
-        # The agreement matrix is built transiently per resolution and not retained.
+        # For each resolution, compute consensus score and multilateral scores. The agreement
+        # matrix is built transiently per resolution and not retained.
         consensus_scores = {}
         multilateral_rows = []
 
@@ -175,7 +169,7 @@ class DataProcessor:
 
         multilateral_scores = np.array(multilateral_rows, dtype=np.float32)  # float32 saves disk space when pickling
 
-        # Step 3: Compute boolean arrays with vote-type indicators. By pickling these arrays,
+        # Compute boolean arrays with vote-type indicators. By pickling these arrays,
         # the query engine will not have to re-parse vote columns on every startup.
         vote_str = (
             resolutions_df[country_columns]
@@ -197,7 +191,6 @@ class DataProcessor:
 
         return (
             consensus_scores,
-            country_columns,
             multilateral_scores,
             (vote_yes, vote_no, vote_abstained, vote_voted),
         )

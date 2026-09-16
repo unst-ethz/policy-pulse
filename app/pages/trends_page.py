@@ -27,6 +27,8 @@ from ..features import (
     resolution_list,
     wordcloud_interactive
 )
+# aliased: a callback parameter below is itself named `data_store`
+from ..features import data_store as data_store_io
 
 # Tab IDs — defined once here so layout values and callback comparisons stay in sync
 _TAB_RESOLUTION_LIST = "resolution_list"
@@ -484,7 +486,7 @@ def update_resolution_count(data_store, active_tab):
         )
     if not data_store:
         return ""
-    n = len(pd.read_json(data_store, orient="split"))
+    n = len(data_store_io.load_resolutions(data_store))
     return [html.Strong(f"{n:,}"), f" resolution{'s' if n != 1 else ''} match current filters"]
 
 

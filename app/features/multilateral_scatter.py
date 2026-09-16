@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 import pandas as pd
 
 from .. import data
+from . import data_store
 
 # M49 top-level regions in a consistent display order with D3-palette colours
 _REGION_ORDER = ["Africa", "Americas", "Asia", "Europe", "Oceania", "Other"]
@@ -99,7 +100,7 @@ def register_callbacks(query_engine):
         if not filtered_data:
             return go.Figure(), "", ""
 
-        resolutions = pd.read_json(filtered_data, orient="split")
+        resolutions = data_store.load_resolutions(filtered_data)
         if resolutions.empty:
             return go.Figure(), html.Div([html.Strong("No resolutions to plot")]), ""
 

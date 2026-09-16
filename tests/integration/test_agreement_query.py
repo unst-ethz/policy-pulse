@@ -249,14 +249,13 @@ def test_pre_membership_resolutions_are_nan(engine):
 def test_vote_columns_are_categorical(engine):
     """Vote columns must be loaded as CategoricalDtype, not object.
 
-    Regression guard: if the two-pass CSV read in _read_resolution_table is
-    ever removed or bypassed, this test fails immediately rather than silently
-    restoring ~50 MB of unnecessary object-array overhead.
+    Regression guard: if the cast in DataRepository._build_resolution_table is ever removed or
+    bypassed, this test fails immediately rather than silently restoring ~150 MB of unnecessary
+    object-array overhead.
     """
     import pandas as pd
     rt = engine.resolution_table
-    from app.un_data_stream.data.repository import DataRepository
-    vote_cols = [c for c in rt.columns if c not in DataRepository._RESOLUTION_META_COLS]
+    vote_cols = engine.country_columns
     assert vote_cols, "No vote columns found in resolution_table"
     non_categorical = [c for c in vote_cols if not isinstance(rt[c].dtype, pd.CategoricalDtype)]
     assert not non_categorical, (
@@ -270,9 +269,8 @@ def test_vote_values_in_expected_set(engine):
     Catches upstream data changes that introduce a new vote code which would
     silently map to NaN in the categorical dtype and corrupt agreement scores.
     """
-    from app.un_data_stream.data.repository import DataRepository
     rt = engine.resolution_table
-    vote_cols = [c for c in rt.columns if c not in DataRepository._RESOLUTION_META_COLS]
+    vote_cols = engine.country_columns
     allowed = {"Y", "N", "A", "X"}
     for col in vote_cols:
         observed = set(rt[col].dropna().unique())
