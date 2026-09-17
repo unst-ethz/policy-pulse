@@ -15,11 +15,12 @@
 #
 # The image is published weekly by undl-ingest's `undl-snapshot` unit (that repo's
 # deploy/README.md is the source of truth for the publish side). The data is a snapshot, not a
-# live mirror: expect it to be a few days behind the VM, and `docker compose pull` to move to a
-# newer one.
+# live mirror: expect it to be a few days behind the VM.
 #
-# To wipe and re-seed from the image: `docker compose down -v && docker compose up -d`. Without
-# the -v the volume survives and the snapshot is NOT re-applied.
+# To move to a newer snapshot: `uv run update-db`. Note that `pull` + `up -d` is NOT enough --
+# the image restores its dump only into a *fresh* data directory, so recreating the container on
+# a newer image serves the old volume unchanged: new image, old rows, healthy container. The
+# volume has to go: `docker compose pull && docker compose down -v && docker compose up -d`.
 
 services:
   db:

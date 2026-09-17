@@ -38,15 +38,19 @@ IMAGE = "ghcr.io/unst-ethz/policy-pulse-db"
 # production connection, so filling it in is this script's job.
 DEV_PASSWORD = "policy_pulse"
 
-# The tables the app reads on startup. `ingestion_runs` and `subject_closure` are deliberately not
-# checked: the first is ingestion bookkeeping the app never touches, and the second is legitimately
-# derived, so an empty one is a data question rather than a "did the snapshot restore" question.
+# Every table `DataRepository` reads on startup (see repository.py's `read_table` calls). This is
+# a superset of the five undl-ingest smoke-tests before publishing: that check asks "did the dump
+# restore", this one asks "can the app actually run on it", and the app needs `resolution_subject`
+# and `subject_closure` too — an empty closure table silently breaks subject-hierarchy expansion
+# rather than failing outright. `ingestion_runs` is ingestion bookkeeping the app never touches.
 REQUIRED_TABLES = (
     "member_states",
     "resolution_outcomes",
     "resolution_votes",
     "subject",
+    "resolution_subject",
     "subject_broader",
+    "subject_closure",
 )
 
 HEALTH_TIMEOUT_SECONDS = 60
@@ -129,9 +133,9 @@ def check_docker() -> None:
     _say("==> Docker is available")
 
 
-def compose_pull() -> None:
+def compose_pull(image: str | None = None) -> None:
     """Pull the snapshot image, translating the two failures people actually hit."""
-    _say(f"==> Pulling {IMAGE} (private package — needs `docker login ghcr.io`)")
+    _say(f"==> Pulling {image or IMAGE} (private package — needs `docker login ghcr.io`)")
     result = _run(_compose("pull"), cwd=REPO_ROOT)
     if result.returncode == 0:
         return
@@ -214,15 +218,19 @@ def wait_for_healthy() -> None:
     )
 
 
-def check_tables() -> None:
-    """Connect the way the app does and count the core tables, failing if any is empty."""
+def read_counts() -> dict[str, int]:
+    """Count the core tables over the app's own connection settings.
+
+    Going through `app.un_data_stream.data.db` rather than `docker exec ... psql` is the point:
+    it proves the database is reachable *the way the app reaches it*, `.env` included, instead of
+    only proving that something is alive inside the container.
+    """
     # Imported here, not at module scope: this pulls in pandas and SQLAlchemy, and the Docker and
     # compose steps above should be able to fail fast without paying for that.
     import sqlalchemy as sa
 
     from app.un_data_stream.data import db
 
-    _say("==> Checking the data through the app's own connection settings")
     db.load_env()
     configured_port = os.environ.get("PGPORT")
     if configured_port != db_port():
@@ -235,7 +243,7 @@ def check_tables() -> None:
     engine = db.create_engine()
     try:
         with db.connect_or_explain(engine) as conn:
-            counts = {
+            return {
                 table: conn.execute(sa.text(f"select count(*) from {table}")).scalar_one()
                 for table in REQUIRED_TABLES
             }
@@ -243,9 +251,22 @@ def check_tables() -> None:
         # NullPool or not, the engine is disposed explicitly — see db.create_engine's docstring.
         engine.dispose()
 
+
+def check_tables(previous: dict[str, int] | None = None) -> dict[str, int]:
+    """Print the core tables' row counts, with deltas when we know the old ones.
+
+    Fails if any table is empty — that is the snapshot not having restored.
+    """
+    _say("==> Checking the data through the app's own connection settings")
+    counts = read_counts()
+
     width = max(len(table) for table in counts)
     for table, count in counts.items():
-        _say(f"    {table.ljust(width)}  {count:>9,}")
+        line = f"    {table.ljust(width)}  {count:>9,}"
+        if previous is not None:
+            delta = count - previous.get(table, 0)
+            line += f"   {delta:+,}" if delta else "   ="
+        _say(line)
 
     empty = [table for table, count in counts.items() if count == 0]
     if empty:
@@ -255,6 +276,63 @@ def check_tables() -> None:
             "the image's restore step deliberately leaves alone. Wipe it and try again:\n"
             "    docker compose down -v && uv run init-env"
         )
+    return counts
+
+
+def compose_image() -> str:
+    """The image reference the compose file resolves to, env interpolation and all."""
+    result = _run(_compose("config", "--images"), cwd=REPO_ROOT)
+    images = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    if result.returncode != 0 or not images:
+        raise InitEnvError(f"Could not read the image from {COMPOSE_FILE.name}.\n\n{result.stderr}")
+    return images[0]
+
+
+def _image_id(reference: str) -> str | None:
+    """The local image id `reference` resolves to, or None if it isn't present locally."""
+    result = _run(["docker", "image", "inspect", "--format", "{{.Id}}", reference])
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def _running_image_id() -> str | None:
+    """The image id the database container is actually running, or None if there is no container."""
+    result = _run(["docker", "inspect", "--format", "{{.Image}}", CONTAINER_NAME])
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+# Written into the data volume itself once a seed has been verified. The volume is the thing whose
+# contents we are asking about, and this marker shares its lifetime exactly: `docker compose down
+# -v` destroys both together, so the marker can never outlive the data it describes.
+#
+# The image id alone cannot answer "is my data current?". `docker compose pull && up -d` recreates
+# the container on the new image *without* re-running the restore, which leaves a container that
+# reports the new image while serving the old rows — so comparing the running image to the pulled
+# one says "up to date" precisely when the data is stale. This marker records what actually seeded
+# the volume, which is the question.
+SEED_MARKER = "/var/lib/postgresql/data/.policy-pulse-seeded-from"
+
+
+def read_seed_marker() -> str | None:
+    """The image id this volume was seeded from, or None if unknown (no container, or seeded by
+    something other than these commands)."""
+    result = _run(["docker", "exec", CONTAINER_NAME, "cat", SEED_MARKER])
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def write_seed_marker(image_id: str) -> None:
+    """Record what seeded this volume. Best effort: failing to write it costs a future no-op
+    update, which is not worth failing an otherwise successful setup over."""
+    _run(["docker", "exec", CONTAINER_NAME, "sh", "-c", f"printf %s '{image_id}' > {SEED_MARKER}"])
+
+
+def compose_down(remove_volumes: bool) -> None:
+    """Stop the database, optionally destroying its data volume."""
+    args = ["down", "-v"] if remove_volumes else ["down"]
+    result = _run(_compose(*args), cwd=REPO_ROOT)
+    if result.returncode != 0:
+        raise InitEnvError(f"`docker compose {' '.join(args)}` failed.\n\n{result.stderr.strip()}")
 
 
 def main() -> None:
@@ -266,6 +344,10 @@ def main() -> None:
         compose_up()
         wait_for_healthy()
         check_tables()
+        # Record what seeded this volume so `update-db` can tell later whether it is still current.
+        image_id = _image_id(compose_image())
+        if image_id is not None:
+            write_seed_marker(image_id)
     except InitEnvError as exc:
         print(f"\ninit-env failed.\n\n{exc}", file=sys.stderr)
         raise SystemExit(1) from None
@@ -274,7 +356,76 @@ def main() -> None:
     _say("")
     _say(f"Ready. Postgres is on localhost:{port} (database policy_pulse, user policy_pulse).")
     _say("Start the app with `uv run start-app` — http://127.0.0.1:8050")
-    _say("The data is a weekly snapshot: `docker compose pull && docker compose up -d` for newer.")
+    _say("The data is a weekly snapshot; `uv run update-db` moves you to a newer one.")
+
+
+def update() -> None:
+    """Entry point for `uv run update-db` — move the local database to the newest snapshot.
+
+    `docker compose pull && docker compose up -d` is *not* enough on its own, and fails silently
+    when it is wrong. The image restores its dump from `/docker-entrypoint-initdb.d` only on a
+    fresh data directory, so an existing `pgdata` volume means the new image starts up against the
+    old data: the container is healthy, the tables are full, and nothing has changed. The volume
+    has to go for the new snapshot to land, which is why this wipes it rather than just recreating
+    the container.
+
+    Since that wipe is destructive, it is skipped when the pulled image is the one already running
+    (`--force` re-seeds anyway, for a dev database someone has scribbled on).
+    """
+    force = "--force" in sys.argv[1:]
+    try:
+        check_docker()
+        image = compose_image()
+
+        running = _running_image_id()
+        seeded_from = read_seed_marker() if running is not None else None
+        previous: dict[str, int] | None = None
+        if running is not None:
+            # Best effort: if the current database is unreachable there is simply nothing to
+            # compare against, which is not a reason to refuse to update.
+            try:
+                previous = read_counts()
+            except Exception:
+                previous = None
+
+        compose_pull(image)
+        pulled = _image_id(image)
+
+        if seeded_from is not None and seeded_from == pulled and not force:
+            _say("")
+            _say("Already on the newest published snapshot — nothing to do.")
+            _say("(`uv run update-db --force` re-seeds from it anyway.)")
+            return
+
+        if running is None:
+            _say("==> No database container yet — creating one")
+        elif seeded_from is None:
+            # Either an older volume from before these commands existed, or one that a manual
+            # `docker compose up -d` recreated without re-seeding. Both mean the data's provenance
+            # is unknown, and re-seeding is the only way to make it known.
+            _say("==> Cannot tell what this volume was seeded from — re-seeding to be sure")
+        elif seeded_from != pulled:
+            _say("==> New snapshot pulled; re-seeding from it")
+        else:
+            _say("==> Already current, re-seeding anyway (--force)")
+
+        # The wipe and the re-create are one step from the caller's point of view, but `down -v`
+        # is the part that actually discards data, so it is announced before it happens.
+        _say("==> Clearing the data volume (`docker compose down -v`) — the snapshot only ever")
+        _say("    restores into a fresh one")
+        compose_down(remove_volumes=True)
+        compose_up()
+        wait_for_healthy()
+        check_tables(previous=previous)
+        if pulled is not None:
+            write_seed_marker(pulled)
+    except InitEnvError as exc:
+        print(f"\nupdate-db failed.\n\n{exc}", file=sys.stderr)
+        raise SystemExit(1) from None
+
+    _say("")
+    _say(f"Updated. Postgres is on localhost:{db_port()} with the newest snapshot.")
+    _say("Restart the app (`uv run start-app`) to load it — data is read once, at import.")
 
 
 if __name__ == "__main__":

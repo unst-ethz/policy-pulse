@@ -30,6 +30,9 @@ start-app = "app.__main__:main"
 # `uv run init-env` — one command from a fresh clone to a local Postgres holding a copy of the
 # production data (docker-compose.yml + the snapshot image). Dev only; see README.
 init-env = "app.dev.init_env:main"
+# `uv run update-db` — pull the newest snapshot and re-seed the local database from it. Separate
+# from init-env because it destroys the data volume, which is the only way a new snapshot lands.
+update-db = "app.dev.init_env:update"
 
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13.0"]
