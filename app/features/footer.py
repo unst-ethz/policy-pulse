@@ -2,6 +2,11 @@ import os
 
 from dash import html
 
+# TODO (team discussion): surface data freshness next to the build info. Everything needed is
+# already there — `app.data.query_engine.snapshot.source_marker` is the timestamp of the ingestion
+# run this process's data came from, and `.loaded_at` is when this worker read it. Worth deciding
+# whether users should see "data as of <date>" (helps spot a stuck ingestion job) or whether it is
+# noise for a public site. See T12 in plans/app_postgres_migration_plan.md.
 build_commit = os.getenv("BUILD_COMMIT", "unknown")
 build_date = os.getenv("BUILD_DATE", "unknown")
 if build_date != "unknown":

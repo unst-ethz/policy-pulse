@@ -7,6 +7,7 @@ fetching from UNDL and writing these tables, the app only ever selects from them
 
 import logging
 import os
+from datetime import datetime
 
 import pandas as pd
 import sqlalchemy as sa
@@ -86,6 +87,18 @@ def connect_or_explain(engine: Engine, logger: logging.Logger | None = None):
         if logger is not None:
             logger.error(detail)
         raise RuntimeError(f"{detail}\n{hint}") from exc
+
+
+# The app's freshness marker. Deliberately not derived from row-level timestamps: those can
+# reflect a run that failed halfway, whereas this only advances once a full batch completed.
+SUCCESS_MARKER_SQL = sa.text(
+    "SELECT max(completed_at) FROM ingestion_runs WHERE status = 'success'"
+)
+
+
+def read_success_marker(conn: Connection) -> datetime | None:
+    """Timestamp of the most recent successful ingestion run, or None if there has been none."""
+    return conn.execute(SUCCESS_MARKER_SQL).scalar_one_or_none()
 
 
 def read_table(conn: Connection, table_name: str, columns: list[str] | None = None) -> pd.DataFrame:

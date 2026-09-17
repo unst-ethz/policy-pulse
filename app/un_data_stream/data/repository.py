@@ -9,6 +9,7 @@ UNDL, and it does not process raw source data.
 
 import logging
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 from urllib.parse import quote
@@ -106,6 +107,9 @@ class DataRepository:
         self.closure_table: pd.DataFrame
         self.broader_table: pd.DataFrame
         self.member_states_table: pd.DataFrame
+        # MAX(completed_at) of successful ingestion runs as of this load; the reloader compares
+        # the live value against it. None when nothing has ever been ingested successfully.
+        self.source_marker: datetime | None = None
 
         # Load configuration
         self._load_config()
@@ -203,6 +207,12 @@ class DataRepository:
         try:
             self.logger.info("Reading tables from Postgres")
             with db.connect_or_explain(engine, self.logger) as conn:
+                # Read the freshness marker *before* the tables, never after. If an ingestion run
+                # commits while we are reading, a marker taken first is older than the data we
+                # got, so the reloader simply rebuilds once more — harmless. A marker taken last
+                # could be newer than the data, and the reloader would then never rebuild, leaving
+                # this worker permanently behind.
+                self.source_marker = db.read_success_marker(conn)
                 outcomes = db.read_table(
                     conn, "resolution_outcomes", columns=list(RESOLUTION_COLUMNS.values())
                 )
@@ -217,6 +227,7 @@ class DataRepository:
         finally:
             engine.dispose()
 
+        self.logger.info(f"Data ingested up to {self.source_marker}")
         self.logger.info(
             f"Read {len(outcomes)} resolutions, {len(votes)} votes, "
             f"{len(self.subject_table)} subjects, "

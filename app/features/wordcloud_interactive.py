@@ -39,6 +39,17 @@ _WORDCLOUD_MODES = {
 _CONSENSUS_CMAP_COLORS = ["#ff66cc", "#e6b24b", "#33cc33"]
 
 
+def invalidate() -> None:
+    """Drop the cached indices so the next use rebuilds them from current data.
+
+    Called by `app.data.reload_if_stale()` after a periodic reload: these indices are derived
+    from the resolution set, so without this the word cloud would keep serving terms built from
+    the previous load.
+    """
+    global _initialized
+    _initialized = False
+
+
 def _init_wc_data():
     """Initialize word cloud data from keywords CSV file."""
     global \

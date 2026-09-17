@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from ..data import DataRepository
+from .snapshot import DataSnapshot
 
 
 class ResolutionQueryEngine:
@@ -25,32 +26,58 @@ class ResolutionQueryEngine:
         Args:
             repo: DataRepository instance providing all precomputed tables and arrays.
         """
-        data = repo.get_data()
         self.logger = repo.logger
+        self._snap = DataSnapshot.from_repo(repo)
 
-        self.resolution_table = data.get("resolution", pd.DataFrame())
-        self.resolution_subject_table = data.get("resolution_subject", pd.DataFrame())
-        self.subject_table = data.get("subject", pd.DataFrame())
-        self.closure_table = data.get("closure", pd.DataFrame())
-        self.country_columns = data.get("country_columns", [])
+    # ------------------------------------------------------------------
+    # Data handle
+    #
+    # The engine instance is stable for the life of the process: `app/data.py` publishes it once
+    # and three features close over it at callback-registration time
+    # (trends_page.py -> agreement_choropleth / agreement_by_subject / multilateral_scatter).
+    # Rebinding a *new* engine would leave those three serving stale data forever while every
+    # other tab moved on, so a reload replaces the snapshot inside this instance instead.
+    # ------------------------------------------------------------------
 
-        self._multilateral_scores = data.get("multilateral_scores")
+    @property
+    def snapshot(self) -> DataSnapshot:
+        """The data currently being served."""
+        return self._snap
 
-        vote_bool_arrays = data.get("vote_bool_arrays")
-        if vote_bool_arrays is not None and self.country_columns:
-            self._yes = vote_bool_arrays[0]
-            self._no = vote_bool_arrays[1]
-            self._abstained = vote_bool_arrays[2]
-            self._voted = vote_bool_arrays[3]
-            self._row_index = {
-                rid: i for i, rid in enumerate(self.resolution_table["undl_id"].tolist())
-            }
-        else:
-            self._yes = np.empty((0, 0), dtype=bool)
-            self._no = np.empty((0, 0), dtype=bool)
-            self._abstained = np.empty((0, 0), dtype=bool)
-            self._voted = np.empty((0, 0), dtype=bool)
-            self._row_index = {}
+    def swap(self, snapshot: DataSnapshot) -> DataSnapshot:
+        """Atomically replace the served data, returning the snapshot that was in place.
+
+        One assignment, so a reader either sees the whole old snapshot or the whole new one.
+        Queries in flight keep the snapshot they started with — they took their reference at
+        method entry — and finish against consistent data.
+        """
+        previous, self._snap = self._snap, snapshot
+        self.logger.info(f"Swapped in new data: {snapshot.describe()}")
+        return previous
+
+    # Read-only views onto the current snapshot, kept under their historical names because
+    # features read them directly (resolution_list.py, recent_resolutions_panel.py,
+    # wordcloud_interactive.py, general_stats_panel.py) and so do the tests.
+
+    @property
+    def resolution_table(self) -> pd.DataFrame:
+        return self._snap.resolution_table
+
+    @property
+    def resolution_subject_table(self) -> pd.DataFrame:
+        return self._snap.resolution_subject_table
+
+    @property
+    def subject_table(self) -> pd.DataFrame:
+        return self._snap.subject_table
+
+    @property
+    def closure_table(self) -> pd.DataFrame:
+        return self._snap.closure_table
+
+    @property
+    def country_columns(self) -> List[str]:
+        return self._snap.country_columns
 
     def query_resolutions(
         self,
@@ -72,9 +99,17 @@ class ResolutionQueryEngine:
         Returns:
             pd.DataFrame: Filtered resolutions with all metadata
         """
+        # One read of the snapshot reference: everything below is answered from this
+        # single coherent view, even if a reload swaps the engine's data mid-query.
+        snap = self._snap
 
         # Start with all resolutions
-        filtered_df = self.resolution_table.copy()
+        filtered_df = snap.resolution_table.copy()
+        if filtered_df.empty:
+            # Nothing to filter. Also guards a degenerate snapshot (no rows *and* no columns),
+            # where reaching for "date" below would raise instead of returning nothing.
+            self.logger.info("No resolutions loaded")
+            return filtered_df
 
         filtered_df["date"] = pd.to_datetime(filtered_df["date"])
 
@@ -96,7 +131,7 @@ class ResolutionQueryEngine:
 
             if include_no_subject:
                 # Resolutions that have no entry in the subject table at all
-                all_with_subject = set(self.resolution_subject_table["undl_id"].unique())
+                all_with_subject = set(snap.resolution_subject_table["undl_id"].unique())
                 no_subject_ids = set(filtered_df["undl_id"].unique()) - all_with_subject
                 matching_ids.update(no_subject_ids)
                 self.logger.info(f"No-subject resolutions: {len(no_subject_ids)}")
@@ -105,8 +140,8 @@ class ResolutionQueryEngine:
                 if include_descendants:
                     expanded_subjects = set(real_subject_ids)
                     for subject_id in real_subject_ids:
-                        descendants = self.closure_table[
-                            self.closure_table["ancestor_id"] == subject_id
+                        descendants = snap.closure_table[
+                            snap.closure_table["ancestor_id"] == subject_id
                         ]["descendant_id"].unique()
                         expanded_subjects.update(descendants)
                     self.logger.info(
@@ -116,8 +151,8 @@ class ResolutionQueryEngine:
                 else:
                     subject_filter = real_subject_ids
 
-                subject_resolution_ids = self.resolution_subject_table[
-                    self.resolution_subject_table["subject_id"].isin(subject_filter)
+                subject_resolution_ids = snap.resolution_subject_table[
+                    snap.resolution_subject_table["subject_id"].isin(subject_filter)
                 ]["undl_id"].unique()
                 matching_ids.update(subject_resolution_ids)
 
@@ -152,22 +187,25 @@ class ResolutionQueryEngine:
                   'resolution_count', <iso3>, ...] where each cell is the mean bilateral
                   agreement score across all selected resolutions.
         """
-        if not self._row_index:
+        # One read of the snapshot reference: everything below is answered from this
+        # single coherent view, even if a reload swaps the engine's data mid-query.
+        snap = self._snap
+        if not snap.row_index:
             self.logger.error("No vote data available")
             return pd.DataFrame()
 
-        if country_code not in self.country_columns:
+        if country_code not in snap.country_columns:
             self.logger.error(f"Country '{country_code}' not found in country columns")
-            self.logger.info(f"Available countries (first 10): {self.country_columns[:10]}")
+            self.logger.info(f"Available countries (first 10): {snap.country_columns[:10]}")
             return pd.DataFrame()
 
-        country_idx = self.country_columns.index(country_code)
+        country_idx = snap.country_columns.index(country_code)
 
         if resolution_ids is None:
-            rid_list = self.resolution_table["undl_id"].tolist()
+            rid_list = snap.resolution_table["undl_id"].tolist()
             rows = list(range(len(rid_list)))
         else:
-            pairs = [(r, self._row_index[r]) for r in resolution_ids if r in self._row_index]
+            pairs = [(r, snap.row_index[r]) for r in resolution_ids if r in snap.row_index]
             missing = len(resolution_ids) - len(pairs)
             if missing:
                 self.logger.warning(f"Missing vote data for {missing} resolution IDs")
@@ -183,10 +221,10 @@ class ResolutionQueryEngine:
         # False - True = -1 (no),
         # False - False = 0 (abstained);
         # non-voters masked to nan below.
-        yes_float = self._yes[rows].astype(np.float32)
-        no_float = self._no[rows].astype(np.float32)
+        yes_float = snap.yes[rows].astype(np.float32)
+        no_float = snap.no[rows].astype(np.float32)
         v = yes_float - no_float  # (R', C) — all countries' votes
-        v[~self._voted[rows]] = np.nan  # X / missing → excluded from scoring
+        v[~snap.voted[rows]] = np.nan  # X / missing → excluded from scoring
 
         v_c = v[:, country_idx]  # (R',) — reference country's votes
         # broadcast (R',1) vs (R',C): one subtraction covers all resolutions × all countries at once
@@ -195,8 +233,8 @@ class ResolutionQueryEngine:
         )  # (R', C) — agreement scores ∈ {0.0, 0.5, 1.0, nan}
         agree[:, country_idx] = np.nan  # mask self-comparison
 
-        other_idx = [i for i in range(len(self.country_columns)) if i != country_idx]
-        other_cols = [self.country_columns[i] for i in other_idx]
+        other_idx = [i for i in range(len(snap.country_columns)) if i != country_idx]
+        other_cols = [snap.country_columns[i] for i in other_idx]
 
         if average:
             with warnings.catch_warnings():
@@ -234,25 +272,28 @@ class ResolutionQueryEngine:
                 - abstention_rate: fraction of votes cast as abstentions (NaN if no votes)
                 - participation_count: number of selected resolutions the country voted on
         """
-        if self._multilateral_scores is None or not self.country_columns:
+        # One read of the snapshot reference: everything below is answered from this
+        # single coherent view, even if a reload swaps the engine's data mid-query.
+        snap = self._snap
+        if snap.multilateral_scores is None or not snap.country_columns:
             return pd.DataFrame()
 
         if resolution_ids is None or len(resolution_ids) == 0:
-            rows = list(self._row_index.values())
+            rows = list(snap.row_index.values())
         else:
-            rows = [self._row_index[r] for r in resolution_ids if r in self._row_index]
+            rows = [snap.row_index[r] for r in resolution_ids if r in snap.row_index]
 
         if not rows:
             return pd.DataFrame()
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
-            avg_alignment = np.nanmean(self._multilateral_scores[rows], axis=0)  # (C,)
+            avg_alignment = np.nanmean(snap.multilateral_scores[rows], axis=0)  # (C,)
 
-        voted_slice = self._voted[rows]  # (R', C) bool
-        abstained_slice = self._abstained[rows]  # (R', C) bool
-        yes_slice = self._yes[rows]  # (R', C) bool
-        no_slice = self._no[rows]  # (R', C) bool
+        voted_slice = snap.voted[rows]  # (R', C) bool
+        abstained_slice = snap.abstained[rows]  # (R', C) bool
+        yes_slice = snap.yes[rows]  # (R', C) bool
+        no_slice = snap.no[rows]  # (R', C) bool
         participation = voted_slice.sum(axis=0)  # (C,) int
         abstentions = abstained_slice.sum(axis=0)  # (C,) int
         yes_votes = yes_slice.sum(axis=0)  # (C,) int
@@ -272,7 +313,7 @@ class ResolutionQueryEngine:
 
         return pd.DataFrame(
             {
-                "country": self.country_columns,
+                "country": snap.country_columns,
                 "multilateral_alignment": avg_alignment,
                 "abstention_rate": abstention_rate,
                 "yes_rate": yes_rate,
@@ -283,4 +324,7 @@ class ResolutionQueryEngine:
 
     def get_available_countries(self) -> List[str]:
         """Get list of available country codes in the dataset."""
-        return self.country_columns
+        # One read of the snapshot reference: everything below is answered from this
+        # single coherent view, even if a reload swaps the engine's data mid-query.
+        snap = self._snap
+        return snap.country_columns

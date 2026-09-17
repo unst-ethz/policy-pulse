@@ -94,15 +94,11 @@ class DataProcessor:
             multilateral_rows, dtype=np.float32
         )  # float32 saves disk space when pickling
 
-        # Compute boolean arrays with vote-type indicators. By pickling these arrays,
-        # the query engine will not have to re-parse vote columns on every startup.
-        vote_str = (
-            resolutions_df[country_columns].astype(str).apply(lambda s: s.str.strip().str.upper())
+        # Boolean arrays with vote-type indicators, so the query engine never has to look at a
+        # vote column again.
+        vote_yes, vote_no, vote_abstained, vote_voted = self._vote_type_masks(
+            resolutions_df, country_columns
         )
-        vote_yes = (vote_str == "Y").to_numpy(dtype=bool)
-        vote_no = (vote_str == "N").to_numpy(dtype=bool)
-        vote_abstained = (vote_str == "A").to_numpy(dtype=bool)
-        vote_voted = vote_yes | vote_no | vote_abstained
 
         elapsed_time = time.time() - start_time
         n_res = len(consensus_scores)
@@ -117,6 +113,47 @@ class DataProcessor:
             multilateral_scores,
             (vote_yes, vote_no, vote_abstained, vote_voted),
         )
+
+    @staticmethod
+    def _vote_type_masks(
+        resolutions_df: pd.DataFrame, country_columns: List[str]
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Build the (yes, no, abstained, voted) boolean arrays, one column at a time.
+
+        Deliberately avoids `resolutions_df[country_columns].astype(str)`. On the real dataset
+        that materialises 20,832 x 202 ~= 4.2 million Python strings, and the `.apply(...)` that
+        followed built another full object-dtype copy per column — together the largest transient
+        allocation in a load, and the reason a reloading worker's RSS plateaued a few hundred MB
+        above its baseline.
+
+        Vote columns arrive as `CategoricalDtype` with categories Y/N/A/X (see
+        `DataRepository.VOTE_DTYPE`), so the comparison runs on the integer codes and only ever
+        normalises the handful of category labels. Object columns — what the unit tests pass, and
+        historically tolerant of stray case or whitespace — take a per-column string comparison,
+        so at most one column is expanded at a time instead of the whole frame.
+        """
+        n_rows = len(resolutions_df)
+        n_cols = len(country_columns)
+        masks = {code: np.zeros((n_rows, n_cols), dtype=bool) for code in ("Y", "N", "A")}
+
+        for position, column in enumerate(country_columns):
+            values = resolutions_df[column]
+            if isinstance(values.dtype, pd.CategoricalDtype):
+                codes = values.cat.codes.to_numpy()
+                normalised = [str(category).strip().upper() for category in values.cat.categories]
+                for code, mask in masks.items():
+                    # More than one category can normalise to the same code (e.g. 'Y' and 'y'),
+                    # so match every code that does rather than just the first.
+                    matching = [i for i, category in enumerate(normalised) if category == code]
+                    if matching:
+                        mask[:, position] = np.isin(codes, matching)
+            else:
+                text = values.astype(str).str.strip().str.upper()
+                for code, mask in masks.items():
+                    mask[:, position] = (text == code).to_numpy()
+
+        vote_yes, vote_no, vote_abstained = masks["Y"], masks["N"], masks["A"]
+        return vote_yes, vote_no, vote_abstained, vote_yes | vote_no | vote_abstained
 
     @staticmethod
     def _calculate_single_resolution_matrix(

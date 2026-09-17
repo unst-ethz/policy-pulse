@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 from typing import Any
 
@@ -13,9 +14,12 @@ from .features.country_utils import (  # noqa: F401
     get_country_subregion,
 )
 from .un_data_stream import DataRepository, ResolutionQueryEngine
+from .un_data_stream.analysis.snapshot import DataSnapshot
+from .un_data_stream.data import reloader
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-repo = DataRepository(config_path=str(_PROJECT_ROOT / "config" / "data_sources.yaml"))
+_CONFIG_PATH = _PROJECT_ROOT / "config" / "data_sources.yaml"
+repo = DataRepository(config_path=str(_CONFIG_PATH))
 query_engine = ResolutionQueryEngine(repo=repo)
 
 available_countries = query_engine.get_available_countries()
@@ -481,3 +485,80 @@ def get_earliest_year():
 
 def get_latest_year():
     return get_latest_data_date().year
+
+
+# ---------------------------------------------------------------------------
+# Periodic reload
+#
+# The ingestion jobs refresh Postgres twice a day; this lets a running process pick that up
+# without a deploy. See T12 in plans/app_postgres_migration_plan.md.
+# ---------------------------------------------------------------------------
+
+
+def _rebuild_derived_state() -> None:
+    """Rebuild everything in this module that is derived from the repository.
+
+    `query_engine` is *not* rebuilt — its snapshot is swapped instead, because three features
+    close over the engine instance when their callbacks are registered. Everything here is a
+    module global that functions read at call time (or that page layouts read per view), so
+    rebinding is enough.
+    """
+    global _NAME_INDEX, REGION_TREE_DATA, TOP_LEVEL_SUBJECTS, SUBJECT_ID_TO_LABEL_MAP
+    global SUBJECT_TREE_DATA, available_countries
+
+    available_countries = query_engine.get_available_countries()
+    _NAME_INDEX = _build_name_index(repo.get_data()["member_states"])
+    subject_df = repo.get_data()["subject"]
+    TOP_LEVEL_SUBJECTS = set(
+        subject_df.loc[lambda df: df["node_type"] == "scheme", "subject_id"].tolist()
+    )
+    SUBJECT_ID_TO_LABEL_MAP = {
+        row["subject_id"]: row["label_en"] for _, row in subject_df.iterrows()
+    }
+    # Both trees are read inside `filters.layout()` / page layout functions, so a rebuilt tree
+    # reaches the UI on the next page view.
+    REGION_TREE_DATA = get_region_tree_data()
+    SUBJECT_TREE_DATA = get_subject_tree_data()
+
+
+def reload_if_stale() -> bool:
+    """Rebuild and swap in fresh data if a newer successful ingestion run exists.
+
+    Returns whether a reload happened. Raises nothing the caller must handle: a failure leaves
+    the previous data in place, and the reloader logs it and retries on the next tick.
+    """
+    global repo
+
+    live_marker = reloader.read_marker()
+    loaded_marker = query_engine.snapshot.source_marker
+    if not reloader.is_stale(loaded_marker, live_marker):
+        repo.logger.debug("Data still current (marker %s); no reload", loaded_marker)
+        return False
+
+    repo.logger.info("Newer ingestion detected (%s > %s); reloading", live_marker, loaded_marker)
+    started = time.monotonic()
+
+    # Build the whole new state before touching anything that is being served. If this raises,
+    # the swap below never happens and the old data keeps serving.
+    new_repo = DataRepository(config_path=str(_CONFIG_PATH))
+    snapshot = DataSnapshot.from_repo(new_repo)
+
+    query_engine.swap(snapshot)
+    repo = new_repo
+    _rebuild_derived_state()
+
+    # The word cloud builds its per-mode indices once from the resolution set; without this it
+    # would keep serving indices built from the previous load.
+    from .features import wordcloud_interactive
+
+    wordcloud_interactive.invalidate()
+
+    repo.logger.info(
+        "Reload complete in %.1fs: %s", time.monotonic() - started, snapshot.describe()
+    )
+    return True
+
+
+def start_reloader() -> bool:
+    """Start this process's reload poller. Safe to call repeatedly; see reloader.start()."""
+    return reloader.start(reload_if_stale)
