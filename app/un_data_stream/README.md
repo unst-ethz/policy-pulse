@@ -34,10 +34,24 @@ un_data_stream/
 │   ├── db.py          # Postgres connection + table reads (SQLAlchemy Core)
 │   ├── repository.py   # Main entry point: read → reshape → precompute
 │   ├── processor.py    # Vote-agreement precomputation
+│   ├── reloader.py     # Periodic freshness poll + rebuild
 │   └── progress.py     # Progress bar for the precompute loop
 └── analysis/
+    ├── snapshot.py     # The immutable data bundle a query is answered from
     └── query_engine.py # The query layer the app calls
 ```
+
+## Staying fresh
+
+The ingestion jobs refresh Postgres on their own schedule, and each app process notices without a
+deploy: a daemon poller compares `MAX(completed_at)` over successful `ingestion_runs` against the
+marker its data was read with (`snapshot.source_marker`), and on a change rebuilds everything and
+swaps it in with a single assignment. Interval via `RELOAD_INTERVAL_SECONDS` (default 1800, `0`
+disables). A failed rebuild keeps the previous data and retries on the next tick.
+
+Each worker reloads independently, so `--preload`'s copy-on-write sharing ends at the first
+reload — the accepted cost of not running a coordinator. Peak memory is ~2x the ~40 MB working set
+during a rebuild.
 
 ## Usage
 

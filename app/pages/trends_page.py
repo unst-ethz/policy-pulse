@@ -22,14 +22,12 @@ from ..features import (
     agreement_by_subject,
     agreement_choropleth,
     agreement_graph,
+    filtered_resolutions,
     filters,
     multilateral_scatter,
     resolution_list,
     wordcloud_interactive,
 )
-
-# aliased: a callback parameter below is itself named `data_store`
-from ..features import data_store as data_store_io
 
 # Tab IDs — defined once here so layout values and callback comparisons stay in sync
 _TAB_RESOLUTION_LIST = "resolution_list"
@@ -510,19 +508,19 @@ def prevent_disabled_tab_switch(selected_tab, filter_store):
 
 @callback(
     Output("resolution-count-banner", "children"),
-    Input("filter-component-data-store", "data"),
+    Input("filter-component-filter-store", "data"),
     Input("country-view-tabs", "value"),
 )
-def update_resolution_count(data_store, active_tab):
+def update_resolution_count(filter_store, active_tab):
     """Show how many resolutions match the current filters, or a note for the timeline tab."""
     if active_tab == _TAB_TIMELINE:
         return html.Span(
             "Timeline uses full session history — year range, subject and country filters do not apply.",
             style={"fontStyle": "italic"},
         )
-    if not data_store:
+    if not filter_store:
         return ""
-    df = data_store_io.load_resolutions(data_store)
+    df = filtered_resolutions.resolutions_for(filter_store, active_tab)
     n = len(df)
     summary = [html.Strong(f"{n:,}"), f" resolution{'s' if n != 1 else ''} match current filters"]
 

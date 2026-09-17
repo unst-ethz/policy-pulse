@@ -77,6 +77,7 @@ def is_stale(loaded_marker: Optional[datetime], live_marker: Optional[datetime])
         return True
     return live_marker > loaded_marker
 
+
 def start(reload_now: Callable[[], None], interval_s: Optional[int] = None) -> bool:
     """Start this process's poller if it isn't already running. Returns whether it started.
 

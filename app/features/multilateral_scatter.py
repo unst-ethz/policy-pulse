@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 from dash import Input, Output, callback, dcc, html
 
 from .. import data
-from . import data_store
+from . import filtered_resolutions
 
 # M49 top-level regions in a consistent display order with D3-palette colours
 _REGION_ORDER = ["Africa", "Americas", "Asia", "Europe", "Oceania", "Other"]
@@ -89,17 +89,17 @@ def register_callbacks(query_engine):
             Output("multilateral-details", "children"),
         ],
         [
-            Input("filter-component-data-store", "data"),
             Input("filter-component-filter-store", "data"),
+            Input("country-view-tabs", "value"),
             Input("multilateral-y-axis", "value"),
         ],
     )
-    def generate_scatter(filtered_data, filter_store, y_metric):
+    def generate_scatter(filter_store, active_tab, y_metric):
         y_metric = y_metric or "abstention_rate"
-        if not filtered_data:
+        if not filter_store:
             return go.Figure(), "", ""
 
-        resolutions = data_store.load_resolutions(filtered_data)
+        resolutions = filtered_resolutions.resolutions_for(filter_store, active_tab)
         if resolutions.empty:
             return go.Figure(), html.Div([html.Strong("No resolutions to plot")]), ""
 

@@ -14,7 +14,7 @@ from rapidfuzz import process as fuzz_process
 from wordcloud import WordCloud
 
 from .. import data
-from . import data_store
+from . import filtered_resolutions
 from .color_utils import make_adaptive_colorscale_plotly
 from .resolution_list import create_vote_indicator
 
@@ -595,14 +595,14 @@ def _build_empty_wordcloud_figure(message: str) -> go.Figure:
 
 
 def _build_wordcloud(
-    filtered_data_json: str,
-    mode: str = _DEFAULT_MODE,
     filter_store: dict | None = None,
+    active_tab: str | None = None,
+    mode: str = _DEFAULT_MODE,
     color_mode: Literal["frequency", "consensus"] = "frequency",
 ):
-    """Build word cloud figure from filtered data."""
+    """Build word cloud figure for the resolutions matching the current filters."""
     mode_label = _get_mode_label(mode)
-    if not filtered_data_json:
+    if not filter_store:
         return _build_empty_wordcloud_figure(
             _mode_empty_message(
                 mode,
@@ -619,7 +619,7 @@ def _build_wordcloud(
                 )
             )
 
-        df = data_store.load_resolutions(filtered_data_json)
+        df = filtered_resolutions.resolutions_for(filter_store, active_tab)
         if df.empty:
             return _build_empty_wordcloud_figure(
                 _mode_empty_message(
@@ -943,12 +943,12 @@ def register_callbacks():
             Output("wordcloud-interactive-chart", "figure"),
             Output("wordcloud-details", "children"),
         ],
-        Input("filter-component-data-store", "data"),
-        Input("wordcloud-mode-tabs", "value"),
         Input("filter-component-filter-store", "data"),
+        Input("country-view-tabs", "value"),
+        Input("wordcloud-mode-tabs", "value"),
         Input("wordcloud-color-mode", "value"),
     )
-    def update_wordcloud_chart(filtered_data, selected_mode, filter_store, color_mode):
+    def update_wordcloud_chart(filter_store, active_tab, selected_mode, color_mode):
         """Update word cloud and details caption when filters or colour mode change."""
         resolved_color_mode = color_mode or "frequency"
         details_text = (
@@ -956,7 +956,7 @@ def register_callbacks():
         )
         details = html.P([html.Strong("Details: "), details_text], style=_DETAILS_STYLE)
 
-        if not filtered_data:
+        if not filter_store:
             return (
                 go.Figure().add_annotation(
                     text="Loading data...",
@@ -972,9 +972,9 @@ def register_callbacks():
         mode = selected_mode if selected_mode in _WORDCLOUD_MODES else _DEFAULT_MODE
         return (
             _build_wordcloud(
-                filtered_data,
+                filter_store,
+                active_tab,
                 mode=mode,
-                filter_store=filter_store,
                 color_mode=resolved_color_mode,
             ),
             details,
@@ -982,16 +982,17 @@ def register_callbacks():
 
     @callback(
         Output("wordcloud-interactive-meta", "children"),
-        Input("filter-component-data-store", "data"),
+        Input("filter-component-filter-store", "data"),
+        Input("country-view-tabs", "value"),
         Input("wordcloud-mode-tabs", "value"),
     )
-    def update_wc_meta(filtered_data, selected_mode):
+    def update_wc_meta(filter_store, active_tab, selected_mode):
         """Update meta information about word cloud."""
-        if not filtered_data:
+        if not filter_store:
             return "No data available."
 
         try:
-            df = data_store.load_resolutions(filtered_data)
+            df = filtered_resolutions.resolutions_for(filter_store, active_tab)
             if df.empty:
                 return "No data available."
             if "undl_id" not in df.columns:
@@ -1058,12 +1059,12 @@ def register_callbacks():
     @callback(
         Output("wordcloud-interactive-table", "children"),
         Input("wordcloud-interactive-chart", "hoverData"),
-        Input("filter-component-data-store", "data"),
         Input("filter-component-filter-store", "data"),
+        Input("country-view-tabs", "value"),
         Input("wordcloud-mode-tabs", "value"),
         prevent_initial_call=True,
     )
-    def update_resolution_table(hoverData, filtered_data, filter_params, selected_mode):
+    def update_resolution_table(hoverData, filter_params, active_tab, selected_mode):
         """Update resolution list (cards) when hovering over a word."""
         if (
             hoverData is None
@@ -1076,7 +1077,7 @@ def register_callbacks():
                 style={"color": "#7f8c8d"},
             )
 
-        if not filtered_data:
+        if not filter_params:
             return html.Div("No data available.", style={"color": "#7f8c8d"})
 
         try:
@@ -1088,7 +1089,7 @@ def register_callbacks():
             if not word:
                 return html.Div("No word selected.", style={"color": "#7f8c8d"})
 
-            df = data_store.load_resolutions(filtered_data)
+            df = filtered_resolutions.resolutions_for(filter_params, active_tab)
 
             if df.empty:
                 return html.Div("No data available.", style={"color": "#7f8c8d"})

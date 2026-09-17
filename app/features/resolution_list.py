@@ -2,7 +2,7 @@ import pandas as pd
 from dash import Input, Output, State, callback, dcc, html
 
 from .. import data
-from . import data_store as store
+from . import filtered_resolutions
 
 _PAGE_SIZE = 10
 _LOAD_MORE_SIZE = 50
@@ -263,8 +263,8 @@ def register_callbacks():
         Output("rl-vote-filter-wrapper", "style"),
         Output("rl-multi-country-msg", "children"),
         Output("rl-multi-country-msg", "style"),
-        Input("filter-component-data-store", "data"),
         Input("filter-component-filter-store", "data"),
+        Input("country-view-tabs", "value"),
         Input("rl-agreement-dropdown", "value"),
         Input("rl-vote-filter", "value"),
         Input("rl-load-more-btn", "n_clicks"),
@@ -272,8 +272,8 @@ def register_callbacks():
         State("country1-iso-alpha3", "data"),
     )
     def update_resolution_list(
-        data_store,
         filter_params,
+        active_tab,
         agreement_filter,
         vote_filter,
         n_clicks,
@@ -290,7 +290,7 @@ def register_callbacks():
             "cursor": "pointer",
         }
 
-        if not data_store or not filter_params:
+        if not filter_params:
             return (
                 html.Div("Loading...", style={"padding": "20px"}),
                 "",
@@ -337,7 +337,7 @@ def register_callbacks():
         # 1. Load pre-filtered resolutions from the shared data store,
         #    then join vote columns from the resolution table for display.
         try:
-            df = store.load_resolutions(data_store)
+            df = filtered_resolutions.resolutions_for(filter_params, active_tab)
 
             # Join vote columns for country1 + comparison countries
             vote_cols_needed = [c for c in ([country1] + comparison_countries) if c]

@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 from dash import Input, Output, callback, dcc, html
 
 from .. import data
-from . import data_store
+from . import filtered_resolutions
 from .color_utils import make_adaptive_colorscale_plotly
 from .country_utils import get_country_longitude
 
@@ -18,18 +18,18 @@ def register_callbacks(query_engine):
             Output("agreement-choropleth-note", "children"),
         ],
         [
-            Input("filter-component-data-store", "data"),
             Input("filter-component-filter-store", "data"),
+            Input("country-view-tabs", "value"),
             Input("choropleth-color-mode", "value"),
         ],
     )
-    def generate_chart(filtered_data, filter_store, color_mode):
+    def generate_chart(filter_store, active_tab, color_mode):
         adaptive_colour_scale = "adaptive" in (color_mode or [])
 
-        if not filtered_data or not filter_store:
+        if not filter_store:
             return go.Figure(), "", ""
 
-        all_resolutions = data_store.load_resolutions(filtered_data)
+        all_resolutions = filtered_resolutions.resolutions_for(filter_store, active_tab)
         if all_resolutions.empty:
             status_msg = html.Div([html.Div([html.Strong("No resolutions to plot")])])
             return go.Figure(), status_msg, ""

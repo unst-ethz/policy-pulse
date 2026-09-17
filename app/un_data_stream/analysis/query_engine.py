@@ -103,21 +103,35 @@ class ResolutionQueryEngine:
         # single coherent view, even if a reload swaps the engine's data mid-query.
         snap = self._snap
 
-        # Start with all resolutions
-        filtered_df = snap.resolution_table.copy()
-        if filtered_df.empty:
+        table = snap.resolution_table
+        if table.empty:
             # Nothing to filter. Also guards a degenerate snapshot (no rows *and* no columns),
             # where reaching for "date" below would raise instead of returning nothing.
             self.logger.info("No resolutions loaded")
-            return filtered_df
+            return table.copy()
 
-        filtered_df["date"] = pd.to_datetime(filtered_df["date"])
+        # 1. Apply date filters.
+        #
+        # Masked first, copied once at the end: this is called several times per user interaction
+        # (every tab derives its own view), so the cost has to scale with the rows kept rather
+        # than with the whole table. Copying up front — 20k x 217 cells — cost ~3ms a call for
+        # nothing, and converting the date column cost another ~4ms.
+        dates = table["date"]
+        if not pd.api.types.is_datetime64_any_dtype(dates):
+            # The loader hands over datetime64 already; this is for callers that build a frame
+            # by hand (the unit tests) with dates as strings.
+            dates = pd.to_datetime(dates)
 
-        # 1. Apply date filters
+        keep = pd.Series(True, index=table.index)
         if start_date:
-            filtered_df = filtered_df[filtered_df["date"] >= pd.to_datetime(start_date)]
+            keep &= dates >= pd.to_datetime(start_date)
         if end_date:
-            filtered_df = filtered_df[filtered_df["date"] <= pd.to_datetime(end_date)]
+            keep &= dates <= pd.to_datetime(end_date)
+
+        filtered_df = table[keep].copy()
+        # Callers expect a real datetime column (and some assign to it), so hand over the
+        # converted values rather than whatever dtype the source had.
+        filtered_df["date"] = dates[keep]
 
         # 2. Apply subject filters
         if subject_ids is not None and len(subject_ids) > 0:

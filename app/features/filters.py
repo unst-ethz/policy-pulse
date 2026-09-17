@@ -1,4 +1,4 @@
-"""Filter panel component and shared data-store query callback.
+"""Filter panel component: the widgets, the URL sync, and the criteria store.
 
 Registers the filter UI (date range, country, subject, keyword, era presets) and
 the central `query_data_on_filter_change` callback that every tab reads from.
@@ -7,13 +7,10 @@ the central `query_data_on_filter_change` callback that every tab reads from.
 import urllib.parse
 
 import feffery_antd_components as fac
-import pandas as pd
 from dash import Input, Output, State, callback, ctx, dcc, html, no_update
 
 from .. import data
-from . import data_store
-from .country_utils import _load_joining_dates, get_un_membership_years
-from .wordcloud_interactive import get_keyword_matched_ids
+from .country_utils import get_un_membership_years
 
 prefix = "filter-component"
 ids = {
@@ -27,7 +24,6 @@ ids = {
     "preset": f"{prefix}-preset-dropdown",
     "reset_btn": f"{prefix}-reset-btn",
     "filter_store": f"{prefix}-filter-store",
-    "data_store": f"{prefix}-data-store",
     "location": f"{prefix}-location",
     "keyword_search": f"{prefix}-keyword-search",
     "clear_country2_btn": f"{prefix}-clear-country2-btn",
@@ -117,8 +113,8 @@ ERA_SEQUENCE = [
     "sdg_era",
 ]
 
-_TABS_WITHOUT_COUNTRY_FILTER = {"wordcloud"}
-_TABS_WITH_KEYWORD = {"resolution_list", "wordcloud"}
+# Moved to filtered_resolutions.py along with the query itself:
+# TABS_WITHOUT_COUNTRY_FILTER / TABS_WITH_KEYWORD.
 
 
 def get_default_filter_values():
@@ -380,104 +376,6 @@ def register_callbacks():
 
         return filter_data, f"?{urllib.parse.urlencode(url_filters, doseq=True)}"
 
-    # Callback: Query data when filters change
-    # Tabs where country1 is disabled or highlight-only — participation filter must not apply
-
-    @callback(
-        Output(ids["data_store"], "data"),
-        Input(ids["filter_store"], "data"),
-        Input("country-view-tabs", "value"),
-        prevent_initial_call=False,
-    )
-    def query_data_on_filter_change(filter_data, active_tab):
-        """Query data based on current filter selections."""
-        try:
-            # Convert years to inclusive date range (Jan 1 of start year to Dec 31 of end year)
-            start_date = filter_data.get("start_date") if filter_data else None
-            end_date = filter_data.get("end_date") if filter_data else None
-            subject_ids = filter_data.get("subject_ids") if filter_data else None
-            country = filter_data.get("country1_alpha3") if filter_data else None
-
-            # Query resolutions using the query engine
-            df = data.query_engine.query_resolutions(
-                start_date=start_date,
-                end_date=end_date,
-                subject_ids=subject_ids,
-                include_descendants=True,
-            )
-
-            # Apply country filter only on tabs where it is meaningful
-            mode = (filter_data.get("country_filter_mode") or "none") if filter_data else "none"
-            if country and country in df.columns and active_tab not in _TABS_WITHOUT_COUNTRY_FILTER:
-                if mode == "voted":
-                    vote_cleaned = df[country].astype(str).str.strip().str.upper()
-                    has_voted = vote_cleaned.isin(["Y", "N", "A"])
-                    df = df[has_voted]
-                elif mode == "member":
-                    jd = _load_joining_dates()
-                    rows = jd[jd["country"] == country]
-                    if not rows.empty:
-                        min_date = pd.to_datetime(rows["min_date"].min())
-                        max_date = pd.to_datetime(rows["max_date"].max())
-                        df["date"] = pd.to_datetime(df["date"])
-                        df = df[(df["date"] >= min_date) & (df["date"] <= max_date)]
-                    # TODO: multi-period membership (suspended + readmitted countries)
-                # "none": no filter applied
-
-            keyword = filter_data.get("keyword") if filter_data else None
-            if keyword and keyword.strip() and active_tab in _TABS_WITH_KEYWORD and not df.empty:
-                matched_ids = get_keyword_matched_ids(df, keyword)
-                df = df[df["undl_id"].isin(matched_ids)]
-
-            # Build column list: base columns + undl_link + vote columns when countries selected
-            base_cols = [
-                "undl_id",
-                "resolution",
-                "session",
-                "date",
-                "title",
-                "consensus_score",
-                "total_yes",
-                "total_no",
-                "total_abstentions",
-                "modality",
-            ]
-            if "undl_link" in df.columns:
-                base_cols.append("undl_link")
-
-            # country2_raw = filter_data.get("country2")
-            # comparison = []
-            # if isinstance(country2_raw, list):
-            #     comparison = country2_raw
-            # elif isinstance(country2_raw, str) and country2_raw:
-            #     comparison = [country2_raw]
-            # vote_cols = []
-            # if country and country in df.columns:
-            #     vote_cols.append(country)
-            # for c2 in comparison[:5]:
-            #     if c2 in df.columns:
-            #         vote_cols.append(c2)
-            # cols = [c for c in base_cols + vote_cols if c in df.columns]
-
-            # if not cols:
-            cols = base_cols
-
-            # Convert to JSON for storage
-            result_df = df[cols].copy() if not df.empty else pd.DataFrame()
-
-            print(f"\n✅ Queried {len(result_df)} resolutions")
-            if country:
-                print(f"   Filtered by country: {country}")
-
-            return data_store.dump_resolutions(result_df)
-
-        except Exception as e:
-            print(f"\n❌ Error querying data: {e}")
-            import traceback
-
-            traceback.print_exc()
-            return None
-
 
 def layout(page_query_params: dict[str, str] | None = None):
     initial_filters = get_default_filter_values()
@@ -503,7 +401,6 @@ def layout(page_query_params: dict[str, str] | None = None):
         children=[
             # Hidden stores
             dcc.Store(id=ids["filter_store"]),
-            dcc.Store(id=ids["data_store"]),
             dcc.Location(id=ids["location"], refresh=False),
             dcc.Download(id="download-resolutions-csv"),
             # Header row: title + buttons
