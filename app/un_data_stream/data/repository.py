@@ -16,7 +16,6 @@ from urllib.parse import quote
 import pandas as pd
 import yaml
 
-from ..processors.ga_processor import GAResolutionProcessor
 from . import db
 from .processor import DataProcessor
 
@@ -209,6 +208,9 @@ class DataRepository:
                 )
                 votes = db.read_table(conn, "resolution_votes", columns=VOTE_COLUMNS)
                 self.subject_table = db.read_table(conn, "subject")
+                self.resolution_subject_table = db.read_table(
+                    conn, "resolution_subject", columns=["undl_id", "subject_id"]
+                )
                 self.closure_table = db.read_table(conn, "subject_closure")
                 self.broader_table = db.read_table(conn, "subject_broader")
                 self.member_states_table = db.read_table(conn, "member_states")
@@ -217,7 +219,9 @@ class DataRepository:
 
         self.logger.info(
             f"Read {len(outcomes)} resolutions, {len(votes)} votes, "
-            f"{len(self.subject_table)} subjects, {len(self.member_states_table)} member states"
+            f"{len(self.subject_table)} subjects, "
+            f"{len(self.resolution_subject_table)} resolution-subject pairs, "
+            f"{len(self.member_states_table)} member states"
         )
 
         self.resolution_table, self.country_columns = self._build_resolution_table(outcomes, votes)
@@ -238,7 +242,6 @@ class DataRepository:
             consensus_scores
         )
 
-        self.resolution_subject_table = self._build_resolution_subject_table()
         self._prune_unused_subjects()
 
     @staticmethod
@@ -278,29 +281,6 @@ class DataRepository:
         )
 
         return resolution_table, country_columns
-
-    def _build_resolution_subject_table(self) -> pd.DataFrame:
-        """Match each resolution's raw subject strings to thesaurus subject ids.
-
-        INTERIM — this is the app's last remaining piece of source-data processing, and it belongs
-        in the ingestion job (task T11 in `plans/app_postgres_migration_plan.md`): the job sees the
-        *raw repeated* MARC `991.d` fields, whereas the flattened `subjects` text column read here
-        has already lost that structure, and only the job can log unmatched strings to
-        `ingestion_runs.issues_detail`. Once `resolution_subject` is a real table, this method
-        becomes a `db.read_table` call and `GAResolutionProcessor` can go.
-
-        Only `undl_id`/`subjects` are handed to the matcher — it explodes one row per subject
-        string, so passing the full 200-column wide frame would balloon it for no reason.
-        """
-        matched = GAResolutionProcessor(self.logger)._parse_subjects(
-            self.resolution_table[["undl_id", "subjects"]], self.subject_table
-        )
-        return (
-            matched[["undl_id", "subject_id"]]
-            .dropna(subset=["subject_id"])
-            .drop_duplicates()
-            .reset_index(drop=True)
-        )
 
     def _prune_unused_subjects(self):
         """Drop thesaurus entries no resolution maps to, directly or as an ancestor.

@@ -18,7 +18,7 @@ multi-minute startup after every deploy. That pipeline (`fetchers/`, `core/`, `d
 
 ### Key features
 
-- 🐘 **Postgres-sourced**: 6 tables read once at startup (~25s for ~20.8k resolutions and ~950k
+- 🐘 **Postgres-sourced**: 7 tables read once at startup (~25s for ~20.8k resolutions and ~950k
   votes), no local cache to invalidate
 - 📊 **Precomputed agreement arrays**: per-resolution consensus scores plus a
   (resolutions × countries) alignment matrix, built once at load
@@ -35,8 +35,6 @@ un_data_stream/
 │   ├── repository.py   # Main entry point: read → reshape → precompute
 │   ├── processor.py    # Vote-agreement precomputation
 │   └── progress.py     # Progress bar for the precompute loop
-├── processors/
-│   └── ga_processor.py # INTERIM: subject-string matching, moving to undl-ingest (T11)
 └── analysis/
     └── query_engine.py # The query layer the app calls
 ```
@@ -87,10 +85,13 @@ paths:
 | `subject` | thesaurus labels, domains, node types |
 | `subject_broader` | direct SKOS `broader` edges, for tree navigation |
 | `subject_closure` | transitive ancestor/descendant pairs, for hierarchy filters |
+| `resolution_subject` | which thesaurus concepts a resolution is about, for subject filters |
 | `member_states` | ISO codes and multi-language country names |
 
-`resolution_subject` is not yet a table: the app still derives it at load time via
-`GAResolutionProcessor` (see T11).
+Everything here is read as written by `undl-ingest`; the app derives nothing from raw source data.
+Note that `subject`/`subject_broader`/`subject_closure` are **pruned at load** to the subjects
+reachable from a `resolution_subject` row (627 of 7,341 today), so the filter UI only offers
+subjects that can actually match something.
 
 ## Performance model
 

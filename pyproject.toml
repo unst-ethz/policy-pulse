@@ -72,7 +72,6 @@ select = ["E", "F", "I"]
 "app/features/agreement_by_subject.py" = ["E501"]    # 2
 "app/pages/profile_page.py" = ["E501"]               # 1
 "app/data.py" = ["E501"]                             # 4
-"app/un_data_stream/processors/ga_processor.py" = ["E501"]   # 4 — deleted by T11 anyway
 "app/un_data_stream/analysis/query_engine.py" = ["E501"]     # 2
 "tests/integration/test_agreement_query.py" = ["E501"]       # 1
 
