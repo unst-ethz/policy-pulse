@@ -1,12 +1,12 @@
-from dash import dcc, Input, Output, callback, html
-import plotly.graph_objects as go
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+from dash import Input, Output, callback, dcc, html
 
 from .. import data
-
-from .country_utils import get_country_longitude
+from . import filtered_resolutions
 from .color_utils import make_adaptive_colorscale_plotly
+from .country_utils import get_country_longitude
 
 
 def register_callbacks(query_engine):
@@ -18,27 +18,25 @@ def register_callbacks(query_engine):
             Output("agreement-choropleth-note", "children"),
         ],
         [
-            Input("filter-component-data-store", "data"),
             Input("filter-component-filter-store", "data"),
+            Input("country-view-tabs", "value"),
             Input("choropleth-color-mode", "value"),
         ],
     )
-    def generate_chart(filtered_data, filter_store, color_mode):
+    def generate_chart(filter_store, active_tab, color_mode):
         adaptive_colour_scale = "adaptive" in (color_mode or [])
 
-        if not filtered_data or not filter_store:
+        if not filter_store:
             return go.Figure(), "", ""
 
-        all_resolutions = pd.read_json(filtered_data, orient="split")
+        all_resolutions = filtered_resolutions.resolutions_for(filter_store, active_tab)
         if all_resolutions.empty:
             status_msg = html.Div([html.Div([html.Strong("No resolutions to plot")])])
             return go.Figure(), status_msg, ""
 
         country1 = filter_store.get("country1_alpha3")
         if country1 is None:
-            status_msg = html.Div(
-                [html.Div([html.Strong("Please select a primary country")])]
-            )
+            status_msg = html.Div([html.Div([html.Strong("Please select a primary country")])])
             return go.Figure(), status_msg, ""
 
         agreement_data = query_engine.query_agreement_between_countries(
@@ -48,23 +46,38 @@ def register_callbacks(query_engine):
         )
 
         # Clean the returned agreement data
-        agreement_data.drop(columns=['source_country', 'resolution_count'], inplace=True)
+        agreement_data.drop(columns=["source_country", "resolution_count"], inplace=True)
         agreement_data = agreement_data.T.reset_index()
         agreement_data.columns = ["three_letter_country", "agreement_score"]
         agreement_data["Country"] = agreement_data["three_letter_country"].apply(
             data.get_country_display_name
         )
         agreement_data["Agreement"] = agreement_data["agreement_score"].apply(
-            lambda x: f"{x:.2f} with {data.get_country_display_name(country1)}"
-            if pd.notna(x) else "No shared vote"
+            lambda x: (
+                f"{x:.2f} with {data.get_country_display_name(country1)}"
+                if pd.notna(x)
+                else "No shared vote"
+            )
         )
 
         # Set up colour scale based on the distribution of consensus scores
         # Crucial: We need to restrict to resolutions where country1 actually voted
         # since these are the only ones that can contribute to any bilateral agreement
         # score on the Choropleth map.
-        country1_resolutions = all_resolutions.dropna(subset=[country1]) if country1 in all_resolutions.columns else all_resolutions
-        has_consensus = "consensus_score" in all_resolutions.columns and not country1_resolutions.empty
+        country1_resolutions = (
+            all_resolutions.dropna(subset=[country1])
+            if country1 in all_resolutions.columns
+            else all_resolutions
+        )
+        # The column existing is not enough: resolutions adopted without a vote or by a
+        # non-recorded vote have no consensus score, so a narrow date range can select rows that
+        # are all NaN. Anchoring the scale on those gives a NaN midpoint and renders the average
+        # in the note below as "(nan)".
+        has_consensus = (
+            "consensus_score" in all_resolutions.columns
+            and not country1_resolutions.empty
+            and country1_resolutions["consensus_score"].notna().any()
+        )
         use_adaptive = adaptive_colour_scale and has_consensus
         if use_adaptive:
             colorscale, lo, avg, hi = make_adaptive_colorscale_plotly(
@@ -181,7 +194,9 @@ def register_callbacks(query_engine):
             "always voted in opposite ways (Yes vs. No). "
         )
         shared_disclaimer = (
-            "The data only covers GA resolutions that were successfully passed. "
+            "The data only covers GA resolutions that were successfully passed, and agreement is "
+            "computed only over those with a recorded vote — resolutions adopted without a vote, or "
+            "by a non-recorded vote, have no per-country votes to compare. "
             "The map provides a simplified, static overview of political geography. Some smaller nations "
             "and territories are not shown and the map does not reflect historical border changes over time. "
             "The boundaries and names shown and the designations used on this map do not imply official "
@@ -192,7 +207,8 @@ def register_callbacks(query_engine):
         if use_adaptive:
             middle_part = (
                 "The midpoint of the colour scale (yellow) is anchored at the average consensus score "
-                f"across selected resolutions ({avg:.2f}). The consensus score of a resolution is the "
+                f"across the selected resolutions that were voted on ({avg:.2f}). The consensus score "
+                "of a resolution is the "
                 "average pairwise vote agreement across all country pairs that both cast a vote. "
                 f"Countries appearing blue thus agreed with {country1_name} more than the global average; "
                 "those appearing red agreed less. "
@@ -224,9 +240,19 @@ layout = [
             html.Div(id="agreement-choropleth-status"),
             dcc.Checklist(
                 id="choropleth-color-mode",
-                options=[{"label": " Centre colour scale on average consensus score", "value": "adaptive"}],
+                options=[
+                    {
+                        "label": " Centre colour scale on average consensus score",
+                        "value": "adaptive",
+                    }
+                ],
                 value=[],
-                style={"fontSize": "14px", "color": "#555", "marginBottom": "8px", "paddingLeft": "2%"},
+                style={
+                    "fontSize": "14px",
+                    "color": "#555",
+                    "marginBottom": "8px",
+                    "paddingLeft": "2%",
+                },
             ),
             dcc.Loading(
                 children=[

@@ -1,32 +1,32 @@
 import textwrap
 
-from dash import dcc, Input, Output, callback, html
 import plotly.graph_objects as go
-import pandas as pd
+from dash import Input, Output, callback, dcc, html
 
 from .. import data
+from . import filtered_resolutions
 
 # M49 top-level regions in a consistent display order with D3-palette colours
 _REGION_ORDER = ["Africa", "Americas", "Asia", "Europe", "Oceania", "Other"]
 _REGION_COLORS = {
-    "Africa":   "#D62728",
+    "Africa": "#D62728",
     "Americas": "#1F77B4",
-    "Asia":     "#FF7F0E",
-    "Europe":   "#2CA02C",
-    "Oceania":  "#9467BD",
-    "Other":    "#7F7F7F",
+    "Asia": "#FF7F0E",
+    "Europe": "#2CA02C",
+    "Oceania": "#9467BD",
+    "Other": "#7F7F7F",
 }
 
 _COLOR_DISAGREE = "#c0392b"
-_COLOR_AGREE    = "#1558b0"
-_COLOR_MEAN     = "#888888"
+_COLOR_AGREE = "#1558b0"
+_COLOR_MEAN = "#888888"
 
 _MIN_VOTES_THRESHOLD = 10
 
 _Y_AXIS_OPTIONS = [
     {"label": " Abstention Rate", "value": "abstention_rate"},
-    {"label": " Yes Share",       "value": "yes_rate"},
-    {"label": " No Share",        "value": "no_rate"},
+    {"label": " Yes Share", "value": "yes_rate"},
+    {"label": " No Share", "value": "no_rate"},
     # TODO: Add "Not-Voting Share" (fraction of selected resolutions with no vote cast).
     #  Crucial: This would need to reflect countries' membership dates in the UN to be meaningful.
 ]
@@ -71,12 +71,12 @@ def _callout_position(y_metric: str, cx: float, cy: float) -> tuple[float, float
     if y_metric == "yes_rate":
         occluded = cx < 0.30 and cy > 0.80
         if occluded:
-            return 0.02, 0.04, "left", "bottom"   # top-left → bottom-left
+            return 0.02, 0.04, "left", "bottom"  # top-left → bottom-left
         return 0.02, 0.96, "left", "top"
     else:
         occluded = cx < 0.30 and cy < 0.20
         if occluded:
-            return 0.02, 0.96, "left", "top"      # bottom-left → top-left
+            return 0.02, 0.96, "left", "top"  # bottom-left → top-left
         return 0.02, 0.04, "left", "bottom"
 
 
@@ -89,17 +89,17 @@ def register_callbacks(query_engine):
             Output("multilateral-details", "children"),
         ],
         [
-            Input("filter-component-data-store", "data"),
             Input("filter-component-filter-store", "data"),
+            Input("country-view-tabs", "value"),
             Input("multilateral-y-axis", "value"),
         ],
     )
-    def generate_scatter(filtered_data, filter_store, y_metric):
+    def generate_scatter(filter_store, active_tab, y_metric):
         y_metric = y_metric or "abstention_rate"
-        if not filtered_data:
+        if not filter_store:
             return go.Figure(), "", ""
 
-        resolutions = pd.read_json(filtered_data, orient="split")
+        resolutions = filtered_resolutions.resolutions_for(filter_store, active_tab)
         if resolutions.empty:
             return go.Figure(), html.Div([html.Strong("No resolutions to plot")]), ""
 
@@ -120,26 +120,30 @@ def register_callbacks(query_engine):
             group = stats[stats["region"] == region]
             if group.empty:
                 continue
-            fig.add_trace(go.Scatter(
-                x=group["multilateral_alignment"],
-                y=group[y_metric],
-                mode="markers",
-                name=region,
-                marker=dict(size=10, color=_REGION_COLORS[region], opacity=0.65),
-                text=group["country_name"],
-                customdata=group[["multilateral_alignment", y_metric, "participation_count"]].values,
-                hovertemplate=(
-                    "<b>%{text}</b><br>"
-                    "Multilateral vote agreement: %{customdata[0]:.3f}<br>"
-                    f"{y_label}: %{{customdata[1]:.1%}}<br>"
-                    "Votes cast: %{customdata[2]:.0f}"
-                    "<extra></extra>"
-                ),
-            ))
+            fig.add_trace(
+                go.Scatter(
+                    x=group["multilateral_alignment"],
+                    y=group[y_metric],
+                    mode="markers",
+                    name=region,
+                    marker=dict(size=10, color=_REGION_COLORS[region], opacity=0.65),
+                    text=group["country_name"],
+                    customdata=group[
+                        ["multilateral_alignment", y_metric, "participation_count"]
+                    ].values,
+                    hovertemplate=(
+                        "<b>%{text}</b><br>"
+                        "Multilateral vote agreement: %{customdata[0]:.3f}<br>"
+                        f"{y_label}: %{{customdata[1]:.1%}}<br>"
+                        "Votes cast: %{customdata[2]:.0f}"
+                        "<extra></extra>"
+                    ),
+                )
+            )
 
         # Axis bounds computed here so the callout corner picker can use them.
         x_lo = min(0.295, stats["multilateral_alignment"].min() * 0.95)
-        x_hi = max(0.95,  stats["multilateral_alignment"].max() * 1.05)
+        x_hi = max(0.95, stats["multilateral_alignment"].max() * 1.05)
         y_lo = -0.01  # small gap so markers at y=0 aren't clipped by the axis line
         y_hi = max(0.505, stats[y_metric].max() * 1.06)
 
@@ -149,26 +153,28 @@ def register_callbacks(query_engine):
             highlight = stats[stats["country"] == country1]
             if not highlight.empty:
                 row = highlight.iloc[0]
-                fig.add_trace(go.Scatter(
-                    x=[row["multilateral_alignment"]],
-                    y=[row[y_metric]],
-                    mode="markers+text",
-                    showlegend=False,
-                    marker=dict(
-                        size=14,
-                        color=_REGION_COLORS.get(row["region"], _REGION_COLORS["Other"]),
-                        line=dict(color="black", width=2),
-                    ),
-                    text=[row["country_name"]],
-                    textposition="top right",
-                    hovertemplate=(
-                        f"<b>{row['country_name']}</b> (selected)<br>"
-                        f"Multilateral vote agreement: {row['multilateral_alignment']:.3f}<br>"
-                        f"{y_label}: {row[y_metric]:.1%}<br>"
-                        f"Votes cast: {int(row['participation_count'])}"
-                        "<extra></extra>"
-                    ),
-                ))
+                fig.add_trace(
+                    go.Scatter(
+                        x=[row["multilateral_alignment"]],
+                        y=[row[y_metric]],
+                        mode="markers+text",
+                        showlegend=False,
+                        marker=dict(
+                            size=14,
+                            color=_REGION_COLORS.get(row["region"], _REGION_COLORS["Other"]),
+                            line=dict(color="black", width=2),
+                        ),
+                        text=[row["country_name"]],
+                        textposition="top right",
+                        hovertemplate=(
+                            f"<b>{row['country_name']}</b> (selected)<br>"
+                            f"Multilateral vote agreement: {row['multilateral_alignment']:.3f}<br>"
+                            f"{y_label}: {row[y_metric]:.1%}<br>"
+                            f"Votes cast: {int(row['participation_count'])}"
+                            "<extra></extra>"
+                        ),
+                    )
+                )
 
                 country_name = row["country_name"]
                 if row["multilateral_alignment"] >= mean_alignment:
@@ -181,9 +187,12 @@ def register_callbacks(query_engine):
                 ax, ay, xanchor, yanchor = _callout_position(y_metric, cx, cy)
 
                 fig.add_annotation(
-                    xref="paper", yref="paper",
-                    x=ax, y=ay,
-                    xanchor=xanchor, yanchor=yanchor,
+                    xref="paper",
+                    yref="paper",
+                    x=ax,
+                    y=ay,
+                    xanchor=xanchor,
+                    yanchor=yanchor,
                     text=_wrap(
                         f"{country_name} is located to the {side} of the mean "
                         f"line, showing that it {tendency}."
@@ -199,7 +208,7 @@ def register_callbacks(query_engine):
 
         # mean_fraction: exact position of the mean line in paper coords (used for arrow tails).
         # mean_fraction_clamped: pulled into [0.2, 0.8] so text labels stay readable at extremes.
-        mean_fraction         = (mean_alignment - x_lo) / (x_hi - x_lo)
+        mean_fraction = (mean_alignment - x_lo) / (x_hi - x_lo)
         mean_fraction_clamped = max(0.2, min(0.8, mean_fraction))
 
         fig.update_layout(
@@ -220,7 +229,8 @@ def register_callbacks(query_engine):
 
         # Row 1 — text labels, centred within each half (clamped position)
         fig.add_annotation(
-            xref="paper", yref="paper",
+            xref="paper",
+            yref="paper",
             x=mean_fraction_clamped / 2,
             y=1.13,
             text="Tend to disagree with the majority",
@@ -230,7 +240,8 @@ def register_callbacks(query_engine):
             yanchor="bottom",
         )
         fig.add_annotation(
-            xref="paper", yref="paper",
+            xref="paper",
+            yref="paper",
             x=mean_fraction_clamped + (1 - mean_fraction_clamped) / 2,
             y=1.13,
             text="Tend to agree with the majority",
@@ -244,37 +255,76 @@ def register_callbacks(query_engine):
         # Plotly does not render showarrow shafts that cross the plot/margin boundary,
         # so we use add_shape for the line (which supports yref="paper" values > 1)
         # and a tiny pixel-offset annotation for just the arrowhead triangle at each tip.
-        arrow_y     = 1.06
-        arrow_size  = 1.5  # arrowhead length multiplier
+        arrow_y = 1.06
+        arrow_size = 1.5  # arrowhead length multiplier
         arrow_width = 1.5  # arrowhead stroke width; equal to arrow_size here by coincidence
-        fig.add_shape(type="line", xref="paper", yref="paper",
-            x0=0.01, y0=arrow_y, x1=mean_fraction, y1=arrow_y,
-            line=dict(color=_COLOR_DISAGREE, width=2))
-        fig.add_shape(type="line", xref="paper", yref="paper",
-            x0=mean_fraction, y0=arrow_y, x1=0.99, y1=arrow_y,
-            line=dict(color=_COLOR_AGREE, width=2))
+        fig.add_shape(
+            type="line",
+            xref="paper",
+            yref="paper",
+            x0=0.01,
+            y0=arrow_y,
+            x1=mean_fraction,
+            y1=arrow_y,
+            line=dict(color=_COLOR_DISAGREE, width=2),
+        )
+        fig.add_shape(
+            type="line",
+            xref="paper",
+            yref="paper",
+            x0=mean_fraction,
+            y0=arrow_y,
+            x1=0.99,
+            y1=arrow_y,
+            line=dict(color=_COLOR_AGREE, width=2),
+        )
         # Arrowhead triangles: tail is 8px behind the tip so only the head is drawn
-        fig.add_annotation(xref="paper", yref="paper", axref="pixel", ayref="pixel",
-            x=0.01, y=arrow_y, ax=8, ay=0,
-            text="", showarrow=True,
-            arrowhead=2, arrowsize=arrow_size, arrowwidth=arrow_width, arrowcolor=_COLOR_DISAGREE)
-        fig.add_annotation(xref="paper", yref="paper", axref="pixel", ayref="pixel",
-            x=0.99, y=arrow_y, ax=-8, ay=0,
-            text="", showarrow=True,
-            arrowhead=2, arrowsize=arrow_size, arrowwidth=arrow_width, arrowcolor=_COLOR_AGREE)
+        fig.add_annotation(
+            xref="paper",
+            yref="paper",
+            axref="pixel",
+            ayref="pixel",
+            x=0.01,
+            y=arrow_y,
+            ax=8,
+            ay=0,
+            text="",
+            showarrow=True,
+            arrowhead=2,
+            arrowsize=arrow_size,
+            arrowwidth=arrow_width,
+            arrowcolor=_COLOR_DISAGREE,
+        )
+        fig.add_annotation(
+            xref="paper",
+            yref="paper",
+            axref="pixel",
+            ayref="pixel",
+            x=0.99,
+            y=arrow_y,
+            ax=-8,
+            ay=0,
+            text="",
+            showarrow=True,
+            arrowhead=2,
+            arrowsize=arrow_size,
+            arrowwidth=arrow_width,
+            arrowcolor=_COLOR_AGREE,
+        )
 
         note_msg = html.P(
             [
                 html.Strong("Details: "),
                 "Each point represents a UN member state, coloured by geographical region. "
                 "The x-axis (Multilateral Vote Agreement) is the average pairwise agreement between a country "
-                "and all other countries that voted on the same resolution, averaged across all selected "
-                f"resolutions. {_Y_AXIS_DETAILS[y_metric]} "
+                "and all other countries that voted on the same resolution, averaged across the selected "
+                f"resolutions on which votes were cast. {_Y_AXIS_DETAILS[y_metric]} "
                 "The dashed vertical line marks the mean multilateral voting agreement across all plotted countries. "
                 "The more a country is located to the left of the mean line, the more often it votes "
                 "against the majority. "
                 f"Countries with fewer than {_MIN_VOTES_THRESHOLD} votes cast are excluded. "
-                "The data only covers GA resolutions that were successfully passed."
+                "The data only covers GA resolutions that were successfully passed; those adopted "
+                "without a recorded vote contribute no votes here.",
             ],
             style={
                 "maxWidth": "100%",
@@ -292,26 +342,37 @@ def register_callbacks(query_engine):
 
 
 layout = [
-    html.Div([
-        html.Div(id="multilateral-scatter-status"),
-        html.Div(
-            [
-                html.Span("Y-axis:", style={"fontSize": "14px", "color": "#555", "whiteSpace": "nowrap"}),
-                dcc.Dropdown(
-                    id="multilateral-y-axis",
-                    options=_Y_AXIS_OPTIONS,
-                    value="abstention_rate",
-                    clearable=False,
-                    style={"minWidth": "180px"},
-                ),
-            ],
-            style={"display": "flex", "alignItems": "center", "gap": "8px", "marginBottom": "8px", "paddingLeft": "2%"},
-        ),
-        dcc.Loading(
-            children=[dcc.Graph(id="multilateral-scatter", style={"height": "600px"})],
-            type="circle",
-            color="#3498db",
-        ),
-        html.Div(id="multilateral-details"),
-    ])
+    html.Div(
+        [
+            html.Div(id="multilateral-scatter-status"),
+            html.Div(
+                [
+                    html.Span(
+                        "Y-axis:",
+                        style={"fontSize": "14px", "color": "#555", "whiteSpace": "nowrap"},
+                    ),
+                    dcc.Dropdown(
+                        id="multilateral-y-axis",
+                        options=_Y_AXIS_OPTIONS,
+                        value="abstention_rate",
+                        clearable=False,
+                        style={"minWidth": "180px"},
+                    ),
+                ],
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "gap": "8px",
+                    "marginBottom": "8px",
+                    "paddingLeft": "2%",
+                },
+            ),
+            dcc.Loading(
+                children=[dcc.Graph(id="multilateral-scatter", style={"height": "600px"})],
+                type="circle",
+                color="#3498db",
+            ),
+            html.Div(id="multilateral-details"),
+        ]
+    )
 ]

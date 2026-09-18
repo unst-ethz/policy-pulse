@@ -8,6 +8,9 @@ __pycache__/
 # Jupyter Notebook
 .ipynb_checkpoints
 
+# marimo
+__marimo__/
+
 # IPython
 profile_default/
 ipython_config.py
@@ -23,3 +26,11 @@ closure_table.csv
 
 .vscode
 .python-version
+
+# local secrets / connection info
+.env
+.env.*
+!.env.example
+
+# large local-only reference material, not meant for the repo
+notebooks/voting-preprocessing/

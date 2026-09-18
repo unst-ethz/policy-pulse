@@ -1,7 +1,7 @@
 import functools
 
-from dash import Input, Output, callback, html
 import pandas as pd
+from dash import Input, Output, callback, html
 
 from .. import data
 
@@ -28,15 +28,20 @@ def _stats_card(icon, title, value, subtitle, subtitle_style=None):
     return html.Div(
         [
             html.Div(icon, style={"fontSize": "1.5rem", "lineHeight": "1"}),
-            html.Div([
-                html.Div(title, style={"color": "#4b5563", "fontSize": "0.9rem"}),
-                html.Div(value, style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#1b3357"}),
-                html.Div(subtitle, style=merged_subtitle_style),
-            ], style={
-                "display": "flex",
-                "flexDirection": "column",
-                "gap": "0.25rem",
-            })
+            html.Div(
+                [
+                    html.Div(title, style={"color": "#4b5563", "fontSize": "0.9rem"}),
+                    html.Div(
+                        value, style={"fontSize": "1.5rem", "fontWeight": "700", "color": "#1b3357"}
+                    ),
+                    html.Div(subtitle, style=merged_subtitle_style),
+                ],
+                style={
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.25rem",
+                },
+            ),
         ],
         className="resolution-card",
         style={
@@ -61,14 +66,26 @@ def _build_stats_component():
     year_span = (year_max - year_min + 1) if year_min and year_max else 0
 
     num_countries = len(getattr(data.query_engine, "country_columns", []) or [])
-    total_subject_links = len(getattr(data.query_engine, "resolution_subject_table", pd.DataFrame()))
+    total_subject_links = len(
+        getattr(data.query_engine, "resolution_subject_table", pd.DataFrame())
+    )
     unique_subjects = (
-        getattr(data.query_engine, "resolution_subject_table", pd.DataFrame()).get("subject_id", pd.Series(dtype="object")).nunique()
+        getattr(data.query_engine, "resolution_subject_table", pd.DataFrame())
+        .get("subject_id", pd.Series(dtype="object"))
+        .nunique()
     )
     y_total = _safe_count(df["total_yes"].fillna(0).sum()) if "total_yes" in df.columns else 0
     n_total = _safe_count(df["total_no"].fillna(0).sum()) if "total_no" in df.columns else 0
-    a_total = _safe_count(df["total_abstentions"].fillna(0).sum()) if "total_abstentions" in df.columns else 0
-    x_total = _safe_count(df["total_non_voting"].fillna(0).sum()) if "total_non_voting" in df.columns else 0
+    a_total = (
+        _safe_count(df["total_abstentions"].fillna(0).sum())
+        if "total_abstentions" in df.columns
+        else 0
+    )
+    x_total = (
+        _safe_count(df["total_non_voting"].fillna(0).sum())
+        if "total_non_voting" in df.columns
+        else 0
+    )
     vote_total = max(1, y_total + n_total + a_total + x_total)
 
     y_pct = _safe_pct(y_total, vote_total)
@@ -89,29 +106,81 @@ def _build_stats_component():
                 "🌍",
                 "Countries",
                 f"{num_countries:,}",
-                f"UN member entities appearing in dataset",
+                "UN member entities appearing in dataset",
                 subtitle_style={"whiteSpace": "nowrap"},
             ),
             # _stats_card("🏷️", "Subjects", f"{unique_subjects:,}", f""),
-            _stats_card("🏷️", "Subjects", f"{unique_subjects:,}", f"{total_subject_links:,} resolutions with assigned subjects"),
-            html.Div("Vote Composition Across Accepted Resolutions", style={"fontWeight": "600", "color": "#1f2937", "marginBottom": "8px", "fontSize": "0.8rem", "whiteSpace": "nowrap"}),
+            _stats_card(
+                "🏷️",
+                "Subjects",
+                f"{unique_subjects:,}",
+                f"{total_subject_links:,} resolutions with assigned subjects",
+            ),
+            html.Div(
+                "Vote Composition Across Accepted Resolutions",
+                style={
+                    "fontWeight": "600",
+                    "color": "#1f2937",
+                    "marginBottom": "8px",
+                    "fontSize": "0.8rem",
+                    "whiteSpace": "nowrap",
+                },
+            ),
             html.Div(
                 [
-                    html.Div(style={"width": f"{y_pct:.2f}%", "backgroundColor": "#74bb88", "height": "100%"}),
-                    html.Div(style={"width": f"{n_pct:.2f}%", "backgroundColor": "#cc575f", "height": "100%"}),
-                    html.Div(style={"width": f"{a_pct:.2f}%", "backgroundColor": "#c19f5b", "height": "100%"}),
-                    html.Div(style={"width": f"{x_pct:.2f}%", "backgroundColor": "#6ea3e0", "height": "100%"}),
+                    html.Div(
+                        style={
+                            "width": f"{y_pct:.2f}%",
+                            "backgroundColor": "#74bb88",
+                            "height": "100%",
+                        }
+                    ),
+                    html.Div(
+                        style={
+                            "width": f"{n_pct:.2f}%",
+                            "backgroundColor": "#cc575f",
+                            "height": "100%",
+                        }
+                    ),
+                    html.Div(
+                        style={
+                            "width": f"{a_pct:.2f}%",
+                            "backgroundColor": "#c19f5b",
+                            "height": "100%",
+                        }
+                    ),
+                    html.Div(
+                        style={
+                            "width": f"{x_pct:.2f}%",
+                            "backgroundColor": "#6ea3e0",
+                            "height": "100%",
+                        }
+                    ),
                 ],
-                style={"display": "flex", "height": "14px", "borderRadius": "999px", "overflow": "hidden", "backgroundColor": "#e5e7eb"},
+                style={
+                    "display": "flex",
+                    "height": "14px",
+                    "borderRadius": "999px",
+                    "overflow": "hidden",
+                    "backgroundColor": "#e5e7eb",
+                },
             ),
             html.Div(
                 [
                     html.Span(f"■ Yes: {y_total:,} ({y_pct:.1f}%)", style={"color": "#1a7f37"}),
                     html.Span(f"■ No: {n_total:,} ({n_pct:.1f}%)", style={"color": "#cf222e"}),
                     html.Span(f"■ Abstain: {a_total:,} ({a_pct:.1f}%)", style={"color": "#9a6700"}),
-                    html.Span(f"■ Not Voting: {x_total:,} ({x_pct:.1f}%)", style={"color": "#0969da"}),
+                    html.Span(
+                        f"■ Not Voting: {x_total:,} ({x_pct:.1f}%)", style={"color": "#0969da"}
+                    ),
                 ],
-                style={"display": "flex", "flexDirection": "column", "gap": "0.5rem", "marginTop": "8px", "fontSize": "0.75rem"},
+                style={
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.5rem",
+                    "marginTop": "8px",
+                    "fontSize": "0.75rem",
+                },
             ),
         ],
         style={
@@ -126,6 +195,15 @@ def _build_stats_component():
 @functools.lru_cache(maxsize=1)
 def _get_stats_component_cached():
     return _build_stats_component()
+
+
+def invalidate() -> None:
+    """Drop the cached stats panel so the next render recomputes it from current data.
+
+    Called by `app.data.reload_if_stale()`: the totals, year span and country count are all
+    derived from the repository.
+    """
+    _get_stats_component_cached.cache_clear()
 
 
 layout = html.Div(id="index-general-stats-content")

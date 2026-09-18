@@ -26,12 +26,12 @@ test_cases = [
         "standard_with_single_nan",
         {"A": "Y", "B": "A", "C": "N", "D": "?", "E": "Y", "F": "N"},
         [
-            (0, 0, 1.0),     # self-agreement
-            (0, 4, 1.0),     # Y vs Y
-            (2, 5, 1.0),     # N vs N
-            (0, 1, 0.5),     # Y vs A
-            (0, 2, 0.0),     # Y vs N
-            (1, 2, 0.5),     # A vs N
+            (0, 0, 1.0),  # self-agreement
+            (0, 4, 1.0),  # Y vs Y
+            (2, 5, 1.0),  # N vs N
+            (0, 1, 0.5),  # Y vs A
+            (0, 2, 0.0),  # Y vs N
+            (1, 2, 0.5),  # A vs N
             (0, 3, np.nan),  # Y vs NaN
         ],
         0.4,
@@ -40,7 +40,7 @@ test_cases = [
         "mixed_with_dual_nan",
         {"A": "Y", "B": "N", "C": "?", "D": "?"},
         [
-            (0, 1, 0.0),     # Y vs N
+            (0, 1, 0.0),  # Y vs N
             (0, 2, np.nan),  # Y vs NaN
             (1, 3, np.nan),  # N vs NaN
             (2, 3, np.nan),  # NaN vs NaN

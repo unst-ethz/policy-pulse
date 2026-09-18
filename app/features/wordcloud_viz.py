@@ -1,11 +1,11 @@
-from dash import get_relative_path, html, dcc, clientside_callback, Input, Output
+from dash import Input, Output, clientside_callback, dcc, get_relative_path, html
 
 _TABS = [
-    ("Default",      "wordcloud_hd_default.png"),
+    ("Default", "wordcloud_hd_default.png"),
     ("Geopolitical", "wordcloud_hd_geopolitical.png"),
-    ("Thematic",     "wordcloud_hd_thematic.png"),
-    ("Action",       "wordcloud_hd_action.png"),
-    ("Subjects",     "wordcloud_hd_subjects.png"),
+    ("Thematic", "wordcloud_hd_thematic.png"),
+    ("Action", "wordcloud_hd_action.png"),
+    ("Subjects", "wordcloud_hd_subjects.png"),
 ]
 _N = len(_TABS)
 
@@ -48,7 +48,9 @@ def register_callbacks():
     clientside_callback(
         """
         function(selected) {
-            return Array.from({length: """ + str(_N) + """}, (_, i) =>
+            return Array.from({length: """
+        + str(_N)
+        + """}, (_, i) =>
                 i === selected
                     ? {"width": "100%", "display": "block"}
                     : {"display": "none"}

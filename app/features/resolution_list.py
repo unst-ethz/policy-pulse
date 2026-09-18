@@ -1,17 +1,18 @@
-from dash import callback, Input, Output, State, html, dcc
 import pandas as pd
-from .. import data
+from dash import Input, Output, State, callback, dcc, html
 
+from .. import data
+from . import filtered_resolutions
 
 _PAGE_SIZE = 10
 _LOAD_MORE_SIZE = 50
 _NO_FILTER = "NO_FILTER"
 
 VOTE_MAP = {
-    "Y": {"symbol": "✓", "color": "#2ecc71", "label": "Yes"},           # green checkmark
-    "N": {"symbol": "✗", "color": "#e74c3c", "label": "No"},            # red 'x'
-    "A": {"symbol": "●", "color": "#f39c12", "label": "Abstain"},       # yellow dot
-    "X": {"symbol": "–", "color": "#999",    "label": "Did not vote"},  # grey hyphen
+    "Y": {"symbol": "✓", "color": "#2ecc71", "label": "Yes"},  # green checkmark
+    "N": {"symbol": "✗", "color": "#e74c3c", "label": "No"},  # red 'x'
+    "A": {"symbol": "●", "color": "#f39c12", "label": "Abstain"},  # yellow dot
+    "X": {"symbol": "–", "color": "#999", "label": "Did not vote"},  # grey hyphen
 }
 _VOTE_NA = {"symbol": "·", "color": "#ccc", "label": "Non-member / no data"}  # tiny grey dot
 
@@ -19,6 +20,7 @@ _VOTE_NA = {"symbol": "·", "color": "#ccc", "label": "Non-member / no data"}  #
 def create_vote_summary(yes_count, no_count, abstain_count):
     def fmt(n):
         return str(int(n)) if pd.notna(n) else "–"
+
     items = [("Yes", yes_count), ("No", no_count), ("Abstain", abstain_count)]
     inner = " · ".join(f"{label}: {fmt(count)}" for label, count in items)
     return html.Span(
@@ -40,7 +42,10 @@ def create_vote_indicator(country_name, vote):
     config = VOTE_MAP[vote]
     return html.Span(
         [
-            html.Span(config["symbol"], style={"color": config["color"], "marginRight": "4px", "fontWeight": "bold"}),
+            html.Span(
+                config["symbol"],
+                style={"color": config["color"], "marginRight": "4px", "fontWeight": "bold"},
+            ),
             html.Span(country_name),
         ],
         style={"fontWeight": "500", "marginRight": "15px", "fontSize": "0.9em"},
@@ -78,8 +83,14 @@ layout = [
                                         options=[
                                             {"label": "Date (Newest First)", "value": "date_desc"},
                                             {"label": "Date (Oldest First)", "value": "date_asc"},
-                                            {"label": "Consensus Score (Highest First)", "value": "consensus_desc"},
-                                            {"label": "Consensus Score (Lowest First)", "value": "consensus_asc"},
+                                            {
+                                                "label": "Consensus Score (Highest First)",
+                                                "value": "consensus_desc",
+                                            },
+                                            {
+                                                "label": "Consensus Score (Lowest First)",
+                                                "value": "consensus_asc",
+                                            },
                                         ],
                                         value="date_desc",
                                         clearable=False,
@@ -171,10 +182,28 @@ layout = [
             # --- Vote Legend ---
             html.Div(
                 [
-                    html.Span("Vote key:", style={"fontWeight": "bold", "marginRight": "12px", "fontSize": "0.85em", "color": "#555"}),
+                    html.Span(
+                        "Vote key:",
+                        style={
+                            "fontWeight": "bold",
+                            "marginRight": "12px",
+                            "fontSize": "0.85em",
+                            "color": "#555",
+                        },
+                    ),
                     *[
                         html.Span(
-                            [html.Span(v["symbol"], style={"color": v["color"], "marginRight": "4px", "fontWeight": "bold"}), v["label"]],
+                            [
+                                html.Span(
+                                    v["symbol"],
+                                    style={
+                                        "color": v["color"],
+                                        "marginRight": "4px",
+                                        "fontWeight": "bold",
+                                    },
+                                ),
+                                v["label"],
+                            ],
                             style={"fontSize": "0.85em", "marginRight": "14px"},
                         )
                         for v in [*VOTE_MAP.values(), _VOTE_NA]
@@ -234,8 +263,8 @@ def register_callbacks():
         Output("rl-vote-filter-wrapper", "style"),
         Output("rl-multi-country-msg", "children"),
         Output("rl-multi-country-msg", "style"),
-        Input("filter-component-data-store", "data"),
         Input("filter-component-filter-store", "data"),
+        Input("country-view-tabs", "value"),
         Input("rl-agreement-dropdown", "value"),
         Input("rl-vote-filter", "value"),
         Input("rl-load-more-btn", "n_clicks"),
@@ -243,7 +272,13 @@ def register_callbacks():
         State("country1-iso-alpha3", "data"),
     )
     def update_resolution_list(
-        data_store, filter_params, agreement_filter, vote_filter, n_clicks, sort_order, country1_backup
+        filter_params,
+        active_tab,
+        agreement_filter,
+        vote_filter,
+        n_clicks,
+        sort_order,
+        country1_backup,
     ):
         # Default Styles
         btn_style_hidden = {"display": "none"}
@@ -255,7 +290,7 @@ def register_callbacks():
             "cursor": "pointer",
         }
 
-        if not data_store or not filter_params:
+        if not filter_params:
             return (
                 html.Div("Loading...", style={"padding": "20px"}),
                 "",
@@ -302,13 +337,15 @@ def register_callbacks():
         # 1. Load pre-filtered resolutions from the shared data store,
         #    then join vote columns from the resolution table for display.
         try:
-            df = pd.read_json(data_store, orient="split")
+            df = filtered_resolutions.resolutions_for(filter_params, active_tab)
 
             # Join vote columns for country1 + comparison countries
             vote_cols_needed = [c for c in ([country1] + comparison_countries) if c]
             if vote_cols_needed and not df.empty:
                 res_table = data.query_engine.resolution_table
-                available = list(dict.fromkeys(c for c in vote_cols_needed if c in res_table.columns))
+                available = list(
+                    dict.fromkeys(c for c in vote_cols_needed if c in res_table.columns)
+                )
                 if available:
                     vote_df = res_table.loc[
                         res_table["undl_id"].isin(df["undl_id"]), ["undl_id"] + available
@@ -328,9 +365,7 @@ def register_callbacks():
 
         if df.empty:
             return (
-                html.Div(
-                    "No resolutions found.", style={"padding": "20px", "color": "#777"}
-                ),
+                html.Div("No resolutions found.", style={"padding": "20px", "color": "#777"}),
                 "0 results",
                 btn_style_hidden,
                 agreement_container_style,
@@ -348,7 +383,7 @@ def register_callbacks():
             sort_by, ascending = "consensus_score", True
         else:  # Default to date_desc
             sort_by, ascending = "date", False
-        
+
         filtered_df = df.copy().sort_values(sort_by, ascending=ascending, na_position="last")
 
         if country1 and show_agreement_filter and agreement_filter != _NO_FILTER:
@@ -387,9 +422,7 @@ def register_callbacks():
             res_id = row.get("resolution", "N/A")
             link = row.get("undl_link", "#")
             date_val = row.get("date")
-            date_str = (
-                date_val.strftime("%d %b %Y") if pd.notna(date_val) else "Unknown"
-            )
+            date_str = date_val.strftime("%d %b %Y") if pd.notna(date_val) else "Unknown"
             session_val = row.get("session", "")
             session_str = f"Session {session_val}" if session_val else ""
             title = row.get("title", "Untitled")
@@ -408,16 +441,12 @@ def register_callbacks():
             # Main Country (only if selected)
             if country1:
                 c1_vote = row.get(country1) if country1 in row else None
-                indicators.append(
-                    create_vote_indicator(data.get_country_name(country1), c1_vote)
-                )
+                indicators.append(create_vote_indicator(data.get_country_name(country1), c1_vote))
 
             # Comparators (all selected countries)
             for c2 in comparison_countries:
                 if c2 in filtered_df.columns:
-                    indicators.append(
-                        create_vote_indicator(data.get_country_name(c2), row.get(c2))
-                    )
+                    indicators.append(create_vote_indicator(data.get_country_name(c2), row.get(c2)))
 
             card = html.Div(
                 [
@@ -449,18 +478,27 @@ def register_callbacks():
                                             "fontSize": "0.9em",
                                             "marginLeft": "12px",
                                         },
-                                    ) if session_str else None,
+                                    )
+                                    if session_str
+                                    else None,
                                     html.Span(
                                         f"Consensus score: {consensus_display}",
                                         style={
-                                            "color": "#666" if pd.notna(consensus_score) else "#999",
+                                            "color": "#666"
+                                            if pd.notna(consensus_score)
+                                            else "#999",
                                             "fontSize": "0.9em",
                                             "marginLeft": "12px",
                                         },
                                     ),
                                     vote_summary,
                                 ],
-                                style={"marginBottom": "0.5rem", "display": "flex", "alignItems": "center", "flexWrap": "wrap"},
+                                style={
+                                    "marginBottom": "0.5rem",
+                                    "display": "flex",
+                                    "alignItems": "center",
+                                    "flexWrap": "wrap",
+                                },
                             ),
                             html.Div(title),
                         ],

@@ -1,0 +1,32 @@
+# The Dockerfile copies only `app/` and `config/`, so this is a second line of defence rather
+# than the primary mechanism — it keeps secrets and bulky local material out of the build context
+# (which is uploaded to the daemon) even if a future COPY gets broader.
+
+# local secrets
+.env
+.env.*
+!.env.example
+
+# local state and caches
+.venv/
+__pycache__/
+*.py[codz]
+.pytest_cache/
+logs/
+data/
+
+# not needed to run the app
+notebooks/
+tests/
+slides/
+plans/
+exports/
+reference_ds/
+docs/
+*.md
+!README.md
+
+# vcs / editor
+.git/
+.github/
+.vscode/

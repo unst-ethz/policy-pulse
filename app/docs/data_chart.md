@@ -61,7 +61,7 @@ The class can be found in the file `resolution_analyzer.py`. A config file `data
 
 ```python
 # Basic initialization with default configuration
-analyzer = UNResolutionAnalyzer(config_path='config/data_sources.yaml')
+analyzer = UNResolutionAnalyzer(config_path="config/data_sources.yaml")
 ``` 
 
 ```python
@@ -72,7 +72,7 @@ print(f"Total resolutions: {len(all_resolutions)}")
 
 ```python
 # 3. Query by date range
-date_filtered = analyzer.query(start_date='2000-01-01', end_date='2010-12-31')
+date_filtered = analyzer.query(start_date="2000-01-01", end_date="2010-12-31")
 print(f"Resolutions from 2000-2010: {len(date_filtered)}")
 ```
 
@@ -80,17 +80,17 @@ print(f"Resolutions from 2000-2010: {len(date_filtered)}")
 # 4. Query by subject with descendants
 # Using 'Political and Legal Questions' subject
 political_legal_questions_resolutions = analyzer.query(
-    subject_ids=['http://metadata.un.org/thesaurus/01'],
-    include_descendants=True
+    subject_ids=["http://metadata.un.org/thesaurus/01"], include_descendants=True
 )
-print(f"Political and Legal Questions related resolutions: {len(political_legal_questions_resolutions)}")
+print(
+    f"Political and Legal Questions related resolutions: {len(political_legal_questions_resolutions)}"
+)
 ```
 
 ```python
 # 5. Query by subject without descendants
 palestine_questions_resolutions = analyzer.query(
-    subject_ids=['http://metadata.un.org/thesaurus/1004700'],
-    include_descendants=False
+    subject_ids=["http://metadata.un.org/thesaurus/1004700"], include_descendants=False
 )
 print(f"Palestine Questions (strict) resolutions: {len(palestine_questions_resolutions)}")
 ```
@@ -98,9 +98,9 @@ print(f"Palestine Questions (strict) resolutions: {len(palestine_questions_resol
 ```python
 # 6. Combined query (date range and subject)
 science_technology_recent = analyzer.query(
-    start_date='2015-01-01',
-    subject_ids=['http://metadata.un.org/thesaurus/16'],  # Science and technology
-    include_descendants=True
+    start_date="2015-01-01",
+    subject_ids=["http://metadata.un.org/thesaurus/16"],  # Science and technology
+    include_descendants=True,
 )
 print(f"Recent science and technology resolutions: {len(science_technology_recent)}")
 ```

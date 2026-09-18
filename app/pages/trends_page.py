@@ -11,9 +11,9 @@ from dash import (
     State,
     callback,
     clientside_callback,
+    dcc,
     get_relative_path,
     html,
-    dcc,
     register_page,
 )
 
@@ -22,56 +22,78 @@ from ..features import (
     agreement_by_subject,
     agreement_choropleth,
     agreement_graph,
+    filtered_resolutions,
     filters,
     multilateral_scatter,
     resolution_list,
-    wordcloud_interactive
+    wordcloud_interactive,
 )
 
 # Tab IDs — defined once here so layout values and callback comparisons stay in sync
 _TAB_RESOLUTION_LIST = "resolution_list"
-_TAB_MAP            = "map"
-_TAB_TIMELINE       = "timeline"
-_TAB_SUBJECT        = "subject"
-_TAB_MULTILATERAL   = "multilateral"
-_TAB_WORDCLOUD      = "wordcloud"
+_TAB_MAP = "map"
+_TAB_TIMELINE = "timeline"
+_TAB_SUBJECT = "subject"
+_TAB_MULTILATERAL = "multilateral"
+_TAB_WORDCLOUD = "wordcloud"
 
 # Country filter mode (CFM) options — controls whether the resolution list is
 # restricted to resolutions where the selected country voted / was a member / not at all.
 _CFM_OPTIONS = [
     {"label": " Voted on resolution", "value": "voted"},
-    {"label": " Was UN member",       "value": "member"},
-    {"label": " No filter",           "value": "none"},
+    {"label": " Was UN member", "value": "member"},
+    {"label": " No filter", "value": "none"},
 ]
 _CFM_OPTIONS_DISABLED = [{**o, "disabled": True} for o in _CFM_OPTIONS]
 
 # Base and greyed-out styles for all dropdown controls (country, subject, preset, era)
-_DROPDOWN_STYLE     = {"width": "100%", "fontSize": "14px"}
-_DROPDOWN_STYLE_OFF = {**_DROPDOWN_STYLE, "opacity": "0.5", "cursor": "not-allowed", "backgroundColor": "#e9ecef"}
+_DROPDOWN_STYLE = {"width": "100%", "fontSize": "14px"}
+_DROPDOWN_STYLE_OFF = {
+    **_DROPDOWN_STYLE,
+    "opacity": "0.5",
+    "cursor": "not-allowed",
+    "backgroundColor": "#e9ecef",
+}
 
 # Base and greyed-out styles for the keyword text input
-_INPUT_STYLE     = {
-    "width": "100%", "fontSize": "14px", "padding": "8px 10px",
-    "border": "1px solid #ced4da", "borderRadius": "4px",
-    "fontFamily": "inherit", "boxSizing": "border-box",
+_INPUT_STYLE = {
+    "width": "100%",
+    "fontSize": "14px",
+    "padding": "8px 10px",
+    "border": "1px solid #ced4da",
+    "borderRadius": "4px",
+    "fontFamily": "inherit",
+    "boxSizing": "border-box",
 }
-_INPUT_STYLE_OFF = {**_INPUT_STYLE, "opacity": "0.5", "cursor": "not-allowed", "backgroundColor": "#e9ecef"}
+_INPUT_STYLE_OFF = {
+    **_INPUT_STYLE,
+    "opacity": "0.5",
+    "cursor": "not-allowed",
+    "backgroundColor": "#e9ecef",
+}
 
 # Base and greyed-out styles for the "Filter by membership dates" button
-_BTN_STYLE     = {
-    "fontSize": "13px", "fontFamily": "inherit", "border": "1px solid #adb5bd",
-    "borderRadius": "4px", "padding": "4px 10px", "whiteSpace": "nowrap",
-    "cursor": "pointer", "backgroundColor": "transparent", "color": "#495057",
+_BTN_STYLE = {
+    "fontSize": "13px",
+    "fontFamily": "inherit",
+    "border": "1px solid #adb5bd",
+    "borderRadius": "4px",
+    "padding": "4px 10px",
+    "whiteSpace": "nowrap",
+    "cursor": "pointer",
+    "backgroundColor": "transparent",
+    "color": "#495057",
 }
-_BTN_STYLE_OFF = {**_BTN_STYLE, "cursor": "not-allowed", "backgroundColor": "#e9ecef", "color": "#adb5bd"}
+_BTN_STYLE_OFF = {
+    **_BTN_STYLE,
+    "cursor": "not-allowed",
+    "backgroundColor": "#e9ecef",
+    "color": "#adb5bd",
+}
 
 
 def title(countr1_alpha3=None):
-    return (
-        "Policy Pulse Analysis" + f" (Country 1: {countr1_alpha3})"
-        if countr1_alpha3
-        else ""
-    )
+    return "Policy Pulse Analysis" + f" (Country 1: {countr1_alpha3})" if countr1_alpha3 else ""
 
 
 register_page(__name__, path_template="/trends")
@@ -80,7 +102,6 @@ register_page(__name__, path_template="/trends")
 def layout(country1_alpha3: str | None = None, **other_keyword_arguments):
     """Render the full trends page, passing URL query params into the filter store."""
 
-    available = [c for c in data.available_countries if c != country1_alpha3]
     return html.Div(
         [
             dcc.Store(id="country1-iso-alpha3", data=country1_alpha3),
@@ -255,6 +276,7 @@ def layout(country1_alpha3: str | None = None, **other_keyword_arguments):
         ]
     )
 
+
 # Client-side callback: resolves country 1 ISO alpha3 to a localised display name.
 clientside_callback(
     """
@@ -288,14 +310,28 @@ def update_country_profile_link(filter_store):
     Also styles the link button — greyed out when no primary country is selected.
     """
     _base = {
-        "border": "none", "borderRadius": "4px", "padding": "6px 14px",
-        "fontSize": "13px", "fontWeight": "600", "textDecoration": "none",
+        "border": "none",
+        "borderRadius": "4px",
+        "padding": "6px 14px",
+        "fontSize": "13px",
+        "fontWeight": "600",
+        "textDecoration": "none",
         "display": "inline-block",
     }
-    _disabled = {**_base, "backgroundColor": "#adb5bd", "color": "white",
-                 "cursor": "not-allowed", "opacity": "0.6"}
-    _enabled  = {**_base, "backgroundColor": "#1a73e8", "color": "white",
-                 "cursor": "pointer", "opacity": "1"}
+    _disabled = {
+        **_base,
+        "backgroundColor": "#adb5bd",
+        "color": "white",
+        "cursor": "not-allowed",
+        "opacity": "0.6",
+    }
+    _enabled = {
+        **_base,
+        "backgroundColor": "#1a73e8",
+        "color": "white",
+        "cursor": "pointer",
+        "opacity": "1",
+    }
 
     country1 = (filter_store or {}).get("country1_alpha3")
     if not country1:
@@ -303,7 +339,7 @@ def update_country_profile_link(filter_store):
 
     params = {"country1": country1}
     start_date = (filter_store or {}).get("start_date")
-    end_date   = (filter_store or {}).get("end_date")
+    end_date = (filter_store or {}).get("end_date")
     if start_date:
         params["start_date"] = start_date
     if end_date:
@@ -472,20 +508,35 @@ def prevent_disabled_tab_switch(selected_tab, filter_store):
 
 @callback(
     Output("resolution-count-banner", "children"),
-    Input("filter-component-data-store", "data"),
+    Input("filter-component-filter-store", "data"),
     Input("country-view-tabs", "value"),
 )
-def update_resolution_count(data_store, active_tab):
+def update_resolution_count(filter_store, active_tab):
     """Show how many resolutions match the current filters, or a note for the timeline tab."""
     if active_tab == _TAB_TIMELINE:
         return html.Span(
             "Timeline uses full session history — year range, subject and country filters do not apply.",
             style={"fontStyle": "italic"},
         )
-    if not data_store:
+    if not filter_store:
         return ""
-    n = len(pd.read_json(data_store, orient="split"))
-    return [html.Strong(f"{n:,}"), f" resolution{'s' if n != 1 else ''} match current filters"]
+    df = filtered_resolutions.resolutions_for(filter_store, active_tab)
+    n = len(df)
+    summary = [html.Strong(f"{n:,}"), f" resolution{'s' if n != 1 else ''} match current filters"]
+
+    # Only resolutions with a recorded vote carry per-country votes, so every agreement,
+    # alignment and consensus figure on the other tabs is computed over that subset — which is
+    # a third of the total. Say so rather than letting the larger number imply otherwise.
+    if "modality" in df.columns:
+        voted = int((df["modality"] == "Vote, recorded").sum())
+        if voted != n:
+            summary.append(
+                html.Span(
+                    f" ({voted:,} with recorded votes)",
+                    style={"color": "#6b7280"},
+                )
+            )
+    return summary
 
 
 @callback(
@@ -601,67 +652,73 @@ def _compute_filter_state(selected_tab: str, country1: str | None) -> dict:
     if selected_tab == _TAB_WORDCLOUD:
         c1_off = c2_off = preset_off = cfm_off = True  # no country context needed
     elif selected_tab == _TAB_MULTILATERAL:
-        c2_off = preset_off = True                     # comparison country not used
+        c2_off = preset_off = True  # comparison country not used
     elif selected_tab == _TAB_MAP:
-        c2_off = preset_off = cfm_off = True           # choropleth filters by pair internally
+        c2_off = preset_off = cfm_off = True  # choropleth filters by pair internally
     elif selected_tab == _TAB_TIMELINE:
-        subj_off = yr_era_off = cfm_off = True         # timeline ignores subject + date range
+        subj_off = yr_era_off = cfm_off = True  # timeline ignores subject + date range
     elif selected_tab == _TAB_SUBJECT:
-        subj_off = cfm_off = True                      # tab hardwires "both countries voted"
+        subj_off = cfm_off = True  # tab hardwires "both countries voted"
 
     if no_country:
         cfm_off = True
 
     return {
-        "c1_off":         c1_off,
-        "c2_off":         c2_off,
-        "preset_off":     preset_off,
-        "subj_off":       subj_off,
-        "kw_off":         selected_tab not in (_TAB_RESOLUTION_LIST, _TAB_WORDCLOUD),
-        "cfm_off":        cfm_off,
-        "yr_era_off":     yr_era_off,
+        "c1_off": c1_off,
+        "c2_off": c2_off,
+        "preset_off": preset_off,
+        "subj_off": subj_off,
+        "kw_off": selected_tab not in (_TAB_RESOLUTION_LIST, _TAB_WORDCLOUD),
+        "cfm_off": cfm_off,
+        "yr_era_off": yr_era_off,
         "membership_off": no_country or c1_off or yr_era_off,
     }
 
 
 @callback(
-    Output("filter-component-country-dropdown",    "disabled"),
-    Output("filter-component-country2-dropdown",   "disabled"),
-    Output("filter-component-preset-dropdown",     "disabled"),
-    Output("filter-component-subject-dropdown",    "disabled"),
-    Output("filter-component-keyword-search",      "disabled"),
+    Output("filter-component-country-dropdown", "disabled"),
+    Output("filter-component-country2-dropdown", "disabled"),
+    Output("filter-component-preset-dropdown", "disabled"),
+    Output("filter-component-subject-dropdown", "disabled"),
+    Output("filter-component-keyword-search", "disabled"),
     Output("filter-component-country-filter-mode", "options"),
-    Output("filter-component-year-range",          "disabled"),
-    Output("filter-component-era-preset",          "disabled"),
-    Output("filter-component-era-prev-btn",        "disabled", allow_duplicate=True),
-    Output("filter-component-era-next-btn",        "disabled", allow_duplicate=True),
-    Output("filter-component-membership-dates-btn","disabled"),
+    Output("filter-component-year-range", "disabled"),
+    Output("filter-component-era-preset", "disabled"),
+    Output("filter-component-era-prev-btn", "disabled", allow_duplicate=True),
+    Output("filter-component-era-next-btn", "disabled", allow_duplicate=True),
+    Output("filter-component-membership-dates-btn", "disabled"),
     Input("country-view-tabs", "value"),
     Input("filter-component-country-dropdown", "value"),
-    prevent_initial_call='initial_duplicate',
+    prevent_initial_call="initial_duplicate",
 )
 def _set_filter_disabled_states(selected_tab, country1):
     s = _compute_filter_state(selected_tab, country1)
     return (
-        s["c1_off"], s["c2_off"], s["preset_off"], s["subj_off"],
+        s["c1_off"],
+        s["c2_off"],
+        s["preset_off"],
+        s["subj_off"],
         s["kw_off"],
         _CFM_OPTIONS_DISABLED if s["cfm_off"] else _CFM_OPTIONS,
-        s["yr_era_off"], s["yr_era_off"], s["yr_era_off"], s["yr_era_off"],
+        s["yr_era_off"],
+        s["yr_era_off"],
+        s["yr_era_off"],
+        s["yr_era_off"],
         s["membership_off"],
     )
 
 
 @callback(
-    Output("filter-component-country-dropdown",    "style"),
-    Output("filter-component-country2-dropdown",   "style"),
-    Output("filter-component-preset-dropdown",     "style"),
-    Output("filter-component-subject-dropdown",    "style"),
-    Output("filter-component-keyword-search",      "style"),
-    Output("filter-component-era-preset",          "style"),
-    Output("filter-component-membership-dates-btn","style"),
+    Output("filter-component-country-dropdown", "style"),
+    Output("filter-component-country2-dropdown", "style"),
+    Output("filter-component-preset-dropdown", "style"),
+    Output("filter-component-subject-dropdown", "style"),
+    Output("filter-component-keyword-search", "style"),
+    Output("filter-component-era-preset", "style"),
+    Output("filter-component-membership-dates-btn", "style"),
     Input("country-view-tabs", "value"),
     Input("filter-component-country-dropdown", "value"),
-    prevent_initial_call='initial_duplicate',
+    prevent_initial_call="initial_duplicate",
 )
 def _set_filter_styles(selected_tab, country1):
     s = _compute_filter_state(selected_tab, country1)
@@ -674,9 +731,9 @@ def _set_filter_styles(selected_tab, country1):
         _dd(s["c2_off"]),
         _dd(s["preset_off"]),
         _dd(s["subj_off"]),
-        _INPUT_STYLE_OFF if s["kw_off"]         else _INPUT_STYLE,
+        _INPUT_STYLE_OFF if s["kw_off"] else _INPUT_STYLE,
         _dd(s["yr_era_off"]),
-        _BTN_STYLE_OFF   if s["membership_off"] else _BTN_STYLE,
+        _BTN_STYLE_OFF if s["membership_off"] else _BTN_STYLE,
     )
 
 
@@ -725,9 +782,7 @@ def _calculate_data_uncached(country1: str | None, selected_tuple: tuple):
 
         # normalize and map votes to numeric
         vote_cols = [country1] + selected
-        df[vote_cols] = (
-            df[vote_cols].astype(str).apply(lambda s: s.str.strip().str.upper())
-        )
+        df[vote_cols] = df[vote_cols].astype(str).apply(lambda s: s.str.strip().str.upper())
         df[vote_cols] = df[vote_cols].replace(
             {"": pd.NA, "NAN": pd.NA, "NONE": pd.NA, "<NA>": pd.NA}
         )
@@ -806,8 +861,10 @@ def _calculate_data_uncached(country1: str | None, selected_tuple: tuple):
             if has_votes.any():
                 last_idx = has_votes.values[::-1].argmax()
                 last_session_pos = len(has_votes) - 1 - last_idx
-                out.loc[out.index[last_session_pos + 1:], avg_col] = np.nan
-                print(f"  📅 {col}: last active session = {out.loc[out.index[last_session_pos], 'session']}")
+                out.loc[out.index[last_session_pos + 1 :], avg_col] = np.nan
+                print(
+                    f"  📅 {col}: last active session = {out.loc[out.index[last_session_pos], 'session']}"
+                )
 
         calc_time = time.time() - start_time
         print(f"✅ Calculated in {calc_time:.2f}s ({len(out)} sessions)")
@@ -830,3 +887,12 @@ def _calculate_data_uncached(country1: str | None, selected_tuple: tuple):
             None,
             None,
         )
+
+
+def invalidate() -> None:
+    """Drop the cached per-country-pair agreement series so the next callback recomputes them.
+
+    Called by `app.data.reload_if_stale()`: the cache is keyed only on the country pair, so
+    without this a pair queried before a reload keeps its pre-reload session averages.
+    """
+    _calculate_data_uncached.cache_clear()

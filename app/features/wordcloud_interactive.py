@@ -1,22 +1,22 @@
 import os
 import re
 from collections import Counter
-from io import StringIO
 from typing import Literal
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from dash import Input, Output, State, callback, html, dcc, no_update
+from dash import Input, Output, State, callback, dcc, html, no_update
 from dash.exceptions import PreventUpdate
 from matplotlib import cm as mpl_cm
 from matplotlib import colors as mpl_colors
 from rapidfuzz import process as fuzz_process
 from wordcloud import WordCloud
 
+from .. import data
+from . import filtered_resolutions
 from .color_utils import make_adaptive_colorscale_plotly
 from .resolution_list import create_vote_indicator
-from .. import data
 
 # Initialize word cloud data on module load
 _resolution_wc_data_by_mode = {}
@@ -30,18 +30,53 @@ _EXCLUDED_TERMS_BY_MODE = {
     "geopolitical": {"peoples", "states", "united nations"},
 }
 _WORDCLOUD_MODES = {
-    "default": {"label": "Default", "source": "undlid_keywords.csv:keywords"},
-    "geopolitical": {"label": "Geopolitical", "source": "undlid_keywords_3d_noun_fixed.csv:Geopolitical"},
-    "thematic": {"label": "Thematic", "source": "undlid_keywords_3d_noun_fixed.csv:Thematic"},
-    "action": {"label": "Action", "source": "undlid_keywords_3d_noun_fixed.csv:Action"},
+    "default": {"label": "Default", "source": "resolution_keywords.csv:keywords"},
+    "geopolitical": {"label": "Geopolitical", "source": "resolution_keywords_3d.csv:Geopolitical"},
+    "thematic": {"label": "Thematic", "source": "resolution_keywords_3d.csv:Thematic"},
+    "action": {"label": "Action", "source": "resolution_keywords_3d.csv:Action"},
     "category": {"label": "Subjects", "source": "query_resolutions():subjects"},
 }
 _CONSENSUS_CMAP_COLORS = ["#ff66cc", "#e6b24b", "#33cc33"]
 
 
+def invalidate() -> None:
+    """Drop the cached indices so the next use rebuilds them from current data.
+
+    Called by `app.data.reload_if_stale()` after a periodic reload: these indices are derived
+    from the resolution set, so without this the word cloud would keep serving terms built from
+    the previous load.
+
+    This only clears the flag; the rebuild happens on the next read. Every read therefore has to
+    go through `_word_undlid_map()` / `_wc_data()` below rather than touching the module dicts
+    directly, or it will serve the pre-reload index.
+    """
+    global _initialized
+    _initialized = False
+
+
+def _word_undlid_map(mode: str) -> dict:
+    """Per-mode `{word: [undl_id, ...]}` index, rebuilt first if a reload invalidated it.
+
+    `_init_wc_data()` returns immediately once `_initialized` is set, so this costs a boolean
+    check on the hot path.
+    """
+    _init_wc_data()
+    return _wc_word_undlid_map_by_mode.get(mode, {})
+
+
+def _wc_data(mode: str) -> dict:
+    """Per-mode `{undl_id: {"word_freq": ...}}` index, rebuilt first if a reload invalidated it."""
+    _init_wc_data()
+    return _resolution_wc_data_by_mode.get(mode, {})
+
+
 def _init_wc_data():
     """Initialize word cloud data from keywords CSV file."""
-    global _resolution_wc_data_by_mode, _wc_word_undlid_map_by_mode, _category_term_to_subject_ids, _initialized
+    global \
+        _resolution_wc_data_by_mode, \
+        _wc_word_undlid_map_by_mode, \
+        _category_term_to_subject_ids, \
+        _initialized
 
     if _initialized:
         return
@@ -52,10 +87,8 @@ def _init_wc_data():
     # Get app directory (parent of features directory)
     app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     try:
-        base_keywords_path = os.path.join(app_dir, "assets", "undlid_keywords.csv")
-        three_d_keywords_path = os.path.join(
-            app_dir, "assets", "undlid_keywords_3d_noun_fixed.csv"
-        )
+        base_keywords_path = os.path.join(app_dir, "assets", "resolution_keywords.csv")
+        three_d_keywords_path = os.path.join(app_dir, "assets", "resolution_keywords_3d.csv")
         resolutions_df = data.query_engine.query_resolutions()
         ignore_words = ["resolution", "general assembly"]
         split_pattern_general = re.compile(r"[;,]")
@@ -101,10 +134,12 @@ def _init_wc_data():
         category_term_to_subject_ids = {}
 
         if os.path.exists(base_keywords_path):
+            # Keyed on the resolution symbol, not on any UNDL id: these keywords were compiled
+            # against the retired bulk-CSV export, whose `undl_id` was a digitallibrary record id
+            # and does not match the metadata.un.org MARC ids we store. The symbol is the one key
+            # both id spaces agree on. See T14 in plans/app_postgres_migration_plan.md.
             base_keywords_df = pd.read_csv(base_keywords_path)
-            base_data_all = pd.merge(
-                resolutions_df, base_keywords_df, on="undl_id", how="left"
-            )
+            base_data_all = pd.merge(resolutions_df, base_keywords_df, on="resolution", how="left")
             (
                 resolution_wc_data_by_mode["default"],
                 wc_word_undlid_map_by_mode["default"],
@@ -121,10 +156,7 @@ def _init_wc_data():
 
         if os.path.exists(three_d_keywords_path):
             three_d_df = pd.read_csv(three_d_keywords_path)
-            three_d_df = three_d_df.rename(columns={"Original_ID": "undl_id"})
-            three_d_data_all = pd.merge(
-                resolutions_df, three_d_df, on="undl_id", how="left"
-            )
+            three_d_data_all = pd.merge(resolutions_df, three_d_df, on="resolution", how="left")
             for mode_key, column_name in [
                 ("geopolitical", "Geopolitical"),
                 ("thematic", "Thematic"),
@@ -161,9 +193,7 @@ def _init_wc_data():
             and not subject_df.empty
             and "subject_id" in subject_df.columns
         ):
-            subject_label_col = (
-                "label_en" if "label_en" in subject_df.columns else None
-            )
+            subject_label_col = "label_en" if "label_en" in subject_df.columns else None
             if subject_label_col is None:
                 print("Warning: subject_table has no 'label_en' column; using subject_id.")
                 subject_df["label_en"] = subject_df["subject_id"]
@@ -180,9 +210,9 @@ def _init_wc_data():
                 key = re.sub(r"\s+", " ", str(label).strip().lower())
                 if key:
                     category_term_to_subject_ids.setdefault(key, []).append(subject_id)
-            resolution_subject_df["category_term"] = resolution_subject_df[
-                "subject_id"
-            ].map(subject_lookup)
+            resolution_subject_df["category_term"] = resolution_subject_df["subject_id"].map(
+                subject_lookup
+            )
             resolution_subject_df["category_term"] = (
                 resolution_subject_df["category_term"]
                 .fillna(resolution_subject_df["subject_id"])
@@ -241,7 +271,7 @@ def _init_wc_data():
 def _aggregate_word_freq(undl_ids: pd.Series, mode: str = _DEFAULT_MODE) -> dict:
     """Combine word frequencies across given resolution IDs."""
     agg_counter = Counter()
-    wc_data = _resolution_wc_data_by_mode.get(mode, {})
+    wc_data = _wc_data(mode)
     for undl_id in undl_ids.values:
         if undl_id in wc_data:
             agg_counter.update(wc_data[undl_id]["word_freq"])
@@ -253,7 +283,7 @@ def _aggregate_word_undlids_map(
 ) -> dict:
     """Map words to resolution IDs that contain them."""
     agg_map = {}
-    word_map = _wc_word_undlid_map_by_mode.get(mode, {})
+    word_map = _word_undlid_map(mode)
     for word in word_list:
         agg_map[word] = []
         if word in word_map:
@@ -280,7 +310,7 @@ def search_keywords(
     if not token_lower:
         return matched_ids
 
-    word_map = _wc_word_undlid_map_by_mode.get(mode, {})
+    word_map = _word_undlid_map(mode)
     all_keys = list(word_map.keys())
 
     if exact:
@@ -311,9 +341,7 @@ def _parse_keyword_term(term: str) -> tuple[str, bool]:
     return parsed, exact_mode
 
 
-def get_keyword_matched_ids(
-    df: pd.DataFrame, keyword_expression: str | None
-) -> set:
+def get_keyword_matched_ids(df: pd.DataFrame, keyword_expression: str | None) -> set:
     """
     Resolve keyword expression to matched undl_id set.
     Semantics:
@@ -342,8 +370,8 @@ def get_keyword_matched_ids(
             if not parsed_token:
                 continue
             token_ids: set = set()
-            title_match = df["title"].str.lower().str.contains(
-                parsed_token.lower(), regex=False, na=False
+            title_match = (
+                df["title"].str.lower().str.contains(parsed_token.lower(), regex=False, na=False)
             )
             token_ids |= set(df.loc[title_match, "undl_id"].tolist())
             token_ids |= search_keywords(parsed_token, exact=exact_mode)
@@ -443,16 +471,16 @@ def _assign_colors_from_blues_cmap(frequencies):
     if len(freq_arr) == 0:
         return []
     if np.max(freq_arr) != np.min(freq_arr):
-        normed = 0.3 + 0.7 * (
-            (freq_arr - np.min(freq_arr)) / (np.max(freq_arr) - np.min(freq_arr))
-        )
+        normed = 0.3 + 0.7 * ((freq_arr - np.min(freq_arr)) / (np.max(freq_arr) - np.min(freq_arr)))
     else:
         normed = np.full_like(freq_arr, 0.6)
     colors = [mpl_colors.rgb2hex(cmap(v)) for v in normed]
     return colors
 
 
-def _assign_colors_from_custom_cmap(consensus_scores: list, colorscale: list, lo: float, hi: float) -> list:
+def _assign_colors_from_custom_cmap(
+    consensus_scores: list, colorscale: list, lo: float, hi: float
+) -> list:
     """Map consensus scores to colours using a caller-supplied Plotly colorscale.
 
     Normalises each score into [lo, hi], then looks up the nearest colour entry by
@@ -478,11 +506,13 @@ def _map_words_to_consensus_scores(words: list, mode: str, df: pd.DataFrame) -> 
 
     Words with no matching scored resolutions get None.
     """
-    mode_word_map = _wc_word_undlid_map_by_mode.get(mode, {})
+    mode_word_map = _word_undlid_map(mode)
     c_score_map = df.set_index(df["undl_id"].astype(str))["consensus_score"].dropna().to_dict()
     word_scores = []
     for word in words:
-        res_scores = [c_score_map[rid] for x in mode_word_map.get(word, []) if (rid := str(x)) in c_score_map]
+        res_scores = [
+            c_score_map[rid] for x in mode_word_map.get(word, []) if (rid := str(x)) in c_score_map
+        ]
         word_scores.append(float(np.mean(res_scores)) if res_scores else None)
     return word_scores
 
@@ -529,7 +559,7 @@ def _count_click_search_results(
     if mode == "category":
         # Fast path: count within current filtered result set to avoid
         # per-word query_resolutions calls that can make rendering too slow.
-        mode_word_map = _wc_word_undlid_map_by_mode.get(mode, {})
+        mode_word_map = _word_undlid_map(mode)
         candidate_ids = mode_word_map.get(word, [])
         if not candidate_ids or filtered_df.empty or "undl_id" not in filtered_df.columns:
             return 0
@@ -585,14 +615,14 @@ def _build_empty_wordcloud_figure(message: str) -> go.Figure:
 
 
 def _build_wordcloud(
-    filtered_data_json: str,
-    mode: str = _DEFAULT_MODE,
     filter_store: dict | None = None,
+    active_tab: str | None = None,
+    mode: str = _DEFAULT_MODE,
     color_mode: Literal["frequency", "consensus"] = "frequency",
 ):
-    """Build word cloud figure from filtered data."""
+    """Build word cloud figure for the resolutions matching the current filters."""
     mode_label = _get_mode_label(mode)
-    if not filtered_data_json:
+    if not filter_store:
         return _build_empty_wordcloud_figure(
             _mode_empty_message(
                 mode,
@@ -601,7 +631,7 @@ def _build_wordcloud(
         )
 
     try:
-        if not _wc_word_undlid_map_by_mode.get(mode, {}):
+        if not _word_undlid_map(mode):
             return _build_empty_wordcloud_figure(
                 _mode_empty_message(
                     mode,
@@ -609,7 +639,7 @@ def _build_wordcloud(
                 )
             )
 
-        df = pd.read_json(StringIO(filtered_data_json), orient="split")
+        df = filtered_resolutions.resolutions_for(filter_store, active_tab)
         if df.empty:
             return _build_empty_wordcloud_figure(
                 _mode_empty_message(
@@ -652,16 +682,11 @@ def _build_wordcloud(
         # "how many resolutions can be found by clicking this word".
         # To keep UI responsive, compute search-counts only for top raw-frequency candidates.
         raw_sorted_items = sorted(word_freq.items(), key=lambda x: (-x[1], x[0]))
-        candidate_words = [
-            w for w, _ in raw_sorted_items[:_MAX_WORD_CANDIDATES_FOR_SEARCH_COUNT]
-        ]
+        candidate_words = [w for w, _ in raw_sorted_items[:_MAX_WORD_CANDIDATES_FOR_SEARCH_COUNT]]
         search_count_by_word = {
-            w: _count_click_search_results(w, mode, filter_store, df)
-            for w in candidate_words
+            w: _count_click_search_results(w, mode, filter_store, df) for w in candidate_words
         }
-        weighted_items = [
-            (w, c) for w, c in search_count_by_word.items() if c > 0
-        ]
+        weighted_items = [(w, c) for w, c in search_count_by_word.items() if c > 0]
         if not weighted_items:
             return _build_empty_wordcloud_figure(
                 _mode_empty_message(
@@ -674,9 +699,7 @@ def _build_wordcloud(
         excluded_terms = _EXCLUDED_TERMS_BY_MODE.get(mode, set())
         if excluded_terms:
             weighted_items = [
-                (w, c)
-                for w, c in weighted_items
-                if w.strip().lower() not in excluded_terms
+                (w, c) for w, c in weighted_items if w.strip().lower() not in excluded_terms
             ]
 
         # Taking the first N after exclusions automatically promotes later-ranked
@@ -713,7 +736,7 @@ def _build_wordcloud(
         print(f"{len(words_filtered)}/{len(words)} words were positioned by WordCloud")
 
         if not words_filtered:
-            print(f"Warning: No words were positioned by WordCloud")
+            print("Warning: No words were positioned by WordCloud")
             return _build_empty_wordcloud_figure(
                 _mode_empty_message(
                     mode,
@@ -766,8 +789,17 @@ def _build_wordcloud(
         click_result_counts = [search_count_by_word.get(word, 0) for word in words]
 
         lo = hi = avg = None
-        if color_mode == "consensus" and "consensus_score" in df.columns:
-            colorscale, lo, avg, hi = make_adaptive_colorscale_plotly(df["consensus_score"], _CONSENSUS_CMAP_COLORS)
+        # `.notna().any()` guards the same case as the choropleth: a filter can select only
+        # resolutions with no recorded vote, whose consensus score is NaN, which would otherwise
+        # put "nan" on the colourbar ticks.
+        if (
+            color_mode == "consensus"
+            and "consensus_score" in df.columns
+            and df["consensus_score"].notna().any()
+        ):
+            colorscale, lo, avg, hi = make_adaptive_colorscale_plotly(
+                df["consensus_score"], _CONSENSUS_CMAP_COLORS
+            )
             word_scores = _map_words_to_consensus_scores(words, mode, df)
             word_colors = _assign_colors_from_custom_cmap(word_scores, colorscale, lo, hi)
             hover_text = [
@@ -808,9 +840,7 @@ def _build_wordcloud(
 
             # Center the hover marker on the word
             hover_x_positions.append(x_pos + shift_x_normalized)
-            hover_y_positions.append(
-                y_pos - shift_y_normalized
-            )  # + because y increases upward
+            hover_y_positions.append(y_pos - shift_y_normalized)  # + because y increases upward
 
             # Size hover area to roughly match word size
             hover_sizes.append(size * 1.5)
@@ -849,29 +879,34 @@ def _build_wordcloud(
 
         traces = [hover_trace, text_trace]
         if consensus_bar and lo is not None:
-            traces.insert(0, go.Scatter(
-                x=[None], y=[None],
-                mode="markers",
-                marker=dict(
-                    colorscale=colorscale,
-                    cmin=lo, cmax=hi,
-                    color=[lo],
-                    showscale=True,
-                    colorbar=dict(
-                        thickness=20, len=0.5, x=1.01,
-                        tickvals=[lo, avg, hi],
-                        ticktext=[f"{lo:.2f}", f"{avg:.2f} (avg)", f"{hi:.2f}"],
+            traces.insert(
+                0,
+                go.Scatter(
+                    x=[None],
+                    y=[None],
+                    mode="markers",
+                    marker=dict(
+                        colorscale=colorscale,
+                        cmin=lo,
+                        cmax=hi,
+                        color=[lo],
+                        showscale=True,
+                        colorbar=dict(
+                            thickness=20,
+                            len=0.5,
+                            x=1.01,
+                            tickvals=[lo, avg, hi],
+                            ticktext=[f"{lo:.2f}", f"{avg:.2f} (avg)", f"{hi:.2f}"],
+                        ),
                     ),
+                    hoverinfo="none",
+                    showlegend=False,
                 ),
-                hoverinfo="none",
-                showlegend=False,
-            ))
+            )
         fig = go.Figure(data=traces)
         fig.update_layout(
             showlegend=False,
-            xaxis=dict(
-                visible=False, range=[-1.1, 1.1], scaleanchor="y", scaleratio=1.0
-            ),
+            xaxis=dict(visible=False, range=[-1.1, 1.1], scaleanchor="y", scaleratio=1.0),
             yaxis=dict(visible=False, range=[-1.1, 1.1]),
             margin=dict(l=10, r=10, t=10, b=10),
             plot_bgcolor="white",
@@ -935,23 +970,27 @@ def register_callbacks():
             Output("wordcloud-interactive-chart", "figure"),
             Output("wordcloud-details", "children"),
         ],
-        Input("filter-component-data-store", "data"),
-        Input("wordcloud-mode-tabs", "value"),
         Input("filter-component-filter-store", "data"),
+        Input("country-view-tabs", "value"),
+        Input("wordcloud-mode-tabs", "value"),
         Input("wordcloud-color-mode", "value"),
     )
-    def update_wordcloud_chart(filtered_data, selected_mode, filter_store, color_mode):
+    def update_wordcloud_chart(filter_store, active_tab, selected_mode, color_mode):
         """Update word cloud and details caption when filters or colour mode change."""
         resolved_color_mode = color_mode or "frequency"
-        details_text = _DETAILS_CONSENSUS if resolved_color_mode == "consensus" else _DETAILS_FREQUENCY
+        details_text = (
+            _DETAILS_CONSENSUS if resolved_color_mode == "consensus" else _DETAILS_FREQUENCY
+        )
         details = html.P([html.Strong("Details: "), details_text], style=_DETAILS_STYLE)
 
-        if not filtered_data:
+        if not filter_store:
             return (
                 go.Figure().add_annotation(
                     text="Loading data...",
-                    x=0.5, y=0.5,
-                    xref="paper", yref="paper",
+                    x=0.5,
+                    y=0.5,
+                    xref="paper",
+                    yref="paper",
                     showarrow=False,
                     font=dict(size=16, color="#7f8c8d"),
                 ),
@@ -960,9 +999,9 @@ def register_callbacks():
         mode = selected_mode if selected_mode in _WORDCLOUD_MODES else _DEFAULT_MODE
         return (
             _build_wordcloud(
-                filtered_data,
+                filter_store,
+                active_tab,
                 mode=mode,
-                filter_store=filter_store,
                 color_mode=resolved_color_mode,
             ),
             details,
@@ -970,23 +1009,25 @@ def register_callbacks():
 
     @callback(
         Output("wordcloud-interactive-meta", "children"),
-        Input("filter-component-data-store", "data"),
+        Input("filter-component-filter-store", "data"),
+        Input("country-view-tabs", "value"),
         Input("wordcloud-mode-tabs", "value"),
     )
-    def update_wc_meta(filtered_data, selected_mode):
+    def update_wc_meta(filter_store, active_tab, selected_mode):
         """Update meta information about word cloud."""
-        if not filtered_data:
+        if not filter_store:
             return "No data available."
 
         try:
-            df = pd.read_json(StringIO(filtered_data), orient="split")
+            df = filtered_resolutions.resolutions_for(filter_store, active_tab)
             if df.empty:
                 return "No data available."
             if "undl_id" not in df.columns:
                 return "No data available."
-            mode = selected_mode if selected_mode in _WORDCLOUD_MODES else _DEFAULT_MODE
-            word_freq = _aggregate_word_freq(df["undl_id"], mode=mode)
-            return f""  # • Unique words: {len(word_freq)}
+            # The meta line is currently disabled, so the aggregation it displayed
+            # (_aggregate_word_freq over df["undl_id"], by mode) is skipped rather than computed
+            # and discarded. Restore both together if the counts come back.
+            return ""
             # return f"Total accepted resolutions: {len(df):,}"  # • Unique words: {len(word_freq)}
         except Exception as e:
             return f"Error: {str(e)}"
@@ -1008,9 +1049,7 @@ def register_callbacks():
         pt = clickData["points"][0]
         custom = pt.get("customdata")
         word = pt.get("text") or (
-            custom[1]
-            if isinstance(custom, (list, tuple)) and len(custom) > 1
-            else None
+            custom[1] if isinstance(custom, (list, tuple)) and len(custom) > 1 else None
         )
         if not word:
             raise PreventUpdate
@@ -1036,21 +1075,23 @@ def register_callbacks():
             new_keyword_value = existing_expression
         else:
             new_keyword_value = (
-                f"{existing_expression} & {exact_phrase}"
-                if existing_expression
-                else exact_phrase
+                f"{existing_expression} & {exact_phrase}" if existing_expression else exact_phrase
             )
-        return new_keyword_value, current_subject_ids if current_subject_ids is not None else no_update, "resolution_list"
+        return (
+            new_keyword_value,
+            current_subject_ids if current_subject_ids is not None else no_update,
+            "resolution_list",
+        )
 
     @callback(
         Output("wordcloud-interactive-table", "children"),
         Input("wordcloud-interactive-chart", "hoverData"),
-        Input("filter-component-data-store", "data"),
         Input("filter-component-filter-store", "data"),
+        Input("country-view-tabs", "value"),
         Input("wordcloud-mode-tabs", "value"),
         prevent_initial_call=True,
     )
-    def update_resolution_table(hoverData, filtered_data, filter_params, selected_mode):
+    def update_resolution_table(hoverData, filter_params, active_tab, selected_mode):
         """Update resolution list (cards) when hovering over a word."""
         if (
             hoverData is None
@@ -1063,21 +1104,19 @@ def register_callbacks():
                 style={"color": "#7f8c8d"},
             )
 
-        if not filtered_data:
+        if not filter_params:
             return html.Div("No data available.", style={"color": "#7f8c8d"})
 
         try:
             pt = hoverData["points"][0]
             custom = pt.get("customdata")
             word = pt.get("text") or (
-                custom[1]
-                if isinstance(custom, (list, tuple)) and len(custom) > 1
-                else None
+                custom[1] if isinstance(custom, (list, tuple)) and len(custom) > 1 else None
             )
             if not word:
                 return html.Div("No word selected.", style={"color": "#7f8c8d"})
 
-            df = pd.read_json(StringIO(filtered_data), orient="split")
+            df = filtered_resolutions.resolutions_for(filter_params, active_tab)
 
             if df.empty:
                 return html.Div("No data available.", style={"color": "#7f8c8d"})
@@ -1086,7 +1125,7 @@ def register_callbacks():
                 return html.Div("No data available.", style={"color": "#7f8c8d"})
 
             mode = selected_mode if selected_mode in _WORDCLOUD_MODES else _DEFAULT_MODE
-            mode_word_map = _wc_word_undlid_map_by_mode.get(mode, {})
+            mode_word_map = _word_undlid_map(mode)
             if word not in mode_word_map:
                 return html.Div(
                     f"No resolutions found for word '{word}'.",
@@ -1101,9 +1140,7 @@ def register_callbacks():
                 )
 
             matching["date"] = pd.to_datetime(matching["date"], errors="coerce")
-            matching = matching.sort_values(
-                by=["date", "resolution"], ascending=[True, True]
-            )
+            matching = matching.sort_values(by=["date", "resolution"], ascending=[True, True])
             max_rows = 10000
             display_df = matching.head(max_rows)
 
@@ -1121,23 +1158,17 @@ def register_callbacks():
                 res_id = row.get("resolution", "N/A")
                 link = row.get("undl_link", "#")
                 date_val = row.get("date")
-                date_str = (
-                    date_val.strftime("%Y-%m-%d") if pd.notnull(date_val) else "Unknown"
-                )
+                date_str = date_val.strftime("%Y-%m-%d") if pd.notnull(date_val) else "Unknown"
                 title = row.get("title", "Untitled")
                 indicators = []
                 if country1 and country1 in row:
                     indicators.append(
-                        create_vote_indicator(
-                            data.get_country_name(country1), row.get(country1)
-                        )
+                        create_vote_indicator(data.get_country_name(country1), row.get(country1))
                     )
                 for c2 in comparison_countries[:5]:
                     if c2 in row:
                         indicators.append(
-                            create_vote_indicator(
-                                data.get_country_name(c2), row.get(c2)
-                            )
+                            create_vote_indicator(data.get_country_name(c2), row.get(c2))
                         )
                 card = html.Div(
                     [

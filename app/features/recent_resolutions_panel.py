@@ -1,7 +1,7 @@
 import functools
 
-from dash import Input, Output, callback, html
 import pandas as pd
+from dash import Input, Output, callback, html
 
 from app.features.resolution_list import create_vote_summary
 
@@ -19,21 +19,6 @@ _BTN_VISIBLE_STYLE = {
 }
 
 _BTN_HIDDEN_STYLE = {"display": "none"}
-
-
-def _safe_count(value):
-    if pd.isna(value):
-        return 0
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return 0
-
-
-def _safe_pct(count, total):
-    if total <= 0:
-        return 0.0
-    return (count / total) * 100.0
 
 
 def _extract_category_tag(row):
@@ -55,9 +40,7 @@ def _build_category_tag_map():
         return {}
 
     subject_labels = (
-        subject_df[["subject_id", label_col]]
-        .dropna(subset=["subject_id", label_col])
-        .copy()
+        subject_df[["subject_id", label_col]].dropna(subset=["subject_id", label_col]).copy()
     )
     merged = resolution_subject_df.merge(subject_labels, on="subject_id", how="left")
     merged = merged.dropna(subset=[label_col])
@@ -81,11 +64,6 @@ def _build_resolution_card(row):
     date_str = date_val.strftime("%Y-%m-%d") if pd.notnull(date_val) else "Unknown"
     title = row.get("title", "Untitled")
     category_tag = _extract_category_tag(row)
-    yes_count = _safe_count(row.get("total_yes", 0))
-    no_count = _safe_count(row.get("total_no", 0))
-    abstain_count = _safe_count(row.get("total_abstentions", 0))
-    not_voting_count = _safe_count(row.get("total_non_voting", 0))
-    total_ms = _safe_count(row.get("total_ms", 0))
     session_val = row.get("session", "")
     session_str = f"Session {session_val}" if session_val else ""
 
@@ -97,11 +75,6 @@ def _build_resolution_card(row):
         row.get("total_no"),
         row.get("total_abstentions"),
     )
-
-    y_pct = _safe_pct(yes_count, total_ms)
-    n_pct = _safe_pct(no_count, total_ms)
-    a_pct = _safe_pct(abstain_count, total_ms)
-    x_pct = _safe_pct(not_voting_count, total_ms)
 
     return html.Div(
         [
@@ -139,9 +112,7 @@ def _build_resolution_card(row):
                             html.Span(
                                 f"Consensus score: {consensus_display}",
                                 style={
-                                    "color": "#666"
-                                    if pd.notna(consensus_score)
-                                    else "#999",
+                                    "color": "#666" if pd.notna(consensus_score) else "#999",
                                     "fontSize": "0.9em",
                                     "marginLeft": "12px",
                                 },
@@ -183,9 +154,7 @@ def _query_sorted_resolutions():
 
     category_map = _build_category_tag_map()
     if "undl_id" in df.columns:
-        df["category_tag"] = (
-            df["undl_id"].astype(str).map(category_map).fillna("No Category")
-        )
+        df["category_tag"] = df["undl_id"].astype(str).map(category_map).fillna("No Category")
     else:
         df["category_tag"] = "No Category"
 
@@ -198,6 +167,15 @@ def _query_sorted_resolutions():
 @functools.lru_cache(maxsize=1)
 def _get_recent_resolutions_cached():
     return _query_sorted_resolutions()
+
+
+def invalidate() -> None:
+    """Drop the cached resolution list so the next render re-queries current data.
+
+    Called by `app.data.reload_if_stale()`: this list is derived from the repository, and it is
+    exactly where stale data is most visible — a reload exists to surface new resolutions.
+    """
+    _get_recent_resolutions_cached.cache_clear()
 
 
 layout = html.Div(
@@ -232,9 +210,7 @@ def register_callbacks():
             df = _get_recent_resolutions_cached().copy()
         except Exception as e:
             return (
-                html.Div(
-                    f"Error loading recent resolutions: {e}", style={"color": "red"}
-                ),
+                html.Div(f"Error loading recent resolutions: {e}", style={"color": "red"}),
                 "",
                 _BTN_HIDDEN_STYLE,
             )

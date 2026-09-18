@@ -1,4 +1,4 @@
-from dash import Input, Output, callback, html, dcc
+from dash import Input, Output, callback, html
 
 
 def register_callbacks():

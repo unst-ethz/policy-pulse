@@ -1,47 +1,16 @@
 # config/data_sources.yaml
-# We're currently not using Security Council data, but we already have support in place
-# Note:
-#    The library API's 'name' field stores the raw name of a data asset WITHOUT the format
-#    suffix (e.g., ".csv"), which is instead stored in a separate 'format' field.
-version: "1.4" # Increment this version to bust local caches
-last_updated: "2026-05-02" # Add member_states authority list (multi-language country names)
+#
+# App runtime settings. The data sources themselves are no longer configured here: the app reads
+# the already-normalized tables from Postgres (connection via PGHOST/PGPORT/PGDATABASE/PGUSER/
+# PGPASSWORD, see .env.example), and fetching from the UN Digital Library is the `undl-ingest`
+# repo's job.
+#
+# This file previously also carried a `version` key used to invalidate a local CSV/pickle cache.
+# There is no cache any more — the app loads from Postgres in ~25s on every start — so there is
+# nothing to bump when the data or processing changes.
+
 debug: true
 logs: true
 
-data_sources:
-  resolutions:
-    ga_resolutions:
-      description: "UN General Assembly Resolution voting data"
-      source_type: "dynamic_api_file"
-      recid: "4060887"
-      file_name_pattern: |
-        .*_ga_voting$
-      format: ".csv"
-
-    sc_resolutions:
-      description: "UN Security Council Resolution voting data"
-      source_type: "dynamic_api_file"
-      recid: "4055387"
-      file_name_pattern: |
-        .*_sc_voting$
-      format: ".csv"
-
-  thesaurus:
-    description: "UNBIS Thesaurus hierarchy"
-    source_type: "dynamic_api_file"
-    recid: "4075456"
-    file_name_pattern: |
-      unbist-.*_2$
-    format: ".ttl"
-
-  member_states:
-    description: "UN Member State authority list with multi-language names (EN, FR, ES, AR, ZH, RU)"
-    source_type: "dynamic_api_file"
-    recid: "4082085"
-    file_name_pattern: |
-      member_states_auths_.*
-    format: ".csv"
-
 paths:
-  data: "data/"
   logs: "logs/"

@@ -1,6 +1,6 @@
-from dash import get_relative_path, html, dcc
-
 import os
+
+from dash import dcc, get_relative_path, html
 
 # At runtime, set this env variable to True if you want to show indicators
 # that the web page is experimental (e.g. to distinguish from a stable version).
@@ -14,9 +14,7 @@ layout = (
                     id="navbar-home-click",
                     children=[
                         dcc.Link("UN-ETH Policy Pulse", href=get_relative_path("/")),
-                        html.Span(" Experimental Branch; Unstable!")
-                        if experimental
-                        else None,
+                        html.Span(" Experimental Branch; Unstable!") if experimental else None,
                     ],
                 )
             ),
