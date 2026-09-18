@@ -39,6 +39,15 @@ def _compute_scale_params(
     position within [lo, hi].
     """
     clean = scores.dropna()
+    if clean.empty:
+        # No scored resolutions in this slice. Resolutions adopted without a vote or by a
+        # non-recorded vote carry no consensus score at all (~72% of the table), so a narrow
+        # enough date range selects nothing scorable. Callers are expected to skip the adaptive
+        # path entirely in that case; returning a neutral finite scale here keeps a missed guard
+        # from feeding NaN into plotly's tickvals/range_color.
+        lo = 0.0 if lo is None else lo
+        hi = 1.0 if hi is None else hi
+        return lo, (lo + hi) / 2.0, hi, 0.5
     lo = float(max(clean.quantile(0.01), 0.0)) if lo is None else lo
     hi = float(min(clean.quantile(0.99), 1.0)) if hi is None else hi
     avg = float(clean.mean())

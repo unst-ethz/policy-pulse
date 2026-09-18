@@ -69,8 +69,14 @@ def register_callbacks(query_engine):
             if country1 in all_resolutions.columns
             else all_resolutions
         )
+        # The column existing is not enough: resolutions adopted without a vote or by a
+        # non-recorded vote have no consensus score, so a narrow date range can select rows that
+        # are all NaN. Anchoring the scale on those gives a NaN midpoint and renders the average
+        # in the note below as "(nan)".
         has_consensus = (
-            "consensus_score" in all_resolutions.columns and not country1_resolutions.empty
+            "consensus_score" in all_resolutions.columns
+            and not country1_resolutions.empty
+            and country1_resolutions["consensus_score"].notna().any()
         )
         use_adaptive = adaptive_colour_scale and has_consensus
         if use_adaptive:

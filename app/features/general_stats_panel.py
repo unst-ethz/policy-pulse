@@ -197,6 +197,15 @@ def _get_stats_component_cached():
     return _build_stats_component()
 
 
+def invalidate() -> None:
+    """Drop the cached stats panel so the next render recomputes it from current data.
+
+    Called by `app.data.reload_if_stale()`: the totals, year span and country count are all
+    derived from the repository.
+    """
+    _get_stats_component_cached.cache_clear()
+
+
 layout = html.Div(id="index-general-stats-content")
 
 

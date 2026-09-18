@@ -10,11 +10,13 @@ import pandas as pd
 import plotly.express as px
 from dash import Input, Output, callback, dash_table, dcc, html
 
-from ..data import (
-    SUBJECT_ID_TO_LABEL_MAP,
-    TOP_LEVEL_SUBJECTS,
-    get_country_name,
-)
+# The subject globals are read through the module, not imported by value: a periodic reload
+# *rebinds* `data.TOP_LEVEL_SUBJECTS` / `data.SUBJECT_ID_TO_LABEL_MAP` rather than mutating them
+# in place, so a `from ..data import ...` here would pin the pre-reload objects for the life of
+# the process. `get_country_name` is safe to bind directly — it is a function that reads the
+# rebound `_NAME_INDEX` at call time.
+from .. import data
+from ..data import get_country_name
 
 # --- Constants ---
 MIN_VOTES_THRESHOLD = 30  # Minimum votes required for a subject to be included
@@ -181,7 +183,13 @@ def register_callbacks(query_engine):
 
         # Calculate agreement
         df = calculate_agreement(
-            query_engine, c1, c2, start_date, end_date, TOP_LEVEL_SUBJECTS, SUBJECT_ID_TO_LABEL_MAP
+            query_engine,
+            c1,
+            c2,
+            start_date,
+            end_date,
+            data.TOP_LEVEL_SUBJECTS,
+            data.SUBJECT_ID_TO_LABEL_MAP,
         )
 
         if df.empty:

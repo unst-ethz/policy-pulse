@@ -169,6 +169,15 @@ def _get_recent_resolutions_cached():
     return _query_sorted_resolutions()
 
 
+def invalidate() -> None:
+    """Drop the cached resolution list so the next render re-queries current data.
+
+    Called by `app.data.reload_if_stale()`: this list is derived from the repository, and it is
+    exactly where stale data is most visible — a reload exists to surface new resolutions.
+    """
+    _get_recent_resolutions_cached.cache_clear()
+
+
 layout = html.Div(
     [
         html.Div(

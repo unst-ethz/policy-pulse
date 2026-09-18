@@ -887,3 +887,12 @@ def _calculate_data_uncached(country1: str | None, selected_tuple: tuple):
             None,
             None,
         )
+
+
+def invalidate() -> None:
+    """Drop the cached per-country-pair agreement series so the next callback recomputes them.
+
+    Called by `app.data.reload_if_stale()`: the cache is keyed only on the country pair, so
+    without this a pair queried before a reload keeps its pre-reload session averages.
+    """
+    _calculate_data_uncached.cache_clear()

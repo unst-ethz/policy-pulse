@@ -45,9 +45,29 @@ def invalidate() -> None:
     Called by `app.data.reload_if_stale()` after a periodic reload: these indices are derived
     from the resolution set, so without this the word cloud would keep serving terms built from
     the previous load.
+
+    This only clears the flag; the rebuild happens on the next read. Every read therefore has to
+    go through `_word_undlid_map()` / `_wc_data()` below rather than touching the module dicts
+    directly, or it will serve the pre-reload index.
     """
     global _initialized
     _initialized = False
+
+
+def _word_undlid_map(mode: str) -> dict:
+    """Per-mode `{word: [undl_id, ...]}` index, rebuilt first if a reload invalidated it.
+
+    `_init_wc_data()` returns immediately once `_initialized` is set, so this costs a boolean
+    check on the hot path.
+    """
+    _init_wc_data()
+    return _wc_word_undlid_map_by_mode.get(mode, {})
+
+
+def _wc_data(mode: str) -> dict:
+    """Per-mode `{undl_id: {"word_freq": ...}}` index, rebuilt first if a reload invalidated it."""
+    _init_wc_data()
+    return _resolution_wc_data_by_mode.get(mode, {})
 
 
 def _init_wc_data():
@@ -251,7 +271,7 @@ def _init_wc_data():
 def _aggregate_word_freq(undl_ids: pd.Series, mode: str = _DEFAULT_MODE) -> dict:
     """Combine word frequencies across given resolution IDs."""
     agg_counter = Counter()
-    wc_data = _resolution_wc_data_by_mode.get(mode, {})
+    wc_data = _wc_data(mode)
     for undl_id in undl_ids.values:
         if undl_id in wc_data:
             agg_counter.update(wc_data[undl_id]["word_freq"])
@@ -263,7 +283,7 @@ def _aggregate_word_undlids_map(
 ) -> dict:
     """Map words to resolution IDs that contain them."""
     agg_map = {}
-    word_map = _wc_word_undlid_map_by_mode.get(mode, {})
+    word_map = _word_undlid_map(mode)
     for word in word_list:
         agg_map[word] = []
         if word in word_map:
@@ -290,7 +310,7 @@ def search_keywords(
     if not token_lower:
         return matched_ids
 
-    word_map = _wc_word_undlid_map_by_mode.get(mode, {})
+    word_map = _word_undlid_map(mode)
     all_keys = list(word_map.keys())
 
     if exact:
@@ -486,7 +506,7 @@ def _map_words_to_consensus_scores(words: list, mode: str, df: pd.DataFrame) -> 
 
     Words with no matching scored resolutions get None.
     """
-    mode_word_map = _wc_word_undlid_map_by_mode.get(mode, {})
+    mode_word_map = _word_undlid_map(mode)
     c_score_map = df.set_index(df["undl_id"].astype(str))["consensus_score"].dropna().to_dict()
     word_scores = []
     for word in words:
@@ -539,7 +559,7 @@ def _count_click_search_results(
     if mode == "category":
         # Fast path: count within current filtered result set to avoid
         # per-word query_resolutions calls that can make rendering too slow.
-        mode_word_map = _wc_word_undlid_map_by_mode.get(mode, {})
+        mode_word_map = _word_undlid_map(mode)
         candidate_ids = mode_word_map.get(word, [])
         if not candidate_ids or filtered_df.empty or "undl_id" not in filtered_df.columns:
             return 0
@@ -611,7 +631,7 @@ def _build_wordcloud(
         )
 
     try:
-        if not _wc_word_undlid_map_by_mode.get(mode, {}):
+        if not _word_undlid_map(mode):
             return _build_empty_wordcloud_figure(
                 _mode_empty_message(
                     mode,
@@ -769,7 +789,14 @@ def _build_wordcloud(
         click_result_counts = [search_count_by_word.get(word, 0) for word in words]
 
         lo = hi = avg = None
-        if color_mode == "consensus" and "consensus_score" in df.columns:
+        # `.notna().any()` guards the same case as the choropleth: a filter can select only
+        # resolutions with no recorded vote, whose consensus score is NaN, which would otherwise
+        # put "nan" on the colourbar ticks.
+        if (
+            color_mode == "consensus"
+            and "consensus_score" in df.columns
+            and df["consensus_score"].notna().any()
+        ):
             colorscale, lo, avg, hi = make_adaptive_colorscale_plotly(
                 df["consensus_score"], _CONSENSUS_CMAP_COLORS
             )
@@ -1098,7 +1125,7 @@ def register_callbacks():
                 return html.Div("No data available.", style={"color": "#7f8c8d"})
 
             mode = selected_mode if selected_mode in _WORDCLOUD_MODES else _DEFAULT_MODE
-            mode_word_map = _wc_word_undlid_map_by_mode.get(mode, {})
+            mode_word_map = _word_undlid_map(mode)
             if word not in mode_word_map:
                 return html.Div(
                     f"No resolutions found for word '{word}'.",

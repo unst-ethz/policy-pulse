@@ -1,3 +1,4 @@
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -521,6 +522,32 @@ def _rebuild_derived_state() -> None:
     SUBJECT_TREE_DATA = get_subject_tree_data()
 
 
+def _invalidate_feature_caches() -> None:
+    """Drop every cache a feature module derives from the repository.
+
+    Each module exposes its own `invalidate()`. They are looked up in `sys.modules` rather than
+    imported, for two reasons: these modules import `app.data`, so a top-level import here would
+    be circular; and importing a *page* module has side effects — `trends_page` calls
+    `register_page()` at import time, which raises unless a Dash app already exists. A module
+    that was never imported holds no cache to clear, so skipping it is also the correct answer.
+
+    If you memoise anything derived from `query_engine` or `repo` — an `lru_cache`, a lazily
+    built index — give its module an `invalidate()` and list it here, or it will serve pre-reload
+    data for the life of the process. Caches derived only from the static CSV assets
+    (`country_utils`) do not belong here; a reload cannot change them.
+    """
+    module_names = (
+        f"{__package__}.features.wordcloud_interactive",
+        f"{__package__}.features.recent_resolutions_panel",
+        f"{__package__}.features.general_stats_panel",
+        f"{__package__}.pages.trends_page",
+    )
+    for module_name in module_names:
+        module = sys.modules.get(module_name)
+        if module is not None:
+            module.invalidate()
+
+
 def reload_if_stale() -> bool:
     """Rebuild and swap in fresh data if a newer successful ingestion run exists.
 
@@ -547,11 +574,7 @@ def reload_if_stale() -> bool:
     repo = new_repo
     _rebuild_derived_state()
 
-    # The word cloud builds its per-mode indices once from the resolution set; without this it
-    # would keep serving indices built from the previous load.
-    from .features import wordcloud_interactive
-
-    wordcloud_interactive.invalidate()
+    _invalidate_feature_caches()
 
     repo.logger.info(
         "Reload complete in %.1fs: %s", time.monotonic() - started, snapshot.describe()
