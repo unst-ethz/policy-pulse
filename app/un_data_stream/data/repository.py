@@ -103,6 +103,7 @@ class DataRepository:
         # Initialize data attributes
         self.resolution_table: pd.DataFrame
         self.resolution_subject_table: pd.DataFrame
+        self.keyword_table: pd.DataFrame
         self.subject_table: pd.DataFrame
         self.closure_table: pd.DataFrame
         self.broader_table: pd.DataFrame
@@ -128,7 +129,8 @@ class DataRepository:
         """Return all processed data as a dict consumed by ResolutionQueryEngine.
 
         Keys:
-            resolution, resolution_subject, subject, closure, broader — pd.DataFrames
+            resolution, resolution_subject, resolution_keyword, subject, closure, broader
+                                — pd.DataFrames
             country_columns     — List[str] of ISO3 country codes (length C)
             multilateral_scores — (R x C) np.ndarray, float32
             vote_bool_arrays    — 4-tuple of (R x C) bool arrays (yes, no, abstained, voted)
@@ -136,6 +138,7 @@ class DataRepository:
         return {
             "resolution": self.resolution_table,
             "resolution_subject": self.resolution_subject_table,
+            "resolution_keyword": self.keyword_table,
             "subject": self.subject_table,
             "closure": self.closure_table,
             "broader": self.broader_table,
@@ -221,6 +224,9 @@ class DataRepository:
                 self.resolution_subject_table = db.read_table(
                     conn, "resolution_subject", columns=["undl_id", "subject_id"]
                 )
+                self.keyword_table = db.read_table(
+                    conn, "resolution_keyword_cloud", columns=["undl_id", "dimension", "keyword"]
+                )
                 self.closure_table = db.read_table(conn, "subject_closure")
                 self.broader_table = db.read_table(conn, "subject_broader")
                 self.member_states_table = db.read_table(conn, "member_states")
@@ -232,6 +238,7 @@ class DataRepository:
             f"Read {len(outcomes)} resolutions, {len(votes)} votes, "
             f"{len(self.subject_table)} subjects, "
             f"{len(self.resolution_subject_table)} resolution-subject pairs, "
+            f"{len(self.keyword_table)} keyword rows, "
             f"{len(self.member_states_table)} member states"
         )
 
@@ -316,16 +323,23 @@ class DataRepository:
         )
 
     def _log_memory_footprints(self):
-        """Log the memory footprint of every table and array held in memory."""
+        """Log the memory footprint of every table and array held in memory.
+
+        `deep=True` because every frame here is string-heavy and the shallow measure counts only
+        the pointer array — it reports single-digit MB for tables several times that, which
+        defeats the point of a log that exists to catch memory regressions.
+        """
         for name, table in (
             ("Resolution Table", self.resolution_table),
             ("Resolution Subject Table", self.resolution_subject_table),
+            ("Keyword Table", self.keyword_table),
             ("Subject Table", self.subject_table),
             ("Closure Table", self.closure_table),
             ("Broader Table", self.broader_table),
             ("Member States Table", self.member_states_table),
         ):
-            self.logger.info(f"{name}: {table.memory_usage(index=True).sum() / (1024**2):.2f} MB")
+            size = table.memory_usage(index=True, deep=True).sum()
+            self.logger.info(f"{name}: {size / (1024**2):.2f} MB")
         self.logger.info(
             f"Multilateral Scores: {self.multilateral_scores.nbytes / (1024**2):.2f} MB"
         )

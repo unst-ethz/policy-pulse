@@ -1,4 +1,3 @@
-import os
 import re
 from collections import Counter
 from typing import Literal
@@ -26,17 +25,43 @@ _initialized = False
 _DEFAULT_MODE = "default"
 _MAX_WORDS_RENDER = 20
 _MAX_WORD_CANDIDATES_FOR_SEARCH_COUNT = 30
-_EXCLUDED_TERMS_BY_MODE = {
+_EXCLUDED_TERMS_BY_AXIS = {
     "geopolitical": {"peoples", "states", "united nations"},
 }
+# Derived rather than repeated so a later addition to an axis cannot forget the union.
+_EXCLUDED_TERMS_BY_MODE = {
+    **_EXCLUDED_TERMS_BY_AXIS,
+    "default": set().union(*_EXCLUDED_TERMS_BY_AXIS.values()),
+}
 _WORDCLOUD_MODES = {
-    "default": {"label": "Default", "source": "resolution_keywords.csv:keywords"},
-    "geopolitical": {"label": "Geopolitical", "source": "resolution_keywords_3d.csv:Geopolitical"},
-    "thematic": {"label": "Thematic", "source": "resolution_keywords_3d.csv:Thematic"},
-    "action": {"label": "Action", "source": "resolution_keywords_3d.csv:Action"},
-    "category": {"label": "Subjects", "source": "query_resolutions():subjects"},
+    "default": {"label": "Default", "dimension": "general"},
+    "geopolitical": {"label": "Geopolitical", "dimension": "geopolitical"},
+    "thematic": {"label": "Thematic", "dimension": "thematic"},
+    "action": {"label": "Action", "dimension": "action"},
+    "category": {"label": "Subjects", "dimension": None},
 }
 _CONSENSUS_CMAP_COLORS = ["#ff66cc", "#e6b24b", "#33cc33"]
+
+
+def _build_keyword_indices(pairs: pd.DataFrame, exclude: set[str] | None = None):
+    """Index one dimension of `resolution_keyword_cloud` into the two dicts the cloud reads.
+
+    Returns `({undl_id: {"word_freq": {term: 1}}}, {term: [undl_id, ...]})`.
+    """
+    resolution_wc_data: dict = {}
+    wc_word_undlid_map: dict = {}
+    exclude_set = exclude or set()
+
+    for undl_id, keyword in pairs[["undl_id", "keyword"]].itertuples(index=False):
+        if keyword in exclude_set:
+            continue
+        entry = resolution_wc_data.setdefault(undl_id, {"word_freq": {}})
+        # Always 1: a keyword either describes a resolution or it does not, and the cloud sizes
+        # a word by how many resolutions carry it, not by repetition within one.
+        entry["word_freq"][keyword] = 1
+        wc_word_undlid_map.setdefault(keyword, []).append(undl_id)
+
+    return resolution_wc_data, wc_word_undlid_map
 
 
 def invalidate() -> None:
@@ -71,7 +96,11 @@ def _wc_data(mode: str) -> dict:
 
 
 def _init_wc_data():
-    """Initialize word cloud data from keywords CSV file."""
+    """Build every word-cloud index from the current snapshot.
+
+    Keyword panels come from `resolution_keyword_cloud`, the Subjects panel from
+    `resolution_subject`. Runs once per load; `invalidate()` forces the next read to rebuild.
+    """
     global \
         _resolution_wc_data_by_mode, \
         _wc_word_undlid_map_by_mode, \
@@ -83,15 +112,11 @@ def _init_wc_data():
 
     print("Initializing word cloud data...")
 
-    # Find the keywords CSV file in the app/assets directory
-    # Get app directory (parent of features directory)
-    app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     try:
-        base_keywords_path = os.path.join(app_dir, "assets", "resolution_keywords.csv")
-        three_d_keywords_path = os.path.join(app_dir, "assets", "resolution_keywords_3d.csv")
         resolutions_df = data.query_engine.query_resolutions()
-        ignore_words = ["resolution", "general assembly"]
-        split_pattern_general = re.compile(r"[;,]")
+        served_ids = (
+            set(resolutions_df["undl_id"].astype(str)) if not resolutions_df.empty else set()
+        )
         # Subject/category values may be delimited by "|", "--", or ";".
         split_pattern_subject = re.compile(r"\||--|;")
 
@@ -133,54 +158,28 @@ def _init_wc_data():
         wc_word_undlid_map_by_mode = {}
         category_term_to_subject_ids = {}
 
-        if os.path.exists(base_keywords_path):
-            # Keyed on the resolution symbol, not on any UNDL id: these keywords were compiled
-            # against the retired bulk-CSV export, whose `undl_id` was a digitallibrary record id
-            # and does not match the metadata.un.org MARC ids we store. The symbol is the one key
-            # both id spaces agree on. See T14 in plans/app_postgres_migration_plan.md.
-            base_keywords_df = pd.read_csv(base_keywords_path)
-            base_data_all = pd.merge(resolutions_df, base_keywords_df, on="resolution", how="left")
-            (
-                resolution_wc_data_by_mode["default"],
-                wc_word_undlid_map_by_mode["default"],
-            ) = build_indices(
-                base_data_all,
-                "keywords",
-                split_pattern_general,
-                ignore_words,
-            )
+        keyword_df = data.query_engine.keyword_table
+        if keyword_df is not None and not keyword_df.empty:
+            keyword_df = keyword_df[keyword_df["undl_id"].astype(str).isin(served_ids)]
+            by_dimension = dict(tuple(keyword_df.groupby("dimension", observed=True)))
         else:
-            print(f"Warning: Keywords file not found at {base_keywords_path}")
-            resolution_wc_data_by_mode["default"] = {}
-            wc_word_undlid_map_by_mode["default"] = {}
+            print("Warning: resolution_keyword_cloud is empty; keyword word clouds unavailable.")
+            by_dimension = {}
 
-        if os.path.exists(three_d_keywords_path):
-            three_d_df = pd.read_csv(three_d_keywords_path)
-            three_d_data_all = pd.merge(resolutions_df, three_d_df, on="resolution", how="left")
-            for mode_key, column_name in [
-                ("geopolitical", "Geopolitical"),
-                ("thematic", "Thematic"),
-                ("action", "Action"),
-            ]:
-                if column_name not in three_d_data_all.columns:
-                    print(f"Warning: Column '{column_name}' not found in 3D keywords CSV.")
-                    resolution_wc_data_by_mode[mode_key] = {}
-                    wc_word_undlid_map_by_mode[mode_key] = {}
-                    continue
-                (
-                    resolution_wc_data_by_mode[mode_key],
-                    wc_word_undlid_map_by_mode[mode_key],
-                ) = build_indices(
-                    three_d_data_all,
-                    column_name,
-                    split_pattern_general,
-                    ignore_words,
-                )
-        else:
-            print(f"Warning: 3D keywords file not found at {three_d_keywords_path}")
-            for mode_key in ["geopolitical", "thematic", "action"]:
+        for mode_key, spec in _WORDCLOUD_MODES.items():
+            dimension = spec["dimension"]
+            if dimension is None:
+                continue
+            pairs = by_dimension.get(dimension)
+            if pairs is None or pairs.empty:
+                print(f"Warning: no '{dimension}' rows in resolution_keyword_cloud.")
                 resolution_wc_data_by_mode[mode_key] = {}
                 wc_word_undlid_map_by_mode[mode_key] = {}
+                continue
+            (
+                resolution_wc_data_by_mode[mode_key],
+                wc_word_undlid_map_by_mode[mode_key],
+            ) = _build_keyword_indices(pairs, _EXCLUDED_TERMS_BY_MODE.get(mode_key))
 
         resolution_subject_df = getattr(
             data.query_engine, "resolution_subject_table", pd.DataFrame()
@@ -257,7 +256,8 @@ def _init_wc_data():
             mode_words = len(_wc_word_undlid_map_by_mode.get(mode_key, {}))
             mode_resolutions = len(_resolution_wc_data_by_mode.get(mode_key, {}))
             print(
-                f"✅ Word cloud mode '{mode_key}' initialized: {mode_resolutions} resolutions, {mode_words} unique words"
+                f"✅ Word cloud mode '{mode_key}' initialized: "
+                f"{mode_resolutions} resolutions, {mode_words} unique words"
             )
 
     except Exception as e:

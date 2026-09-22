@@ -68,6 +68,10 @@ class ResolutionQueryEngine:
         return self._snap.resolution_subject_table
 
     @property
+    def keyword_table(self) -> pd.DataFrame:
+        return self._snap.keyword_table
+
+    @property
     def subject_table(self) -> pd.DataFrame:
         return self._snap.subject_table
 

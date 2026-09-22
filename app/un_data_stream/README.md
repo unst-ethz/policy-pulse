@@ -100,6 +100,7 @@ paths:
 | `subject_broader` | direct SKOS `broader` edges, for tree navigation |
 | `subject_closure` | transitive ancestor/descendant pairs, for hierarchy filters |
 | `resolution_subject` | which thesaurus concepts a resolution is about, for subject filters |
+| `resolution_keyword_cloud` | *view*: word-cloud keywords, one row per (resolution, dimension, term). Dimensions are `geopolitical`/`thematic`/`action` plus `general`, which the view derives as their union — the app's default keyword panel |
 | `member_states` | ISO codes and multi-language country names |
 
 Everything here is read as written by `undl-ingest`; the app derives nothing from raw source data.
