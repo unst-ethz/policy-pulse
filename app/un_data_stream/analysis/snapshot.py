@@ -25,6 +25,7 @@ class DataSnapshot:
 
     resolution_table: pd.DataFrame
     resolution_subject_table: pd.DataFrame
+    keyword_table: pd.DataFrame
     subject_table: pd.DataFrame
     closure_table: pd.DataFrame
     country_columns: List[str]
@@ -63,6 +64,7 @@ class DataSnapshot:
         return cls(
             resolution_table=resolution_table,
             resolution_subject_table=data.get("resolution_subject", pd.DataFrame()),
+            keyword_table=data.get("resolution_keyword", pd.DataFrame()),
             subject_table=data.get("subject", pd.DataFrame()),
             closure_table=data.get("closure", pd.DataFrame()),
             country_columns=country_columns,
@@ -81,7 +83,7 @@ class DataSnapshot:
         marker = self.source_marker.isoformat() if self.source_marker else "unknown"
         return (
             f"{len(self.resolution_table)} resolutions, {len(self.country_columns)} countries, "
-            f"ingested up to {marker}"
+            f"{len(self.keyword_table)} keyword rows, ingested up to {marker}"
         )
 
 
@@ -93,6 +95,7 @@ def empty_snapshot() -> "DataSnapshot":
     return DataSnapshot(
         resolution_table=pd.DataFrame(columns=["undl_id", "date"]),
         resolution_subject_table=pd.DataFrame(columns=["undl_id", "subject_id"]),
+        keyword_table=pd.DataFrame(columns=["undl_id", "dimension", "keyword"]),
         subject_table=pd.DataFrame(columns=["subject_id", "label_en", "node_type"]),
         closure_table=pd.DataFrame(columns=["ancestor_id", "descendant_id", "depth"]),
         country_columns=[],

@@ -108,6 +108,7 @@ def _snapshot(n_resolutions: int, marker: datetime) -> DataSnapshot:
     return DataSnapshot(
         resolution_table=pd.DataFrame({"undl_id": ids, "date": ["2020-01-01"] * n_resolutions}),
         resolution_subject_table=pd.DataFrame(columns=["undl_id", "subject_id"]),
+        keyword_table=pd.DataFrame(columns=["undl_id", "dimension", "keyword"]),
         subject_table=pd.DataFrame(columns=["subject_id", "label_en", "node_type"]),
         closure_table=pd.DataFrame(columns=["ancestor_id", "descendant_id", "depth"]),
         country_columns=countries,
@@ -186,6 +187,7 @@ def test_public_properties_follow_the_swap(engine):
     engine.swap(_snapshot(5, NOW))
 
     assert len(engine.resolution_table) == 5
+    assert engine.keyword_table.empty
     assert engine.country_columns == ["AAA", "BBB"]
     assert engine.get_available_countries() == ["AAA", "BBB"]
 
