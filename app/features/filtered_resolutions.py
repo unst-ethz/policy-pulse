@@ -74,8 +74,9 @@ def resolutions_for(filter_data: dict | None, active_tab: str | None = None) -> 
         if mode == "voted":
             df = df[cast_a_vote]
         else:
-            # Member on the day, *or* voted on this resolution — see "Membership and voting
-            # activity" in app/data.py for why the second half is not redundant.
+            # Member on the day, *or* voted on this resolution. The second half is not
+            # redundant: membership periods are keyed by ISO code, so a state that voted under a
+            # predecessor's code has votes outside its recorded periods (see `membership_mask`).
             df = df[data.membership_mask(country, df["date"]) | cast_a_vote]
 
     keyword = filter_data.get("keyword")

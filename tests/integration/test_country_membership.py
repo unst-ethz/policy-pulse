@@ -93,6 +93,22 @@ def test_unknown_code_does_not_empty_the_table(data):
     assert mask.all()
 
 
+def test_participation_range_stays_inside_the_year_slider(data):
+    """A founding member joined in 1945, a year before the first resolution the app has.
+
+    The range feeds a slider bounded by the data, so a 1945 start would render clamped while the
+    store and URL disagreed with it.
+    """
+    outside = [
+        (iso, years)
+        for iso in data.available_countries
+        if (years := data.get_participation_year_range(iso))
+        and not (data.get_earliest_year() <= years[0] <= years[1] <= data.get_latest_year())
+    ]
+
+    assert not outside, f"ranges the year slider cannot represent: {outside}"
+
+
 def test_participation_range_of_a_current_member_ends_with_the_data(data):
     first_year, last_year = data.get_participation_year_range("CHE")
 

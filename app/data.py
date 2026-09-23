@@ -83,11 +83,12 @@ def _coverage_periods(coverage_periods: Any) -> list[Period]:
         start, _, end = period.partition(":")
         try:
             start_ts = pd.Timestamp(start)
+            end_ts = pd.Timestamp(end) if end else None
         except ValueError:
             continue  # an unplaceable period; the group's other periods still stand
         if pd.isna(start_ts):  # pd.Timestamp("") is NaT rather than an error
             continue
-        periods.append((start_ts, pd.Timestamp(end) if end else None))
+        periods.append((start_ts, end_ts))
     return periods
 
 
@@ -327,10 +328,11 @@ def get_participation_year_range(iso3_code: str) -> tuple[int, int] | None:
     if not periods:
         return None
 
-    first_year = min(start for start, _ in periods).year
+    first_year = max(min(start for start, _ in periods).year, get_earliest_year())
     if any(end is None for _, end in periods):
         return first_year, get_latest_year()
-    return first_year, max(end for _, end in periods).year
+    last_year = min(max(end for _, end in periods).year, get_latest_year())
+    return first_year, last_year
 
 
 # Build M49 region tree for AntdTreeSelect
