@@ -108,6 +108,8 @@ class DataRepository:
         self.closure_table: pd.DataFrame
         self.broader_table: pd.DataFrame
         self.member_states_table: pd.DataFrame
+        # One row per country code that has ever cast a vote: first_vote, last_vote.
+        self.voting_activity_table: pd.DataFrame
         # MAX(completed_at) of successful ingestion runs as of this load; the reloader compares
         # the live value against it. None when nothing has ever been ingested successfully.
         self.source_marker: datetime | None = None
@@ -129,7 +131,8 @@ class DataRepository:
         """Return all processed data as a dict consumed by ResolutionQueryEngine.
 
         Keys:
-            resolution, resolution_subject, resolution_keyword, subject, closure, broader
+            resolution, resolution_subject, resolution_keyword, subject, closure, broader,
+            member_states, voting_activity
                                 — pd.DataFrames
             country_columns     — List[str] of ISO3 country codes (length C)
             multilateral_scores — (R x C) np.ndarray, float32
@@ -144,6 +147,7 @@ class DataRepository:
             "broader": self.broader_table,
             "country_columns": self.country_columns,
             "member_states": self.member_states_table,
+            "voting_activity": self.voting_activity_table,
             "multilateral_scores": self.multilateral_scores,
             "vote_bool_arrays": self.vote_bool_arrays,
         }
@@ -233,13 +237,16 @@ class DataRepository:
         finally:
             engine.dispose()
 
+        self.voting_activity_table = self._build_voting_activity(outcomes, votes)
+
         self.logger.info(f"Data ingested up to {self.source_marker}")
         self.logger.info(
             f"Read {len(outcomes)} resolutions, {len(votes)} votes, "
             f"{len(self.subject_table)} subjects, "
             f"{len(self.resolution_subject_table)} resolution-subject pairs, "
             f"{len(self.keyword_table)} keyword rows, "
-            f"{len(self.member_states_table)} member states"
+            f"{len(self.member_states_table)} member states, "
+            f"{len(self.voting_activity_table)} countries with voting activity"
         )
 
         self.resolution_table, self.country_columns = self._build_resolution_table(outcomes, votes)
@@ -261,6 +268,18 @@ class DataRepository:
         )
 
         self._prune_unused_subjects()
+
+    @staticmethod
+    def _build_voting_activity(outcomes: pd.DataFrame, votes: pd.DataFrame) -> pd.DataFrame:
+        """First and last date each country code actually cast a vote."""
+        cast = votes.loc[votes["vote"] != "X", ["undl_id", "country_code"]]
+        dated = cast.merge(outcomes[["undl_id", "date"]], on="undl_id")
+        dated["date"] = pd.to_datetime(dated["date"])
+        return (
+            dated.groupby("country_code")["date"]
+            .agg(first_vote="min", last_vote="max")
+            .reset_index()
+        )
 
     @staticmethod
     def _build_resolution_table(
@@ -337,6 +356,7 @@ class DataRepository:
             ("Closure Table", self.closure_table),
             ("Broader Table", self.broader_table),
             ("Member States Table", self.member_states_table),
+            ("Voting Activity Table", self.voting_activity_table),
         ):
             size = table.memory_usage(index=True, deep=True).sum()
             self.logger.info(f"{name}: {size / (1024**2):.2f} MB")

@@ -1,4 +1,8 @@
-"""Shared country-level lookup utilities."""
+"""Shared country-level lookup utilities.
+
+M49 regional groupings and country centroids only. Membership and voting-activity dates live in
+`app.data`, which reads them from Postgres rather than from a file here.
+"""
 
 from functools import lru_cache
 from pathlib import Path
@@ -6,11 +10,6 @@ from pathlib import Path
 import pandas as pd
 
 _ASSETS = Path(__file__).resolve().parent.parent / "assets"
-
-
-@lru_cache(maxsize=None)
-def _load_joining_dates() -> pd.DataFrame:
-    return pd.read_csv(_ASSETS / "joining_dates.csv", parse_dates=["min_date", "max_date"])
 
 
 @lru_cache(maxsize=None)
@@ -35,19 +34,6 @@ def _country_to_subregion() -> dict[str, str]:
         if isinstance(row.get("ISO-alpha3 Code"), str)
         and isinstance(row.get("Sub-region Name"), str)
     }
-
-
-def get_un_membership_years(country_alpha3: str) -> tuple[int, int] | None:
-    """Return (first_year, last_year) of UN membership for a country.
-
-    For countries with multiple membership periods, returns the widest range
-    (earliest join to latest leave/current year). Returns None if not found.
-    """
-    jd = _load_joining_dates()
-    rows = jd[jd["country"] == country_alpha3]
-    if rows.empty:
-        return None
-    return rows["min_date"].min().year, rows["max_date"].max().year
 
 
 def get_country_region(iso3: str) -> str:

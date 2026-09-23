@@ -59,25 +59,59 @@ _LEGACY_VOTING_CODES: dict[str, dict[str, Any]] = {
 }
 
 
-# TODO: quick check that the years make sense? Also i feel like this code is fragile
-def _coverage_years(coverage_periods: Any) -> tuple[list[int], list[int]]:
-    """Start and end years from a `'start:end|start:end'` coverage_periods value.
+# (iso_code, name_en) -> the voting code that owns that member_states row's membership years.
+# West Germany's record is filed under DEU but its votes are cast as GER, so its years belong to
+# GER — otherwise DEU and GER both claim 1973-1990. Same for Serbia and Montenegro / SRB.
+_PERIOD_OWNER: dict[tuple[str, str], str] = {
+    payload["source"]: legacy_iso for legacy_iso, payload in _LEGACY_VOTING_CODES.items()
+}
 
-    Dates are ISO (`'1955-12-14'`). A period with a blank end is still open and contributes no end
-    year — that's what separates an ongoing membership from a closed one, and it's why a state with
-    several periods (KHM: 1955-1970, 1975-1976, 1990-) reads as current.
+Period = tuple[pd.Timestamp, pd.Timestamp | None]
+
+
+def _coverage_periods(coverage_periods: Any) -> list[Period]:
+    """Parse a `'start:end|start:end'` coverage_periods value into (start, end) timestamps.
+
+    Dates are ISO (`'1955-12-14'`). A blank end means the period is still open and is returned as
+    `None` — that's what separates an ongoing membership from a closed one, and it's why a state
+    with several periods (KHM: 1955-1970, 1975-1976, 1990-) reads as current.
     """
     if pd.isna(coverage_periods):
-        return [], []
-    starts: list[int] = []
-    ends: list[int] = []
+        return []
+    periods: list[Period] = []
     for period in str(coverage_periods).split("|"):
         start, _, end = period.partition(":")
-        if start[:4].isdigit():
-            starts.append(int(start[:4]))
-        if end[:4].isdigit():
-            ends.append(int(end[:4]))
-    return starts, ends
+        try:
+            start_ts = pd.Timestamp(start)
+            end_ts = pd.Timestamp(end) if end else None
+        except ValueError:
+            continue  # an unplaceable period; the group's other periods still stand
+        if pd.isna(start_ts):  # pd.Timestamp("") is NaT rather than an error
+            continue
+        periods.append((start_ts, end_ts))
+    return periods
+
+
+def _merge_periods(periods: list[Period]) -> list[Period]:
+    """Sort and coalesce overlapping or adjacent periods into a minimal list.
+
+    Adjacent counts as touching: an authority record that ends a period on the day the next one
+    begins (MMR: Burma to 1989-06-17, Myanmar from 1989-06-18) describes one continuous
+    membership, not two, and a one-day hole would drop any resolution that fell in it.
+    """
+    merged: list[Period] = []
+    for start, end in sorted(periods, key=lambda p: p[0]):
+        if not merged:
+            merged.append((start, end))
+            continue
+        prev_start, prev_end = merged[-1]
+        if prev_end is None:
+            continue  # an open period swallows everything that starts after it
+        if start <= prev_end + pd.Timedelta(days=1):
+            merged[-1] = (prev_start, None if end is None else max(prev_end, end))
+        else:
+            merged.append((start, end))
+    return merged
 
 
 def _split_names(value: Any) -> list[str]:
@@ -87,13 +121,23 @@ def _split_names(value: Any) -> list[str]:
     return [name.strip() for name in str(value).split(";") if name.strip()]
 
 
-def _build_name_record(group: pd.DataFrame) -> dict:
-    """Build one ISO's name record from its member_states rows.
+def _build_name_record(group: pd.DataFrame, code: str) -> dict:
+    """Build one code's record — names, aliases and membership periods — from its rows.
 
     An ISO normally has one current row (`record_type == 'ms'`) plus a former-state row per
     historical name — MMR is Myanmar + Burma. Ten ISOs are `fs`-only: states that dissolved (SUN,
     CSK, YUG, DDR, ...), which get a year range appended to their display name.
+
+    Membership periods are the union of the group's rows, because those rows describe one seat
+    under successive names — minus any row another code owns (see `_PERIOD_OWNER`).
     """
+    rows = group[["iso_code", "name_en", "coverage_periods"]].itertuples(index=False)
+    owned_periods: list[Period] = []
+    for iso, name_en, coverage in rows:
+        if _PERIOD_OWNER.get((iso, name_en), iso) == code:
+            owned_periods.extend(_coverage_periods(coverage))
+    periods = _merge_periods(owned_periods)
+
     current = group[group["record_type"] == "ms"]
     if not current.empty:
         # Every current member state's final coverage period is open, so `record_type` alone
@@ -105,12 +149,14 @@ def _build_name_record(group: pd.DataFrame) -> dict:
         # spans every period the entity existed (YMD has two such rows: Southern then Democratic
         # Yemen).
         latest_end = group["coverage_periods"].apply(
-            lambda cp: max(_coverage_years(cp)[1], default=0)
+            lambda cp: max((end.year for _, end in _coverage_periods(cp) if end), default=0)
         )
         canonical = group.loc[latest_end.idxmax()]
-        starts = [y for cp in group["coverage_periods"] for y in _coverage_years(cp)[0]]
-        ends = [y for cp in group["coverage_periods"] for y in _coverage_years(cp)[1]]
-        year_range = (min(starts), max(ends)) if starts and ends else None
+        year_range = (
+            (periods[0][0].year, periods[-1][1].year)
+            if periods and periods[-1][1] is not None
+            else None
+        )
 
     en_name = canonical["name_en"]
     names: dict[str, str] = {"en": en_name}
@@ -140,6 +186,7 @@ def _build_name_record(group: pd.DataFrame) -> dict:
         "display_aliases": display_aliases,
         "search_aliases": search_aliases,
         "year_range": year_range,
+        "periods": periods,
     }
 
 
@@ -152,13 +199,14 @@ def _build_name_index(member_states_df: pd.DataFrame) -> dict[str, dict]:
         search_aliases:  list[str]              - display aliases plus variant spellings, translations,
                                                   abbreviations from the 'other_names' column
         year_range:      tuple[int, int] | None - set only for retired ISOs (no current row)
+        periods:         list[Period]           - merged UN membership periods
     """
     index: dict[str, dict] = {}
 
     for iso, group in member_states_df.groupby("iso_code"):
         if not isinstance(iso, str) or not iso.strip():
             continue
-        index[iso] = _build_name_record(group)
+        index[iso] = _build_name_record(group, iso)
 
     # Merge voting-only codes (see _LEGACY_VOTING_CODES above). Each resolves to a single fs row,
     # which has no current row and therefore picks up a year range automatically.
@@ -176,7 +224,7 @@ def _build_name_index(member_states_df: pd.DataFrame) -> dict[str, dict]:
                 f"{successor_iso}; votes cast under {legacy_iso} will show the bare code"
             )
             continue
-        record = _build_name_record(rows)
+        record = _build_name_record(rows, legacy_iso)
         record["names"].update(payload.get("names", {}))
         index[legacy_iso] = record
 
@@ -221,6 +269,70 @@ def get_country_search_terms(iso3_code: str, lang: str = "en") -> str:
     terms = {rec["names"]["en"], rec["names"].get(lang, rec["names"]["en"])}
     terms.update(rec["search_aliases"])
     return " ".join(t for t in terms if t)
+
+
+def _build_voting_activity(voting_activity_df: pd.DataFrame) -> dict[str, Period]:
+    """`{iso: (first_vote, last_vote)}` for every code that has ever cast a vote."""
+    return dict(
+        zip(
+            voting_activity_df["country_code"],
+            zip(voting_activity_df["first_vote"], voting_activity_df["last_vote"]),
+        )
+    )
+
+
+_VOTING_ACTIVITY: dict[str, Period] = _build_voting_activity(repo.get_data()["voting_activity"])
+
+
+def get_membership_periods(iso3_code: str) -> list[Period]:
+    """UN membership periods for a code, earliest first. `end` is None while ongoing."""
+    rec = _NAME_INDEX.get(iso3_code)
+    return rec["periods"] if rec else []
+
+
+def get_voting_activity(iso3_code: str) -> Period | None:
+    """(first, last) date this code cast a vote, or None if it never has."""
+    return _VOTING_ACTIVITY.get(iso3_code)
+
+
+def membership_mask(iso3_code: str, dates: pd.Series) -> pd.Series:
+    """Boolean mask over `dates`: was this code a UN member on each date?
+
+    Gaps are preserved, so a state that left and returned does not match the years in between.
+    Callers filtering resolutions should OR this with "did it vote on this one".
+    """
+    if not pd.api.types.is_datetime64_any_dtype(dates):
+        dates = pd.to_datetime(dates)
+    periods = get_membership_periods(iso3_code)
+    if not periods:
+        return pd.Series(True, index=dates.index)
+
+    mask = pd.Series(False, index=dates.index)
+    for start, end in periods:
+        in_period = dates >= start
+        if end is not None:
+            in_period &= dates <= end
+        mask |= in_period
+    return mask
+
+
+def get_participation_year_range(iso3_code: str) -> tuple[int, int] | None:
+    """(first_year, last_year) a country took part, for clamping a year range to.
+
+    Outer bounds over membership *and* voting activity.
+    """
+    periods = list(get_membership_periods(iso3_code))
+    activity = get_voting_activity(iso3_code)
+    if activity is not None:
+        periods.append(activity)
+    if not periods:
+        return None
+
+    first_year = max(min(start for start, _ in periods).year, get_earliest_year())
+    if any(end is None for _, end in periods):
+        return first_year, get_latest_year()
+    last_year = min(max(end for _, end in periods).year, get_latest_year())
+    return first_year, last_year
 
 
 # Build M49 region tree for AntdTreeSelect
@@ -304,10 +416,8 @@ def get_region_tree_data() -> list[dict]:
         r_code = sub_to_region[sr_code]
         regions[r_code].setdefault("children", []).append(node)
 
-    # Use joining_dates.csv as the authoritative source for countries with voting data
-    from .features.country_utils import _load_joining_dates
-
-    valid = set(_load_joining_dates()["country"].tolist())
+    # The countries with voting data are the ones that have actually cast a vote.
+    valid = set(_VOTING_ACTIVITY)
 
     for parent_dict in [inter_regions, sub_regions]:
         for code, node in parent_dict.items():
@@ -505,10 +615,11 @@ def _rebuild_derived_state() -> None:
     rebinding is enough.
     """
     global _NAME_INDEX, REGION_TREE_DATA, TOP_LEVEL_SUBJECTS, SUBJECT_ID_TO_LABEL_MAP
-    global SUBJECT_TREE_DATA, available_countries
+    global SUBJECT_TREE_DATA, available_countries, _VOTING_ACTIVITY
 
     available_countries = query_engine.get_available_countries()
     _NAME_INDEX = _build_name_index(repo.get_data()["member_states"])
+    _VOTING_ACTIVITY = _build_voting_activity(repo.get_data()["voting_activity"])
     subject_df = repo.get_data()["subject"]
     TOP_LEVEL_SUBJECTS = set(
         subject_df.loc[lambda df: df["node_type"] == "scheme", "subject_id"].tolist()

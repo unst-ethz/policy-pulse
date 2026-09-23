@@ -8,7 +8,6 @@ import plotly.graph_objects as go
 from dash import Input, Output, clientside_callback, dcc, html, register_page
 
 from .. import data
-from ..features.country_utils import get_un_membership_years
 from ..features.resolution_list import VOTE_MAP
 
 P5 = ["USA", "GBR", "FRA", "RUS", "CHN"]
@@ -127,7 +126,7 @@ def layout(
         )
 
     # ── clamp year range to UN membership period ──────────────────────────────
-    membership = get_un_membership_years(country1)
+    membership = data.get_participation_year_range(country1)
     if membership:
         mem_start = f"{membership[0]}-01-01"
         mem_end = f"{membership[1]}-12-31"

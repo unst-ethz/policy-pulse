@@ -10,7 +10,6 @@ import feffery_antd_components as fac
 from dash import Input, Output, State, callback, ctx, dcc, html, no_update
 
 from .. import data
-from .country_utils import get_un_membership_years
 
 prefix = "filter-component"
 ids = {
@@ -285,7 +284,7 @@ def register_callbacks():
         country1 = (filter_store or {}).get("country1_alpha3")
         if not country1:
             return no_update
-        years = get_un_membership_years(country1)
+        years = data.get_participation_year_range(country1)
         if years is None:
             return no_update
         return list(years)
