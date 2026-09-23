@@ -17,7 +17,6 @@ Kept in its own module so the tabs and `filters.py` can share it without an impo
 import pandas as pd
 
 from .. import data
-from .country_utils import _load_joining_dates
 
 # The country participation filter is meaningless where country1 is disabled or highlight-only.
 TABS_WITHOUT_COUNTRY_FILTER = {"wordcloud"}
@@ -63,21 +62,21 @@ def resolutions_for(filter_data: dict | None, active_tab: str | None = None) -> 
     )
 
     country = filter_data.get("country1_alpha3")
-    mode = filter_data.get("country_filter_mode") or "none"
-    if country and country in df.columns and active_tab not in TABS_WITHOUT_COUNTRY_FILTER:
+    mode = filter_data.get("country_filter_mode") or "none"  # 'none' applies no country filter
+    if (
+        mode in ("voted", "member")
+        and country in df.columns
+        and active_tab not in TABS_WITHOUT_COUNTRY_FILTER
+    ):
+        # No normalization: the vote columns are a category of exactly Y/N/A/X with no nulls
+        # (repository.py), and normalizing would decategorize 20k values on every callback.
+        cast_a_vote = df[country].isin(["Y", "N", "A"])
         if mode == "voted":
-            vote_cleaned = df[country].astype(str).str.strip().str.upper()
-            df = df[vote_cleaned.isin(["Y", "N", "A"])]
-        elif mode == "member":
-            jd = _load_joining_dates()
-            rows = jd[jd["country"] == country]
-            if not rows.empty:
-                min_date = pd.to_datetime(rows["min_date"].min())
-                max_date = pd.to_datetime(rows["max_date"].max())
-                df["date"] = pd.to_datetime(df["date"])
-                df = df[(df["date"] >= min_date) & (df["date"] <= max_date)]
-            # TODO: multi-period membership (suspended + readmitted countries)
-        # "none": no filter applied
+            df = df[cast_a_vote]
+        else:
+            # Member on the day, *or* voted on this resolution — see "Membership and voting
+            # activity" in app/data.py for why the second half is not redundant.
+            df = df[data.membership_mask(country, df["date"]) | cast_a_vote]
 
     keyword = filter_data.get("keyword")
     if keyword and keyword.strip() and active_tab in TABS_WITH_KEYWORD and not df.empty:
