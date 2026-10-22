@@ -1,5 +1,12 @@
 # Word Cloud Feature — Implementation Documentation
 
+> **Note (2026-10):** the keyword indices, keyword search and term ranking have moved out of
+> `app/features/wordcloud_interactive.py` into `app/un_data_stream/analysis/keywords.py` and
+> `word_cloud.py`, shared with the HTTP API. `_init_wc_data()` is gone: the index is built per data
+> snapshot by `keywords.keyword_index(snapshot)`. The keyword data now comes from the
+> `resolution_keyword_cloud` table in Postgres, not the CSV assets described below. The feature
+> module keeps only the layout and colouring.
+
 ## Overview
 
 The word cloud visualises the most frequent keywords found in UN General Assembly resolutions, filtered by the active user selections (country, year range, subject, keyword search). It supports five distinct **keyword panels** (modes), each derived from a different extraction pipeline. Users can hover over a word to preview matching resolutions, and click a word to push it into the keyword-search filter and switch to the Resolutions tab.
