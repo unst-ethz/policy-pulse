@@ -1,0 +1,121 @@
+/*
+ * Design tokens. Components use roles, never raw hex.
+ *
+ * Vote colours follow the data's own scale (Yes = +1, Abstain = 0, No = −1): a diverging
+ * blue ↔ red pair with a neutral grey between them. The same poles colour every agreement scale
+ * (1 = always voted alike, 0 = always Yes-vs-No), so blue reads as "with" and red as "against"
+ * across the whole app. Validated with the data-viz palette checker (CVD + contrast) in both modes.
+ *
+ * The one accent is the gold of the General Assembly Hall wall, used for selection and focus only.
+ */
+:root {
+  color-scheme: light;
+
+  --page: #f2f4f7;
+  --surface: #ffffff;
+  --surface-sunk: #f7f8fa;
+  --ink: #172033;
+  --ink-2: #485165;
+  --muted: #646d7e;
+  --rule: #dde1e8;
+  --rule-strong: #c3c9d3;
+
+  --accent: #8a650c;
+  --accent-wash: #f5ecd6;
+  --focus: #b8860b;
+
+  --yes: #2a78d6;
+  --no: #e34948;
+  --abstain: #8f8d86;
+  --absent: #c3c2b7;
+  --scale-mid: #f0efec;
+  /* Deeper steps of the vote hues for fills that carry white text (all >= 6:1). */
+  --yes-cell: #1c5cab;
+  --no-cell: #b8302f;
+  --abstain-cell: #5f5e59;
+
+  --danger-ink: #a12626;
+
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-condensed: 'IBM Plex Sans Condensed', 'IBM Plex Sans', system-ui, sans-serif;
+
+  /* Type scale: 1.2 steps from a 15px body. */
+  --text-xs: 0.8125rem; /* 13 */
+  --text-sm: 0.875rem; /* 14 */
+  --text-md: 0.9375rem; /* 15 */
+  --text-lg: 1.125rem; /* 18 */
+  --text-xl: 1.375rem; /* 22 */
+  --text-2xl: 1.75rem; /* 28 */
+  --text-3xl: 2.25rem; /* 36 */
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 72px;
+
+  --radius-s: 3px;
+  --radius-m: 6px;
+
+  --content-width: 1240px;
+  --gutter: 24px;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --gutter: 16px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --page: #11151c;
+    --surface: #191e27;
+    --surface-sunk: #151a22;
+    --ink: #e8ebf0;
+    --ink-2: #b9c0cc;
+    --muted: #8d95a3;
+    --rule: #2a313c;
+    --rule-strong: #3a4250;
+    --accent: #d9ab45;
+    --accent-wash: #2d2717;
+    --focus: #e0b450;
+    --yes: #3987e5;
+    --no: #e66767;
+    --abstain: #b9b8b0;
+    --absent: #4a4a46;
+    --scale-mid: #383835;
+    --yes-cell: #2f6fc2;
+    --no-cell: #c43c3b;
+    --abstain-cell: #6b6a64;
+    --danger-ink: #f08a8a;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --page: #11151c;
+  --surface: #191e27;
+  --surface-sunk: #151a22;
+  --ink: #e8ebf0;
+  --ink-2: #b9c0cc;
+  --muted: #8d95a3;
+  --rule: #2a313c;
+  --rule-strong: #3a4250;
+  --accent: #d9ab45;
+  --accent-wash: #2d2717;
+  --focus: #e0b450;
+  --yes: #3987e5;
+  --no: #e66767;
+  --abstain: #b9b8b0;
+  --absent: #4a4a46;
+  --scale-mid: #383835;
+  --yes-cell: #2f6fc2;
+  --no-cell: #c43c3b;
+  --abstain-cell: #6b6a64;
+  --danger-ink: #f08a8a;
+}

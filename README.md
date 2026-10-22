@@ -18,6 +18,9 @@ uv run start-api         # HTTP API: http://127.0.0.1:8000/api/docs
 uv run pytest            # tests (integration tests skip themselves without the database)
 ```
 
+The Vue 3 prototype that will replace the Dash site lives in `web/` (see [web/README.md](web/README.md)):
+with the API running, `cd web && npm install && npm run dev` serves it on http://localhost:5173.
+
 We are moving from the Dash prototype to a Vue 3 frontend on top of an HTTP API; the plan and its
 status are in [plans/frontend_maturation_plan.md](plans/frontend_maturation_plan.md).
 
@@ -30,6 +33,7 @@ app/un_data_stream/analysis/   every analysis, framework-free: filtering, keywor
 app/data.py                    the loaded data plus country names, membership periods, trees
 app/api/                       FastAPI: routes, query parameters, response schemas
 app/features/, app/pages/      the Dash UI (to be retired once the Vue frontend reaches parity)
+web/                           the Vue 3 frontend (prototype), on top of app/api
 ```
 
 New analyses go into `app/un_data_stream/analysis/` as plain functions with unit tests on the

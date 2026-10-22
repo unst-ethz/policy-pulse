@@ -1,6 +1,6 @@
 # From Dash prototype to a mature prototype (Vue 3 frontend)
 
-Status: Phase 1 done (branch `feature/api-phase1`, 2026-10-22); Phase 2 next.
+Status: Phase 1 done; a Vue prototype covering phases 2–3 is in `web/` (branch `feature/api-phase1`, 2026-10-22). Dash is still in place.
 
 ## 1. Where we are
 
@@ -198,3 +198,33 @@ Phase 1 deliberately preserved behaviour, so these are reproduced by both Dash a
 - CI workflow: ruff + pytest (unit always, integration against the snapshot image), and lint /
   type-check / test for `web/`.
 - Decide items 1–5 above with the team before porting the affected views.
+
+## 7. Vue prototype (2026-10-22)
+
+A working prototype in `web/` (see `web/README.md`), so the partners can react to something real
+before the remaining phase 2 infrastructure is built.
+
+Built:
+- Vite + Vue 3 + TypeScript, Vue Router, TanStack Query, typed client generated from the API's
+  OpenAPI schema (`npm run gen:api`), Reka UI (headless) for pickers, ECharts + d3-geo (Equal
+  Earth) for the map, timeline and scatter, d3-cloud for the word cloud.
+- Pages: home (latest recorded vote as a vote board), resolutions (filters, sort, pagination,
+  votes of chosen countries, CSV), resolution detail (vote map + board, subjects, keywords),
+  countries index, country hub (overview, who votes alike map + rankings, agreement over time,
+  by topic, notable votes), topics (word cloud), alignment (scatter), about the data.
+- All state in the URL; one filter row per page showing only the filters that apply.
+- Light and dark mode; right-to-left layout for Arabic; UI strings in English and French, data
+  names in all six UN languages. Every chart has a table view.
+- Checks: `vue-tsc` type check, Vitest unit tests, an i18n key checker. Each page was rendered
+  headless at desktop and phone width, in dark mode and in Arabic, with no console errors.
+
+Presentation choices that differ from Dash (not data fixes; the API is unchanged):
+- The board, map and tally count "did not vote" only for states that were UN members on the
+  adoption date (vote columns exist for the Soviet Union etc. on every resolution).
+- The country agreement map is centred on that country's average agreement by default, so blue
+  means "more like it than most" — on a fixed 0–1 scale nearly every country is the same blue.
+- The vote chips stay empty on resolutions adopted without a recorded vote.
+
+Not done yet: CI for `web/`, Playwright end-to-end tests, a production container for `web/`
+(nginx serving `dist/`, proxying `/api`), Arabic/Chinese/Russian/Spanish UI strings, a compare
+page for more than one country at a time, and the five behaviour decisions listed in section 6.

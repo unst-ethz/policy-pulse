@@ -1,0 +1,107 @@
+/**
+ * The resolution filter, kept in the URL so every view is shareable and the back button works.
+ *
+ * URL keys are short and human-readable (`from=1990&to=2020&subject=…&country=CHE&mode=voted&q=…`);
+ * `toApiParams` turns them into the API's filter parameters.
+ */
+import { computed } from 'vue'
+import { type LocationQuery, useRoute, useRouter } from 'vue-router'
+
+export type CountryMode = 'voted' | 'member' | 'none'
+
+export interface Filters {
+  from: number | null
+  to: number | null
+  subjects: string[]
+  country: string | null
+  mode: CountryMode
+  keyword: string
+}
+
+const MODES: CountryMode[] = ['voted', 'member', 'none']
+
+function one(value: LocationQuery[string] | undefined): string | null {
+  const v = Array.isArray(value) ? value[0] : value
+  return v ?? null
+}
+
+function year(value: LocationQuery[string] | undefined): number | null {
+  const v = Number(one(value))
+  return Number.isInteger(v) && v > 1900 && v < 2100 ? v : null
+}
+
+export function parseFilters(query: LocationQuery): Filters {
+  const subjects = query.subject
+  const mode = one(query.mode) as CountryMode | null
+  return {
+    from: year(query.from),
+    to: year(query.to),
+    subjects: (Array.isArray(subjects) ? subjects : subjects ? [subjects] : []).filter(
+      (s): s is string => !!s,
+    ),
+    country: one(query.country)?.toUpperCase() ?? null,
+    mode: mode && MODES.includes(mode) ? mode : 'none',
+    keyword: one(query.q) ?? '',
+  }
+}
+
+export function serializeFilters(filters: Filters): Record<string, string | string[]> {
+  const query: Record<string, string | string[]> = {}
+  if (filters.from) query.from = String(filters.from)
+  if (filters.to) query.to = String(filters.to)
+  if (filters.subjects.length) query.subject = filters.subjects
+  if (filters.country) query.country = filters.country
+  if (filters.country && filters.mode !== 'none') query.mode = filters.mode
+  if (filters.keyword.trim()) query.q = filters.keyword.trim()
+  return query
+}
+
+/** The API's shared filter parameters for `filters`. */
+export function toApiParams(filters: Filters) {
+  return {
+    start_date: filters.from ? `${filters.from}-01-01` : undefined,
+    end_date: filters.to ? `${filters.to}-12-31` : undefined,
+    subject: filters.subjects.length ? filters.subjects : undefined,
+    country: filters.country ?? undefined,
+    country_mode: filters.country ? filters.mode : undefined,
+    keyword: filters.keyword.trim() || undefined,
+  }
+}
+
+export function countActive(filters: Filters): number {
+  return (
+    (filters.from || filters.to ? 1 : 0) +
+    (filters.subjects.length ? 1 : 0) +
+    (filters.country && filters.mode !== 'none' ? 1 : 0) +
+    (filters.keyword.trim() ? 1 : 0)
+  )
+}
+
+export function useFilters() {
+  const route = useRoute()
+  const router = useRouter()
+
+  const filters = computed(() => parseFilters(route.query))
+
+  /** Merge a change into the URL. Other query keys (page, sort, view options) are kept. */
+  function update(patch: Partial<Filters>, extra: Record<string, string | undefined> = {}) {
+    const next = { ...filters.value, ...patch }
+    const kept = Object.fromEntries(
+      Object.entries(route.query).filter(
+        ([key]) => !['from', 'to', 'subject', 'country', 'mode', 'q', 'page'].includes(key),
+      ),
+    )
+    const query: Record<string, unknown> = { ...kept, ...serializeFilters(next) }
+    for (const [key, value] of Object.entries(extra)) {
+      if (value === undefined) delete query[key]
+      else query[key] = value
+    }
+    router.replace({ query: query as LocationQuery })
+  }
+
+  function clear() {
+    update({ from: null, to: null, subjects: [], country: null, mode: 'none', keyword: '' })
+  }
+
+  return { filters, update, clear }
+}
