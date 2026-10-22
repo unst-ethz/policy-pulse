@@ -1,0 +1,232 @@
+"""Response models. They define the OpenAPI schema the frontend's TypeScript client is built from.
+
+Conventions: ISO3 codes for countries, `undl_id` (a string) for resolutions, scores in [0, 1],
+`null` wherever a value is undefined (no shared vote, no recorded vote, no data) — never NaN.
+"""
+
+import datetime as dt
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+Vote = Literal["Y", "N", "A", "X"]
+
+
+class Meta(BaseModel):
+    data_version: str = Field(description="Changes whenever the served data changes")
+    last_ingestion: dt.datetime | None = Field(description="Last successful ingestion run")
+    earliest_date: dt.date | None
+    latest_date: dt.date | None
+    resolution_count: int
+    country_count: int
+    languages: list[str]
+
+
+class Period(BaseModel):
+    start: dt.date
+    end: dt.date | None = Field(description="null while ongoing")
+
+
+class Country(BaseModel):
+    iso3: str
+    name: str
+    display_name: str = Field(description="Name with historical names, for pickers")
+    historical_names: list[str]
+    search_terms: str = Field(description="Everything a search box should match on")
+    region: str
+    subregion: str | None
+    former_state: bool = Field(description="The code no longer exists (e.g. SUN, YUG)")
+    membership: list[Period]
+    first_vote: dt.date | None
+    last_vote: dt.date | None
+    participation: tuple[int, int] | None = Field(
+        description="First and last year of membership or voting, within the data's range"
+    )
+
+
+class TreeNode(BaseModel):
+    id: str
+    label: str
+    children: list["TreeNode"] = []
+
+
+class VoteTotals(BaseModel):
+    Y: int
+    N: int
+    A: int
+    X: int
+
+
+class DatasetStats(BaseModel):
+    total_resolutions: int
+    year_min: int | None
+    year_max: int | None
+    countries: int
+    subjects: int
+    subject_links: int
+    resolutions_with_subjects: int
+    votes: VoteTotals
+
+
+class Resolution(BaseModel):
+    undl_id: str
+    symbol: str | None
+    session: str | None
+    date: dt.date | None
+    title: str | None
+    consensus_score: float | None = Field(description="null unless adopted by recorded vote")
+    yes: int | None
+    no: int | None
+    abstentions: int | None
+    modality: str | None
+    undl_link: str | None
+    votes: dict[str, Vote] = Field(default={}, description="Votes of the requested countries")
+    category: str | None = None
+
+
+class ResolutionPage(BaseModel):
+    total: int
+    recorded_votes: int = Field(description="How many of `total` were adopted by recorded vote")
+    offset: int
+    limit: int
+    items: list[Resolution]
+
+
+class Subject(BaseModel):
+    id: str
+    label: str
+
+
+class ResolutionDetail(Resolution):
+    agenda_title: str | None
+    draft: str | None
+    non_voting: int | None
+    subjects: list[Subject]
+    keywords: dict[str, list[str]] = Field(description="Keyword terms per dimension")
+    all_votes: dict[str, Vote] = Field(description="Every country's vote (X = did not vote)")
+
+
+class ConsensusScale(BaseModel):
+    """Colour-scale anchors: 1st/99th percentile (or fixed bounds) and the mean consensus."""
+
+    lo: float
+    avg: float
+    hi: float
+
+
+class CountryScore(BaseModel):
+    country: str
+    score: float | None
+
+
+class AgreementMap(BaseModel):
+    country: str
+    resolution_count: int
+    scores: list[CountryScore]
+    consensus: ConsensusScale | None
+
+
+class SessionValue(BaseModel):
+    agreement: float | None
+    shared_votes: int
+
+
+class TimelineSession(BaseModel):
+    session: str
+    year: int
+    values: dict[str, SessionValue]
+
+
+class AgreementTimeline(BaseModel):
+    country: str
+    compare: list[str]
+    min_votes: int
+    sessions: list[TimelineSession]
+
+
+class SubjectAgreement(BaseModel):
+    subject_id: str
+    label: str
+    agreement: float
+    shared_votes: int
+
+
+class AgreementBySubject(BaseModel):
+    country: str
+    compare: str
+    min_votes: int
+    subjects: list[SubjectAgreement]
+
+
+class MultilateralCountry(BaseModel):
+    country: str
+    name: str
+    region: str
+    alignment: float
+    yes_rate: float | None
+    no_rate: float | None
+    abstention_rate: float | None
+    votes_cast: int
+
+
+class Multilateral(BaseModel):
+    resolution_count: int
+    min_votes: int
+    mean_alignment: float | None
+    countries: list[MultilateralCountry]
+
+
+class CloudTerm(BaseModel):
+    term: str
+    count: int = Field(description="Resolutions a click on the term returns")
+    frequency: int = Field(description="Resolutions in the selection carrying the term")
+    mean_consensus: float | None
+    subject_ids: list[str] = Field(default=[], description="`category` mode: subjects to filter")
+
+
+class WordCloud(BaseModel):
+    mode: str
+    resolution_count: int
+    terms: list[CloudTerm]
+    consensus: ConsensusScale | None
+
+
+class RankedCountry(BaseModel):
+    country: str
+    agreement: float
+
+
+class YearlyAlignment(BaseModel):
+    year: int
+    values: dict[str, float | None]
+
+
+class NotableVote(BaseModel):
+    undl_id: str
+    symbol: str | None
+    date: dt.date | None
+    title: str | None
+    vote: Vote
+    consensus_score: float
+    undl_link: str | None
+
+
+class CountryProfile(BaseModel):
+    country: str
+    name: str
+    subregion: str | None
+    start_date: dt.date | None
+    end_date: dt.date | None
+    total_resolutions: int
+    votes: dict[str, int] = Field(description='"Y", "N", "A" and "absent"')
+    multilateral_alignment: float | None
+    multilateral_rank: int | None
+    multilateral_ranked: int
+    min_joint_votes: int
+    most_aligned: list[RankedCountry]
+    least_aligned: list[RankedCountry]
+    comparison: list[str]
+    comparison_is_default: bool
+    yearly_alignment: list[YearlyAlignment]
+    opposed_high_consensus: list[NotableVote]
+    supported_low_consensus: list[NotableVote]

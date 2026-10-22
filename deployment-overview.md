@@ -87,6 +87,24 @@ up in a published layer (`.dockerignore` excludes it as well).
 
 ---
 
+## The HTTP API
+
+The same image also runs the API (`app/api/`), which the upcoming Vue frontend will use. It is
+not deployed on the VM yet. Running it means overriding the command:
+
+```bash
+docker run --rm -p 8000:8000 --env-file .env policy-pulse \
+  gunicorn --bind 0.0.0.0:8000 --workers 2 --timeout 120 --preload \
+  -k uvicorn_worker.UvicornWorker app.api.main:app
+```
+
+Same model as the Dash app: `--preload` loads the data once and the workers share it
+copy-on-write, and each worker starts its own reload poller after the fork (in the FastAPI
+lifespan). `GET /api/health` is the liveness probe. Set `POLICY_PULSE_CORS_ORIGINS` to the
+frontend's origin(s).
+
+---
+
 ## Code Requirement
 
 Your Dash app must expose the server object for Gunicorn:

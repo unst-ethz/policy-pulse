@@ -6,15 +6,49 @@ Website: http://unst-dev.vsos.ethz.ch/
 
 ## Development
 
-- `app/` is the website (Dash), `notebooks/` is data exploration, `tests/` covers the data layer
+- `app/` is the website (Dash) and the HTTP API (`app/api/`), `notebooks/` is data exploration,
+  `tests/` covers the data layer, the analyses and the API
 - Dependencies are managed with [uv](https://docs.astral.sh/uv/): `uv sync`
 
 ```bash
 uv sync                  # install dependencies
 uv run init-env          # start a local database with a copy of the production data (see below)
-uv run start-app         # http://127.0.0.1:8050
-uv run pytest            # tests
+uv run start-app         # Dash website: http://127.0.0.1:8050
+uv run start-api         # HTTP API: http://127.0.0.1:8000/api/docs
+uv run pytest            # tests (integration tests skip themselves without the database)
 ```
+
+We are moving from the Dash prototype to a Vue 3 frontend on top of an HTTP API; the plan and its
+status are in [plans/frontend_maturation_plan.md](plans/frontend_maturation_plan.md).
+
+## Code layout
+
+```
+app/un_data_stream/data/       loading from Postgres, the precomputed vote arrays, periodic reload
+app/un_data_stream/analysis/   every analysis, framework-free: filtering, keywords, agreement,
+                               word cloud, country profile, overview — used by Dash *and* the API
+app/data.py                    the loaded data plus country names, membership periods, trees
+app/api/                       FastAPI: routes, query parameters, response schemas
+app/features/, app/pages/      the Dash UI (to be retired once the Vue frontend reaches parity)
+```
+
+New analyses go into `app/un_data_stream/analysis/` as plain functions with unit tests on the
+synthetic data in `tests/unit/conftest.py`; the API and the UI then only present them.
+
+## HTTP API
+
+`uv run start-api` serves the API on port 8000 (`POLICY_PULSE_API_PORT` to change it). The
+interactive documentation at `/api/docs` lists every endpoint with its parameters, and
+`/api/openapi.json` is the schema the frontend's TypeScript client is generated from.
+
+- Endpoints live under `/api/v1`. List and analysis endpoints share one set of filter parameters
+  (`start_date`, `end_date`, `subject`, `country`, `country_mode`, `keyword`); `lang` picks the
+  language of country and subject names (en, fr, es, ar, zh, ru).
+- Responses carry an `ETag` and an `X-Data-Version` header; repeat requests with `If-None-Match`
+  get a `304` until the data is reloaded.
+- Browsers may call it from the origins in `POLICY_PULSE_CORS_ORIGINS` (comma-separated; defaults
+  to the Vite dev server, `http://localhost:5173`).
+- Startup loads the data like the Dash app does (about 25 s), so `--reload` restarts are slow.
 
 ## Local database
 

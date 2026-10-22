@@ -271,6 +271,12 @@ def get_country_search_terms(iso3_code: str, lang: str = "en") -> str:
     return " ".join(t for t in terms if t)
 
 
+def get_historical_names(iso3_code: str) -> list[str]:
+    """Names of predecessor entities that held this code's seat, e.g. ['Burma'] for MMR."""
+    rec = _NAME_INDEX.get(iso3_code)
+    return list(rec["display_aliases"]) if rec else []
+
+
 def _build_voting_activity(voting_activity_df: pd.DataFrame) -> dict[str, Period]:
     """`{iso: (first_vote, last_vote)}` for every code that has ever cast a vote."""
     return dict(
