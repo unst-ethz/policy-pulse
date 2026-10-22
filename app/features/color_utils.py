@@ -3,6 +3,8 @@
 import pandas as pd
 import plotly.colors as pc
 
+from ..un_data_stream.analysis.agreement import consensus_scale as _compute_scale_params
+
 
 def make_adaptive_colorscale_plotly(
     scores: pd.Series,
@@ -27,32 +29,6 @@ def make_adaptive_colorscale_plotly(
     colors = pc.sample_colorscale(base_colorscale, n)
     colorscale = [(_remap_t(i / (n - 1), midpoint_frac), color) for i, color in enumerate(colors)]
     return colorscale, lo, avg, hi
-
-
-def _compute_scale_params(
-    scores: pd.Series, lo: float = None, hi: float = None
-) -> tuple[float, float, float, float]:
-    """Compute colour-scale parameters from a consensus-score series.
-
-    lo/hi default to the 1st/99th percentile (clamped to [0, 1]); pass explicit
-    values to fix the range. avg is always the data mean; midpoint_frac is avg's
-    position within [lo, hi].
-    """
-    clean = scores.dropna()
-    if clean.empty:
-        # No scored resolutions in this slice. Resolutions adopted without a vote or by a
-        # non-recorded vote carry no consensus score at all (~72% of the table), so a narrow
-        # enough date range selects nothing scorable. Callers are expected to skip the adaptive
-        # path entirely in that case; returning a neutral finite scale here keeps a missed guard
-        # from feeding NaN into plotly's tickvals/range_color.
-        lo = 0.0 if lo is None else lo
-        hi = 1.0 if hi is None else hi
-        return lo, (lo + hi) / 2.0, hi, 0.5
-    lo = float(max(clean.quantile(0.01), 0.0)) if lo is None else lo
-    hi = float(min(clean.quantile(0.99), 1.0)) if hi is None else hi
-    avg = float(clean.mean())
-    midpoint_frac = (avg - lo) / (hi - lo) if hi > lo else 0.5
-    return lo, avg, hi, midpoint_frac
 
 
 def _remap_t(t: float, midpoint_frac: float) -> float:

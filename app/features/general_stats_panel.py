@@ -1,18 +1,9 @@
 import functools
 
-import pandas as pd
 from dash import Input, Output, callback, html
 
 from .. import data
-
-
-def _safe_count(value):
-    if pd.isna(value):
-        return 0
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return 0
+from ..un_data_stream.analysis import overview
 
 
 def _safe_pct(part, whole):
@@ -53,41 +44,19 @@ def _stats_card(icon, title, value, subtitle, subtitle_style=None):
 
 
 def _build_stats_component():
-    df = data.query_engine.query_resolutions().copy()
-    if df.empty:
+    stats = overview.dataset_stats(data.query_engine)
+    if stats is None:
         return html.Div("No data available.", style={"color": "#666"})
 
-    df["date"] = pd.to_datetime(df.get("date"), errors="coerce")
-    valid_dates = df["date"].dropna()
-
-    total_resolutions = len(df)
-    year_min = int(valid_dates.dt.year.min()) if not valid_dates.empty else None
-    year_max = int(valid_dates.dt.year.max()) if not valid_dates.empty else None
+    total_resolutions = stats.total_resolutions
+    year_min, year_max = stats.year_min, stats.year_max
     year_span = (year_max - year_min + 1) if year_min and year_max else 0
+    num_countries = stats.countries
+    total_subject_links = stats.subject_links
+    unique_subjects = stats.subjects
 
-    num_countries = len(getattr(data.query_engine, "country_columns", []) or [])
-    total_subject_links = len(
-        getattr(data.query_engine, "resolution_subject_table", pd.DataFrame())
-    )
-    unique_subjects = (
-        getattr(data.query_engine, "resolution_subject_table", pd.DataFrame())
-        .get("subject_id", pd.Series(dtype="object"))
-        .nunique()
-    )
-    y_total = _safe_count(df["total_yes"].fillna(0).sum()) if "total_yes" in df.columns else 0
-    n_total = _safe_count(df["total_no"].fillna(0).sum()) if "total_no" in df.columns else 0
-    a_total = (
-        _safe_count(df["total_abstentions"].fillna(0).sum())
-        if "total_abstentions" in df.columns
-        else 0
-    )
-    x_total = (
-        _safe_count(df["total_non_voting"].fillna(0).sum())
-        if "total_non_voting" in df.columns
-        else 0
-    )
+    y_total, n_total, a_total, x_total = (stats.votes[k] for k in ("Y", "N", "A", "X"))
     vote_total = max(1, y_total + n_total + a_total + x_total)
-
     y_pct = _safe_pct(y_total, vote_total)
     n_pct = _safe_pct(n_total, vote_total)
     a_pct = _safe_pct(a_total, vote_total)

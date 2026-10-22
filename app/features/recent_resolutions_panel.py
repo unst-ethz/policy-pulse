@@ -6,6 +6,7 @@ from dash import Input, Output, callback, html
 from app.features.resolution_list import create_vote_summary
 
 from .. import data
+from ..un_data_stream.analysis import overview
 
 INITIAL_VISIBLE = 3
 STEP_VISIBLE = 5
@@ -26,35 +27,6 @@ def _extract_category_tag(row):
     if pd.isna(raw_category) or raw_category is None or str(raw_category).strip() == "":
         return "No Category"
     return str(raw_category).strip() or "No Category"
-
-
-def _build_category_tag_map():
-    resolution_subject_df = data.query_engine.resolution_subject_table
-    subject_df = data.query_engine.subject_table
-
-    if resolution_subject_df.empty or subject_df.empty:
-        return {}
-
-    label_col = "label_en" if "label_en" in subject_df.columns else None
-    if label_col is None:
-        return {}
-
-    subject_labels = (
-        subject_df[["subject_id", label_col]].dropna(subset=["subject_id", label_col]).copy()
-    )
-    merged = resolution_subject_df.merge(subject_labels, on="subject_id", how="left")
-    merged = merged.dropna(subset=[label_col])
-    if merged.empty:
-        return {}
-
-    merged["undl_id"] = merged["undl_id"].astype(str)
-    merged[label_col] = merged[label_col].astype(str).str.strip()
-    merged = merged[merged[label_col] != ""]
-    if merged.empty:
-        return {}
-
-    first_labels = merged.groupby("undl_id", as_index=False)[label_col].first()
-    return dict(zip(first_labels["undl_id"], first_labels[label_col]))
 
 
 def _build_resolution_card(row):
@@ -148,20 +120,7 @@ def _build_resolution_card(row):
 
 
 def _query_sorted_resolutions():
-    df = data.query_engine.query_resolutions()
-    if df.empty:
-        return df
-
-    category_map = _build_category_tag_map()
-    if "undl_id" in df.columns:
-        df["category_tag"] = df["undl_id"].astype(str).map(category_map).fillna("No Category")
-    else:
-        df["category_tag"] = "No Category"
-
-    if "date" in df.columns:
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        df = df.sort_values(by=["date"], ascending=False, na_position="last")
-    return df
+    return overview.recent_resolutions(data.query_engine)
 
 
 @functools.lru_cache(maxsize=1)

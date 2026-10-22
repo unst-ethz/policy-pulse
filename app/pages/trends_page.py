@@ -3,8 +3,6 @@ import time
 from typing import List
 from urllib.parse import urlencode
 
-import numpy as np
-import pandas as pd
 from dash import (
     Input,
     Output,
@@ -28,6 +26,7 @@ from ..features import (
     resolution_list,
     wordcloud_interactive,
 )
+from ..un_data_stream.analysis import agreement, filtering
 
 # Tab IDs — defined once here so layout values and callback comparisons stay in sync
 _TAB_RESOLUTION_LIST = "resolution_list"
@@ -583,9 +582,6 @@ def download_resolutions_csv(n_clicks, filter_store):
     if not filter_store:
         return None
 
-    start_date = filter_store.get("start_date")
-    end_date = filter_store.get("end_date")
-    subject_ids = filter_store.get("subject_ids")
     country1 = filter_store.get("country1_alpha3")
     country2_raw = filter_store.get("country2")
 
@@ -595,46 +591,12 @@ def download_resolutions_csv(n_clicks, filter_store):
     elif isinstance(country2_raw, str) and country2_raw:
         comparison = [country2_raw]
 
-    df = data.query_engine.query_resolutions(
-        start_date=start_date,
-        end_date=end_date,
-        subject_ids=subject_ids,
-        include_descendants=True,
+    result = filtering.export_frame(
+        data.query_engine,
+        filtering.ResolutionFilter.from_filter_store(filter_store),
+        vote_countries=[country1, *comparison],
+        country_name=data.get_country_name,
     )
-
-    # Apply keyword filter: OR logic across comma-separated phrases
-    keyword = filter_store.get("keyword")
-    if keyword and keyword.strip() and not df.empty:
-        matched_ids = wordcloud_interactive.get_keyword_matched_ids(df, keyword)
-        df = df[df["undl_id"].isin(matched_ids)]
-
-    base_cols = [
-        "undl_id",
-        "resolution",
-        "date",
-        "session",
-        "title",
-        "agenda_title",
-        "subjects",
-        "draft",
-    ]
-    if "undl_link" in df.columns:
-        base_cols.append("undl_link")
-
-    vote_cols = []
-    if country1 and country1 in df.columns:
-        vote_cols.append(country1)
-    for c in comparison:
-        if c in df.columns and c not in vote_cols:
-            vote_cols.append(c)
-
-    cols = [c for c in base_cols + vote_cols if c in df.columns]
-    result = df[cols].copy() if not df.empty else pd.DataFrame(columns=cols)
-
-    # Rename vote columns to readable country names
-    rename_map = {c: data.get_country_name(c) for c in vote_cols}
-    result = result.rename(columns=rename_map)
-
     return dcc.send_data_frame(result.to_csv, "resolutions.csv", index=False)
 
 
@@ -766,35 +728,13 @@ def _calculate_data_uncached(country1: str | None, selected_tuple: tuple):
     if country1 is None:
         return (None, None, None)
 
-    selected = list(selected_tuple)
-    selected = [c for c in selected if c != country1]
-    if len(selected) == 0:
+    if not [c for c in selected_tuple if c != country1]:
         return (None, None, None)
 
-    print(f"🔄 Calculating session agreement: {country1} vs {selected}")
     start_time = time.time()
-
     try:
-        vote_mapping = {"Y": 1, "A": 0, "N": -1}
-
-        cols = ["date", "session", country1] + selected
-        df = data.query_engine.query_resolutions()[cols].copy()
-
-        # normalize and map votes to numeric
-        vote_cols = [country1] + selected
-        df[vote_cols] = df[vote_cols].astype(str).apply(lambda s: s.str.strip().str.upper())
-        df[vote_cols] = df[vote_cols].replace(
-            {"": pd.NA, "NAN": pd.NA, "NONE": pd.NA, "<NA>": pd.NA}
-        )
-        df[vote_cols] = df[vote_cols].replace(vote_mapping)
-        df[vote_cols] = df[vote_cols].apply(pd.to_numeric, errors="coerce")
-
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        df = df.sort_values("date").reset_index(drop=True)
-
-        # check that at least one overlapping vote exists
-        mask_any = (~df[country1].isna()) & df[selected].notna().any(axis=1)
-        if not mask_any.any():
+        out = agreement.session_agreement(data.query_engine, country1, selected_tuple)
+        if out is None:
             return (
                 html.Div(
                     style={
@@ -814,62 +754,7 @@ def _calculate_data_uncached(country1: str | None, selected_tuple: tuple):
                 None,
                 None,
             )
-
-        # compute per-resolution agreement (vectorized)
-        diffs = df[selected].subtract(df[country1], axis=0).abs()
-        agreement = 1.0 - (diffs / 2.0)
-
-        for col in selected:
-            both_voted = df[[country1, col]].notna().all(axis=1)
-            agreement[col] = agreement[col].where(both_voted, np.nan)
-
-        # build temporary df for session-level groupby
-        tmp = pd.DataFrame({"session": df["session"], "date": df["date"]})
-        for col in selected:
-            tmp[f"agreement_{col}"] = agreement[col]
-
-        # derive year per session (median date's year)
-        session_year = tmp.groupby("session")["date"].median().dt.year
-        session_year.name = "year"
-
-        # aggregate per session per country
-        out_parts = [session_year]
-        for col in selected:
-            agree_col = f"agreement_{col}"
-            avg_col = f"avg_agreement_{col}"
-            n_col = f"n_votes_{col}"
-
-            grouped = tmp.groupby("session")[agree_col]
-            avg_agreement = grouped.mean()
-            avg_agreement.name = avg_col
-            n_votes = grouped.apply(lambda x: x.notna().sum())
-            n_votes.name = n_col
-
-            # minimum 3 votes threshold
-            avg_agreement = avg_agreement.where(n_votes >= 3, np.nan)
-
-            out_parts.extend([avg_agreement, n_votes])
-
-        out = pd.concat(out_parts, axis=1).reset_index()
-        out = out.sort_values(["year", "session"]).reset_index(drop=True)
-
-        # last-vote cutoff: find last session each country voted in
-        for col in selected:
-            avg_col = f"avg_agreement_{col}"
-            n_col = f"n_votes_{col}"
-            has_votes = out[avg_col].notna()
-            if has_votes.any():
-                last_idx = has_votes.values[::-1].argmax()
-                last_session_pos = len(has_votes) - 1 - last_idx
-                out.loc[out.index[last_session_pos + 1 :], avg_col] = np.nan
-                print(
-                    f"  📅 {col}: last active session = {out.loc[out.index[last_session_pos], 'session']}"
-                )
-
-        calc_time = time.time() - start_time
-        print(f"✅ Calculated in {calc_time:.2f}s ({len(out)} sessions)")
-
-        return (None, out.to_json(), calc_time)
+        return (None, out.to_json(), time.time() - start_time)
 
     except Exception as e:
         print(f"❌ Calculation error: {e}")

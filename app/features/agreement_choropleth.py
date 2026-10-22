@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 from dash import Input, Output, callback, dcc, html
 
 from .. import data
+from ..un_data_stream.analysis import agreement
 from . import filtered_resolutions
 from .color_utils import make_adaptive_colorscale_plotly
 from .country_utils import get_country_longitude
@@ -39,16 +40,11 @@ def register_callbacks(query_engine):
             status_msg = html.Div([html.Div([html.Strong("Please select a primary country")])])
             return go.Figure(), status_msg, ""
 
-        agreement_data = query_engine.query_agreement_between_countries(
-            country1,
-            resolution_ids=all_resolutions["undl_id"].tolist(),
-            average=True,
+        agreement_data = (
+            agreement.agreement_map(query_engine, country1, all_resolutions["undl_id"].tolist())
+            .rename_axis("three_letter_country")
+            .reset_index(name="agreement_score")
         )
-
-        # Clean the returned agreement data
-        agreement_data.drop(columns=["source_country", "resolution_count"], inplace=True)
-        agreement_data = agreement_data.T.reset_index()
-        agreement_data.columns = ["three_letter_country", "agreement_score"]
         agreement_data["Country"] = agreement_data["three_letter_country"].apply(
             data.get_country_display_name
         )

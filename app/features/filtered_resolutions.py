@@ -17,6 +17,7 @@ Kept in its own module so the tabs and `filters.py` can share it without an impo
 import pandas as pd
 
 from .. import data
+from ..un_data_stream.analysis import filtering
 
 # The country participation filter is meaningless where country1 is disabled or highlight-only.
 TABS_WITHOUT_COUNTRY_FILTER = {"wordcloud"}
@@ -28,19 +29,7 @@ TABS_WITH_KEYWORD = {"resolution_list", "wordcloud"}
 # columns would silently switch on per-country display paths that have been dormant. Those
 # branches predate this module — see the commented-out `vote_cols` block in filters.py — and
 # turning them on is a feature decision, not part of removing the store.
-COLUMNS = [
-    "undl_id",
-    "resolution",
-    "session",
-    "date",
-    "title",
-    "consensus_score",
-    "total_yes",
-    "total_no",
-    "total_abstentions",
-    "modality",
-    "undl_link",
-]
+COLUMNS = filtering.COLUMNS
 
 
 def resolutions_for(filter_data: dict | None, active_tab: str | None = None) -> pd.DataFrame:
@@ -50,41 +39,16 @@ def resolutions_for(filter_data: dict | None, active_tab: str | None = None) -> 
     does not apply on tabs where country1 is highlight-only, and keyword search only applies to
     the tabs that list resolutions. Passing the *active* tab (rather than the calling tab's own
     id) keeps every tab showing the same set, which is what the shared store did.
+
+    The filtering itself is `un_data_stream.analysis.filtering`, shared with the API.
     """
     if not filter_data:
         return pd.DataFrame(columns=COLUMNS)
 
-    df = data.query_engine.query_resolutions(
-        start_date=filter_data.get("start_date"),
-        end_date=filter_data.get("end_date"),
-        subject_ids=filter_data.get("subject_ids"),
-        include_descendants=True,
+    return filtering.filter_resolutions(
+        data.query_engine,
+        filtering.ResolutionFilter.from_filter_store(filter_data),
+        membership_mask=data.membership_mask,
+        apply_country=active_tab not in TABS_WITHOUT_COUNTRY_FILTER,
+        apply_keyword=active_tab in TABS_WITH_KEYWORD,
     )
-
-    country = filter_data.get("country1_alpha3")
-    mode = filter_data.get("country_filter_mode") or "none"  # 'none' applies no country filter
-    if (
-        mode in ("voted", "member")
-        and country in df.columns
-        and active_tab not in TABS_WITHOUT_COUNTRY_FILTER
-    ):
-        # No normalization: the vote columns are a category of exactly Y/N/A/X with no nulls
-        # (repository.py), and normalizing would decategorize 20k values on every callback.
-        cast_a_vote = df[country].isin(["Y", "N", "A"])
-        if mode == "voted":
-            df = df[cast_a_vote]
-        else:
-            # Member on the day, *or* voted on this resolution. The second half is not
-            # redundant: membership periods are keyed by ISO code, so a state that voted under a
-            # predecessor's code has votes outside its recorded periods (see `membership_mask`).
-            df = df[data.membership_mask(country, df["date"]) | cast_a_vote]
-
-    keyword = filter_data.get("keyword")
-    if keyword and keyword.strip() and active_tab in TABS_WITH_KEYWORD and not df.empty:
-        # Imported here, not at module scope: wordcloud_interactive reads this module.
-        from .wordcloud_interactive import get_keyword_matched_ids
-
-        matched_ids = get_keyword_matched_ids(df, keyword)
-        df = df[df["undl_id"].isin(matched_ids)]
-
-    return df[[column for column in COLUMNS if column in df.columns]]

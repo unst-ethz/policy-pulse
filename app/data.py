@@ -645,10 +645,11 @@ def _invalidate_feature_caches() -> None:
     If you memoise anything derived from `query_engine` or `repo` — an `lru_cache`, a lazily
     built index — give its module an `invalidate()` and list it here, or it will serve pre-reload
     data for the life of the process. Caches derived only from the static CSV assets
-    (`country_utils`) do not belong here; a reload cannot change them.
+    (`country_utils`) do not belong here; a reload cannot change them. Neither do caches keyed on
+    the snapshot itself (`analysis.keywords.keyword_index`): a reload swaps the snapshot, which
+    misses them by construction.
     """
     module_names = (
-        f"{__package__}.features.wordcloud_interactive",
         f"{__package__}.features.recent_resolutions_panel",
         f"{__package__}.features.general_stats_panel",
         f"{__package__}.pages.trends_page",

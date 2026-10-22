@@ -9,9 +9,8 @@ from dash import Input, Output, clientside_callback, dcc, html, register_page
 
 from .. import data
 from ..features.resolution_list import VOTE_MAP
-
-P5 = ["USA", "GBR", "FRA", "RUS", "CHN"]
-MIN_JOINT_VOTES = 100
+from ..un_data_stream.analysis import profile
+from ..un_data_stream.analysis.profile import MIN_JOINT_VOTES
 
 register_page(__name__, path="/profile")
 
@@ -125,65 +124,34 @@ def layout(
             style={"padding": "40px", "color": "#666"},
         )
 
-    # ── clamp year range to UN membership period ──────────────────────────────
     membership = data.get_participation_year_range(country1)
-    if membership:
-        mem_start = f"{membership[0]}-01-01"
-        mem_end = f"{membership[1]}-12-31"
-        if start_date is None or start_date < mem_start:
-            start_date = mem_start
-        if end_date is None or end_date > mem_end:
-            end_date = mem_end
-
-    comparison_raw = [
-        c
-        for c in (country2.split(",") if country2 else [])
-        if c in data.available_countries and c != country1
-    ]
-    comparison = comparison_raw or P5
     country1_name = data.get_country_name(country1)
 
-    # ── query resolutions ─────────────────────────────────────────────────────
-    res_df = data.query_engine.query_resolutions(
+    prof = profile.country_profile(
+        data.query_engine,
+        country1,
         start_date=start_date,
         end_date=end_date,
+        comparison=country2.split(",") if country2 else None,
+        participation=membership,
     )
-
-    if res_df.empty:
+    if prof is None:
         return html.Div(
             "No resolutions found for the current filters.",
             style={"padding": "40px", "color": "#666"},
         )
+    start_date, end_date = prof.start_date, prof.end_date
 
-    res_ids = res_df["undl_id"].tolist()
-
-    # ── vote data for country1 ────────────────────────────────────────────────
-    res_table = data.query_engine.resolution_table
-    cols = [c for c in ["undl_id", "date", "consensus_score", country1] if c in res_table.columns]
-    vote_df = res_table[res_table["undl_id"].isin(res_ids)][cols].copy()
-    vote_df["date"] = pd.to_datetime(vote_df["date"])
-    vote_df["year"] = vote_df["date"].dt.year
-
-    # ── multilateral alignment score + rank ───────────────────────────────────
-    ml_stats = data.query_engine.query_multilateral_stats(res_ids)
     multilateral_rank_str = None
-    if not ml_stats.empty:
-        ml_valid = ml_stats.dropna(subset=["multilateral_alignment"]).copy()
-        ml_valid["_rank"] = (
-            ml_valid["multilateral_alignment"].rank(ascending=False, method="min").astype(int)
+    if prof.multilateral_alignment is not None:
+        multilateral_rank_str = (
+            f"{prof.multilateral_alignment:.3f} "
+            f"({prof.multilateral_rank} of {prof.multilateral_ranked})"
         )
-        ml_row = ml_valid[ml_valid["country"] == country1]
-        if not ml_row.empty:
-            score = float(ml_row["multilateral_alignment"].iloc[0])
-            rank = int(ml_row["_rank"].iloc[0])
-            multilateral_rank_str = f"{score:.3f} ({rank} of {len(ml_valid)})"
 
     # ── vote breakdown counts + segment bar ───────────────────────────────────
-    total = len(vote_df)
-    n_yes = int((vote_df[country1] == "Y").sum())
-    n_no = int((vote_df[country1] == "N").sum())
-    n_abs = int((vote_df[country1] == "A").sum())
-    n_absent = total - n_yes - n_no - n_abs
+    total = prof.total_resolutions
+    n_yes, n_no, n_abs, n_absent = (prof.votes[k] for k in ("Y", "N", "A", "absent"))
 
     def _pct(n):
         return n / total * 100 if total else 0
@@ -232,26 +200,10 @@ def layout(
     )
 
     # ── bilateral agreement (ranking tables + alignment over time) ────────────
-    scores_df = data.query_engine.query_agreement_between_countries(
-        country1, resolution_ids=res_ids, average=False
-    )
-    score_country_cols = [c for c in scores_df.columns if c != "undl_id"]
-    joint_counts = scores_df[score_country_cols].notna().sum()
-    qualified = joint_counts[joint_counts >= MIN_JOINT_VOTES].index
-
-    avg_by_country = scores_df[score_country_cols].mean().dropna().sort_values(ascending=False)
-    avg_qualified = avg_by_country[avg_by_country.index.isin(qualified)]
-    top_aligned = avg_qualified.head(10)
-    bottom_aligned = avg_qualified.tail(10).sort_values()
-
-    valid_comp = [c for c in comparison if c in scores_df.columns]
-    yearly = (
-        scores_df.merge(vote_df[["undl_id", "year"]], on="undl_id", how="left")
-        .groupby("year")[valid_comp]
-        .mean()
-        if valid_comp
-        else pd.DataFrame()
-    )
+    top_aligned = prof.most_aligned
+    bottom_aligned = prof.least_aligned
+    yearly = prof.yearly_alignment
+    valid_comp = list(yearly.columns)
 
     colors = px.colors.qualitative.D3
     align_fig = go.Figure()
@@ -276,18 +228,8 @@ def layout(
     )
 
     # ── notable votes ─────────────────────────────────────────────────────────
-    merged_df = vote_df.merge(
-        res_df[["undl_id", "title", "resolution", "undl_link"]], on="undl_id", how="left"
-    )
-    detail_df = merged_df.dropna(subset=["consensus_score", country1])
-    opposed_hi = (
-        detail_df[detail_df[country1].isin(["N", "A"])]
-        .sort_values("consensus_score", ascending=False)
-        .head(5)
-    )
-    supported_lo = (
-        detail_df[detail_df[country1] == "Y"].sort_values("consensus_score", ascending=True).head(5)
-    )
+    opposed_hi = prof.opposed_high_consensus
+    supported_lo = prof.supported_low_consensus
 
     # ── header metadata ───────────────────────────────────────────────────────
     year_start = (start_date or "")[:4]
@@ -303,7 +245,7 @@ def layout(
 
     align_title = (
         "Bilateral Agreement Over Time (vs. P5)"
-        if not comparison_raw
+        if prof.comparison_is_default
         else "Bilateral Agreement Over Time (vs. Selected Countries)"
     )
     subregion = data.get_country_subregion(country1)

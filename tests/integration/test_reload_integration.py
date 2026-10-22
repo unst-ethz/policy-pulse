@@ -139,19 +139,18 @@ def test_reload_clears_every_cache_derived_from_the_repository(data, monkeypatch
     # `app.__main__` builds the Dash instance and imports every page/feature module — the state a
     # reload actually happens in. Only modules already in sys.modules get invalidated.
     import app.__main__  # noqa: F401
+    from app.un_data_stream.analysis import keywords
     from app.un_data_stream.data import reloader
 
-    wordcloud = sys.modules["app.features.wordcloud_interactive"]
     recent = sys.modules["app.features.recent_resolutions_panel"]
     stats = sys.modules["app.features.general_stats_panel"]
     trends = sys.modules["app.pages.trends_page"]
 
     # Populate every cache.
-    wordcloud._init_wc_data()
+    index_before = keywords.keyword_index(data.query_engine.snapshot)
     recent._get_recent_resolutions_cached()
     stats._get_stats_component_cached()
     trends._calculate_data_uncached("CHE", ("USA",))
-    assert wordcloud._initialized
     assert recent._get_recent_resolutions_cached.cache_info().currsize == 1
     assert stats._get_stats_component_cached.cache_info().currsize == 1
     assert trends._calculate_data_uncached.cache_info().currsize == 1
@@ -161,15 +160,14 @@ def test_reload_clears_every_cache_derived_from_the_repository(data, monkeypatch
     )
     assert data.reload_if_stale() is True
 
-    assert not wordcloud._initialized
     assert recent._get_recent_resolutions_cached.cache_info().currsize == 0
     assert stats._get_stats_component_cached.cache_info().currsize == 0
     assert trends._calculate_data_uncached.cache_info().currsize == 0
 
-    # Clearing the flag is only half of it: every read of the word-cloud indices has to route
-    # through the accessors, or it keeps returning the stale dict the flag no longer describes.
-    assert wordcloud._word_undlid_map("default")
-    assert wordcloud._initialized, "reading the index must rebuild it"
+    # The keyword index needs no clearing: it is keyed on the snapshot, which a reload replaces.
+    index_after = keywords.keyword_index(data.query_engine.snapshot)
+    assert index_after is not index_before, "the keyword index must follow the new snapshot"
+    assert index_after.terms("default")
 
 
 def test_invalidation_skips_modules_the_process_never_imported(data):

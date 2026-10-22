@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 from dash import Input, Output, callback, dcc, html
 
 from .. import data
+from ..un_data_stream.analysis import agreement
 from . import filtered_resolutions
 
 # M49 top-level regions in a consistent display order with D3-palette colours
@@ -21,7 +22,7 @@ _COLOR_DISAGREE = "#c0392b"
 _COLOR_AGREE = "#1558b0"
 _COLOR_MEAN = "#888888"
 
-_MIN_VOTES_THRESHOLD = 10
+_MIN_VOTES_THRESHOLD = agreement.MULTILATERAL_MIN_VOTES
 
 _Y_AXIS_OPTIONS = [
     {"label": " Abstention Rate", "value": "abstention_rate"},
@@ -109,8 +110,7 @@ def register_callbacks(query_engine):
 
         stats["country_name"] = stats["country"].apply(data.get_country_display_name)
         stats["region"] = stats["country"].apply(data.get_country_region)
-        stats = stats.dropna(subset=["multilateral_alignment"])
-        stats = stats[stats["participation_count"] >= _MIN_VOTES_THRESHOLD]
+        stats = agreement.qualified_multilateral(stats, _MIN_VOTES_THRESHOLD)
 
         mean_alignment = stats["multilateral_alignment"].mean()
         y_label = _Y_AXIS_LABELS[y_metric]

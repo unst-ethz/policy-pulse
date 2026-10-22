@@ -2,6 +2,7 @@ import pandas as pd
 from dash import Input, Output, State, callback, dcc, html
 
 from .. import data
+from ..un_data_stream.analysis import filtering
 from . import filtered_resolutions
 
 _PAGE_SIZE = 10
@@ -340,17 +341,7 @@ def register_callbacks():
             df = filtered_resolutions.resolutions_for(filter_params, active_tab)
 
             # Join vote columns for country1 + comparison countries
-            vote_cols_needed = [c for c in ([country1] + comparison_countries) if c]
-            if vote_cols_needed and not df.empty:
-                res_table = data.query_engine.resolution_table
-                available = list(
-                    dict.fromkeys(c for c in vote_cols_needed if c in res_table.columns)
-                )
-                if available:
-                    vote_df = res_table.loc[
-                        res_table["undl_id"].isin(df["undl_id"]), ["undl_id"] + available
-                    ]
-                    df = df.merge(vote_df, on="undl_id", how="left")
+            df = filtering.attach_votes(data.query_engine, df, [country1] + comparison_countries)
 
         except Exception as e:
             return (
@@ -375,33 +366,15 @@ def register_callbacks():
             )
 
         # 2. Filter & Sort Logic
-        if sort_order == "date_asc":
-            sort_by, ascending = "date", True
-        elif sort_order == "consensus_desc":
-            sort_by, ascending = "consensus_score", False
-        elif sort_order == "consensus_asc":
-            sort_by, ascending = "consensus_score", True
-        else:  # Default to date_desc
-            sort_by, ascending = "date", False
-
-        filtered_df = df.copy().sort_values(sort_by, ascending=ascending, na_position="last")
+        filtered_df = filtering.sort_resolutions(df, sort_order)
 
         if country1 and show_agreement_filter and agreement_filter != _NO_FILTER:
-            c2 = comparison_countries[0]
-            if country1 in filtered_df.columns and c2 in filtered_df.columns:
-                filtered_df = filtered_df.dropna(subset=[country1, c2])
-                if agreement_filter == "AGREED":
-                    filtered_df = filtered_df[filtered_df[country1] == filtered_df[c2]]
-                elif agreement_filter == "DISAGREED":
-                    filtered_df = filtered_df[filtered_df[country1] != filtered_df[c2]]
-                elif agreement_filter == "STRONGLY_DISAGREED":
-                    cond1 = (filtered_df[country1] == "Y") & (filtered_df[c2] == "N")
-                    cond2 = (filtered_df[country1] == "N") & (filtered_df[c2] == "Y")
-                    filtered_df = filtered_df[cond1 | cond2]
+            filtered_df = filtering.filter_by_pair_agreement(
+                filtered_df, country1, comparison_countries[0], agreement_filter
+            )
 
         if country1 and not comparison_countries and vote_filter and vote_filter != _NO_FILTER:
-            if country1 in filtered_df.columns:
-                filtered_df = filtered_df[filtered_df[country1] == vote_filter]
+            filtered_df = filtering.filter_by_vote(filtered_df, country1, vote_filter)
 
         total_count = len(filtered_df)
 
