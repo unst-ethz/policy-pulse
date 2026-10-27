@@ -172,7 +172,12 @@ def test_profile_clamps_to_membership(client):
     profile = get(client, "/api/v1/countries/CHE/profile")
     assert profile["start_date"] == "2002-01-01"  # UN member since 2002
     assert profile["comparison_is_default"]
-    assert sum(profile["votes"].values()) == profile["total_resolutions"]
+    # The tally covers recorded votes; the rest were adopted without one or by a non-recorded vote
+    assert sum(profile["votes"].values()) == profile["recorded_votes"]
+    assert (
+        profile["recorded_votes"] + profile["adopted_without_vote"] + profile["non_recorded_votes"]
+        == profile["total_resolutions"]
+    )
 
 
 def test_csv_export(client):

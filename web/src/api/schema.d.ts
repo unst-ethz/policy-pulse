@@ -484,12 +484,24 @@ export interface components {
             /** Total Resolutions */
             total_resolutions: number;
             /**
+             * Recorded Votes
+             * @description How many of `total_resolutions` had a recorded vote
+             */
+            recorded_votes: number;
+            /**
              * Votes
-             * @description "Y", "N", "A" and "absent"
+             * @description "Y", "N", "A" and "absent" (did not take part), over recorded votes only
              */
             votes: {
                 [key: string]: number;
             };
+            /** Adopted Without Vote */
+            adopted_without_vote: number;
+            /**
+             * Non Recorded Votes
+             * @description Adopted by a vote not recorded per country
+             */
+            non_recorded_votes: number;
             /** Multilateral Alignment */
             multilateral_alignment: number | null;
             /** Multilateral Rank */

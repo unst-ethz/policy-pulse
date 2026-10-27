@@ -166,9 +166,10 @@ const fr: typeof en = {
     memberFromTo: "Membre de l'ONU de {from} à {to}",
     resolutionsIn: 'résolutions adoptées en {period}',
     alignmentRank: 'accord avec tous les autres États ; rang {rank} sur {of}, le rang 1 votant le plus comme les autres',
-    noVoteRecorded: 'Aucun vote enregistré',
-    noVoteRecordedHelp:
-      'Comprend les résolutions adoptées sans vote, soit la plupart, et les votes enregistrés auxquels le pays n’a pas participé.',
+    recordedVotes: 'Les votes de {name} sur les {n} résolutions ayant fait l’objet d’un vote enregistré.',
+    notRecorded:
+      'Les {n} autres résolutions n’ont pas de votes par pays : {without} ont été adoptées sans vote et {unrecorded} par un vote non enregistré.',
+    noRecordedVotes: 'Aucune de ces résolutions n’a fait l’objet d’un vote enregistré : il n’y a pas de votes par pays à montrer.',
     mapTitle: 'Qui vote comme {name}',
     mapText:
       'À quelle fréquence chaque pays a voté de la même façon, sur les résolutions votées ces années-là.',

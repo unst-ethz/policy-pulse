@@ -164,9 +164,10 @@ export default {
     memberFromTo: 'UN member {from}–{to}',
     resolutionsIn: 'resolutions adopted in {period}',
     alignmentRank: 'agreement with all other states; rank {rank} of {of}, where 1 votes most like the rest',
-    noVoteRecorded: 'No vote recorded',
-    noVoteRecordedHelp:
-      'No vote recorded includes resolutions adopted without a vote, which is most of them, as well as recorded votes the country did not take part in.',
+    recordedVotes: 'How {name} voted on the {n} resolutions with a recorded vote.',
+    notRecorded:
+      'The other {n} resolutions have no country votes: {without} were adopted without a vote and {unrecorded} by a vote that was not recorded per country.',
+    noRecordedVotes: 'None of these resolutions had a recorded vote, so there are no country votes to show.',
     mapTitle: 'Who votes like {name}',
     mapText:
       'How often each country voted the same way, over resolutions with a recorded vote in these years.',

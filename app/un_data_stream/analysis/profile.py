@@ -11,6 +11,10 @@ P5 = ["USA", "GBR", "FRA", "RUS", "CHN"]
 MIN_JOINT_VOTES = 100
 RANKING_SIZE = 10
 NOTABLE_VOTES = 5
+# `modality` of a resolution with per-country votes; the others were adopted without a vote
+# ("Without a vote") or by a vote not recorded per country ("Vote, non-recorded").
+RECORDED_VOTE = "Vote, recorded"
+NON_RECORDED_VOTE = "Vote, non-recorded"
 
 
 @dataclass(frozen=True)
@@ -21,7 +25,10 @@ class CountryProfile:
     comparison: list[str]  # countries the alignment-over-time is computed against
     comparison_is_default: bool  # True when `comparison` fell back to the P5
     total_resolutions: int
-    votes: dict[str, int]  # "Y", "N", "A", "absent" -> count
+    recorded_votes: int  # how many of `total_resolutions` were adopted by recorded vote
+    votes: dict[str, int]  # over recorded votes only: "Y", "N", "A", "absent" -> count
+    adopted_without_vote: int
+    non_recorded_votes: int  # adopted by a vote not recorded per country
     multilateral_alignment: float | None
     multilateral_rank: int | None  # 1 = most aligned
     multilateral_ranked: int  # how many countries were ranked
@@ -74,7 +81,11 @@ def country_profile(
     res_ids = res_df["undl_id"].tolist()
 
     res_table = engine.resolution_table
-    cols = [c for c in ["undl_id", "date", "consensus_score", country] if c in res_table.columns]
+    cols = [
+        c
+        for c in ["undl_id", "date", "modality", "consensus_score", country]
+        if c in res_table.columns
+    ]
     vote_df = res_table[res_table["undl_id"].isin(res_ids)][cols].copy()
     vote_df["date"] = pd.to_datetime(vote_df["date"])
     vote_df["year"] = vote_df["date"].dt.year
@@ -95,9 +106,13 @@ def country_profile(
             rank = int(row["_rank"].iloc[0])
 
     total = len(vote_df)
-    n_yes = int((vote_df[country] == "Y").sum())
-    n_no = int((vote_df[country] == "N").sum())
-    n_abs = int((vote_df[country] == "A").sum())
+    recorded = vote_df["modality"] == RECORDED_VOTE
+    n_recorded = int(recorded.sum())
+    n_non_recorded = int((vote_df["modality"] == NON_RECORDED_VOTE).sum())
+    cast = vote_df.loc[recorded, country]
+    n_yes = int((cast == "Y").sum())
+    n_no = int((cast == "N").sum())
+    n_abs = int((cast == "A").sum())
 
     # Bilateral agreement: rankings and alignment over time
     scores_df = engine.query_agreement_between_countries(
@@ -141,7 +156,10 @@ def country_profile(
         comparison=comparison,
         comparison_is_default=not requested,
         total_resolutions=total,
-        votes={"Y": n_yes, "N": n_no, "A": n_abs, "absent": total - n_yes - n_no - n_abs},
+        recorded_votes=n_recorded,
+        votes={"Y": n_yes, "N": n_no, "A": n_abs, "absent": n_recorded - n_yes - n_no - n_abs},
+        adopted_without_vote=total - n_recorded - n_non_recorded,
+        non_recorded_votes=n_non_recorded,
         multilateral_alignment=score,
         multilateral_rank=rank,
         multilateral_ranked=ranked,

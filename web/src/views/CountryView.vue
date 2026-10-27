@@ -192,14 +192,27 @@ const membershipText = computed(() => {
             </span>
           </div>
         </div>
-        <VoteBar
-          :yes="p.votes.Y ?? 0"
-          :no="p.votes.N ?? 0"
-          :abstain="p.votes.A ?? 0"
-          :absent="p.votes.absent ?? 0"
-          :absent-label="t('country.noVoteRecorded')"
-        />
-        <p class="hint">{{ t('country.noVoteRecordedHelp') }}</p>
+        <div class="tally">
+          <template v-if="p.recorded_votes">
+            <p class="hint">{{ t('country.recordedVotes', { name: name(iso3), n: n(p.recorded_votes) }) }}</p>
+            <VoteBar
+              :yes="p.votes.Y ?? 0"
+              :no="p.votes.N ?? 0"
+              :abstain="p.votes.A ?? 0"
+              :absent="p.votes.absent ?? 0"
+            />
+          </template>
+          <p v-if="!p.recorded_votes" class="hint">{{ t('country.noRecordedVotes') }}</p>
+          <p v-else-if="p.total_resolutions > p.recorded_votes" class="hint">
+            {{
+              t('country.notRecorded', {
+                n: n(p.total_resolutions - p.recorded_votes),
+                without: n(p.adopted_without_vote),
+                unrecorded: n(p.non_recorded_votes),
+              })
+            }}
+          </p>
+        </div>
       </section>
     </QueryState>
 
@@ -400,6 +413,15 @@ const membershipText = computed(() => {
 .caption {
   color: var(--ink-2);
   font-size: var(--text-sm);
+}
+
+.tally {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.tally .hint {
+  margin: 0;
 }
 
 .hint {

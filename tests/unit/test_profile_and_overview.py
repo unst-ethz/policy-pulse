@@ -9,7 +9,10 @@ def test_profile_counts_votes_in_range(engine):
     prof = profile.country_profile(engine, "AAA", participation=(2001, 2002))
     assert (prof.start_date, prof.end_date) == ("2001-01-01", "2002-12-31")
     assert prof.total_resolutions == 4  # 103..106
-    assert prof.votes == {"Y": 1, "N": 1, "A": 1, "absent": 1}
+    # 105 was adopted without a vote, so the tally covers 103, 104 and 106 only
+    assert prof.recorded_votes == 3
+    assert prof.votes == {"Y": 1, "N": 1, "A": 1, "absent": 0}
+    assert (prof.adopted_without_vote, prof.non_recorded_votes) == (1, 0)
 
 
 def test_profile_comparison_falls_back_to_the_p5(engine):

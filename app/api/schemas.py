@@ -221,7 +221,12 @@ class CountryProfile(BaseModel):
     start_date: dt.date | None
     end_date: dt.date | None
     total_resolutions: int
-    votes: dict[str, int] = Field(description='"Y", "N", "A" and "absent"')
+    recorded_votes: int = Field(description="How many of `total_resolutions` had a recorded vote")
+    votes: dict[str, int] = Field(
+        description='"Y", "N", "A" and "absent" (did not take part), over recorded votes only'
+    )
+    adopted_without_vote: int
+    non_recorded_votes: int = Field(description="Adopted by a vote not recorded per country")
     multilateral_alignment: float | None
     multilateral_rank: int | None
     multilateral_ranked: int

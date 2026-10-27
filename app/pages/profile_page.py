@@ -151,10 +151,11 @@ def layout(
 
     # ── vote breakdown counts + segment bar ───────────────────────────────────
     total = prof.total_resolutions
+    recorded = prof.recorded_votes  # the vote counts cover recorded votes only
     n_yes, n_no, n_abs, n_absent = (prof.votes[k] for k in ("Y", "N", "A", "absent"))
 
     def _pct(n):
-        return n / total * 100 if total else 0
+        return n / recorded * 100 if recorded else 0
 
     y_pct, n_pct, a_pct, x_pct = _pct(n_yes), _pct(n_no), _pct(n_abs), _pct(n_absent)
 
