@@ -78,6 +78,13 @@ def agreement_timeline(
     country: str,
     compare: CompareParam,
     min_votes: Annotated[int, Query(ge=1)] = agreement.TIMELINE_MIN_VOTES,
+    special_sessions: Annotated[
+        bool,
+        Query(
+            description="Give special and emergency special sessions points of their own "
+            "instead of counting them towards the regular session in progress"
+        ),
+    ] = False,
 ) -> schemas.AgreementTimeline:
     """Mean agreement per General Assembly session over the *whole* history (no filters).
 
@@ -88,12 +95,20 @@ def agreement_timeline(
     others = [c for c in country_list(compare, "compare") if c != iso3]
     if not others:
         raise HTTPException(422, "`compare` needs at least one other country")
-    out = agreement.session_agreement(data.query_engine, iso3, others, min_votes=min_votes)
+    out = agreement.session_agreement(
+        data.query_engine,
+        iso3,
+        others,
+        min_votes=min_votes,
+        special_sessions=special_sessions,
+    )
     sessions = []
     for row in out.to_dict("records") if out is not None else []:
         sessions.append(
             schemas.TimelineSession(
                 session=str(row["session"]),
+                special=not str(row["session"]).isdigit(),
+                date=row["date"].date(),
                 year=int(row["year"]),
                 values={
                     c: schemas.SessionValue(
@@ -105,7 +120,11 @@ def agreement_timeline(
             )
         )
     return schemas.AgreementTimeline(
-        country=iso3, compare=others, min_votes=min_votes, sessions=sessions
+        country=iso3,
+        compare=others,
+        min_votes=min_votes,
+        special_sessions=special_sessions,
+        sessions=sessions,
     )
 
 

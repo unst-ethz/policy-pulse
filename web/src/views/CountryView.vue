@@ -99,7 +99,14 @@ const mapRows = computed(() =>
 )
 
 // --- timeline -----------------------------------------------------------------------------
-const timeline = useTimeline(() => props.iso3, compare)
+const specialSessions = ref(false)
+const timeline = useTimeline(() => props.iso3, compare, specialSessions)
+// Fractional year of an ISO date, so special sessions sit within their year, not on top of it
+const fractionalYear = (iso: string) => {
+  const d = new Date(`${iso}T00:00:00Z`)
+  const start = Date.UTC(d.getUTCFullYear(), 0, 1)
+  return d.getUTCFullYear() + (d.getTime() - start) / (365.25 * 86_400_000)
+}
 const isDark = computed(() => colors.surface.toLowerCase() !== '#ffffff')
 const seriesColor = (i: number) => (isDark.value ? SERIES_SLOTS_DARK : SERIES_SLOTS)[i % SERIES_SLOTS.length]!
 const seriesColors = computed(() => Object.fromEntries(compare.value.map((c, i) => [c, seriesColor(i)])))
@@ -108,12 +115,17 @@ const series = computed<TimelineSeries[]>(() =>
     country: c,
     label: name(c),
     color: seriesColors.value[c] ?? seriesColor(0),
-    points: (timeline.data.value?.sessions ?? []).map((s) => ({
-      year: s.year,
-      session: s.session,
-      agreement: s.values[c]?.agreement ?? null,
-      votes: s.values[c]?.shared_votes ?? 0,
-    })),
+    points: (timeline.data.value?.sessions ?? [])
+      .map((s) => ({
+        x: fractionalYear(s.date),
+        year: s.year,
+        session: s.session,
+        special: s.special,
+        agreement: s.values[c]?.agreement ?? null,
+        votes: s.values[c]?.shared_votes ?? 0,
+      }))
+      // A special session too small for a value is left out rather than cutting the line
+      .filter((pt) => !(pt.special && pt.agreement == null)),
   })),
 )
 
@@ -256,6 +268,12 @@ const membershipText = computed(() => {
     </section>
 
     <ChartFrame :title="t('country.timelineTitle')" :description="t('country.timelineText', { name: name(iso3) })">
+      <template #controls>
+        <label class="check">
+          <input v-model="specialSessions" type="checkbox" />
+          {{ t('country.specialSessions') }}
+        </label>
+      </template>
       <CountryList v-model="compareModel" :label="t('country.compareWith')" :colors="seriesColors" :exclude="[iso3]" />
       <QueryState
         :loading="timeline.isLoading.value"
@@ -289,7 +307,10 @@ const membershipText = computed(() => {
         </table>
       </template>
       <template #note>
-        <p>{{ t('country.timelineNote', { n: timeline.data.value?.min_votes ?? 3 }) }}</p>
+        <p>
+          {{ t('country.timelineNote', { n: timeline.data.value?.min_votes ?? 3 }) }}
+          <template v-if="!specialSessions">{{ t('country.specialNote') }}</template>
+        </p>
       </template>
     </ChartFrame>
 

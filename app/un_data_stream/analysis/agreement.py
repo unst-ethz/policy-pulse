@@ -40,17 +40,56 @@ def agreement_map(
     return pd.to_numeric(scores, errors="coerce")
 
 
+def fold_into_regular_sessions(
+    sessions: pd.Series, dates: pd.Series, keep_special: bool = False
+) -> pd.Series:
+    """Relabel special / emergency special sessions (and missing labels) as the regular session
+    in progress on the resolution's date, so a per-session timeline has one point per regular
+    session instead of sparse special-session points cutting the lines.
+
+    A regular session is one labelled by digits only ("55"); it is in progress from its first
+    resolution onwards. Rows without a date, or dated before the first regular session, keep
+    their label. With `keep_special`, only missing labels are folded.
+    """
+    missing = sessions.isna()
+    labels = sessions.astype(str)
+    regular = labels.str.fullmatch(r"\d+")
+    starts = (
+        pd.DataFrame({"date": dates[regular], "regular": labels[regular]})
+        .dropna(subset=["date"])
+        .groupby("regular", as_index=False)["date"]
+        .min()
+        .sort_values("date")
+    )
+    to_fold = (missing if keep_special else ~regular) & dates.notna()
+    if starts.empty or not to_fold.any():
+        return labels
+    folded = pd.merge_asof(
+        pd.DataFrame({"date": dates[to_fold], "row": labels.index[to_fold]}).sort_values("date"),
+        starts,
+        on="date",
+        direction="backward",
+    ).set_index("row")["regular"]
+    out = labels.copy()
+    out.loc[folded.dropna().index] = folded.dropna()
+    return out
+
+
 def session_agreement(
     engine: ResolutionQueryEngine,
     country: str,
     others: Iterable[str],
     min_votes: int = TIMELINE_MIN_VOTES,
+    special_sessions: bool = False,
 ) -> pd.DataFrame | None:
     """Per-session mean agreement between `country` and each of `others`, over all resolutions.
 
-    Returns one row per session with columns `session`, `year` (median resolution date's year),
-    and per other country `avg_agreement_<iso3>` / `n_votes_<iso3>`. A session's average is NaN
-    below `min_votes` shared votes, and after the last session the other country voted in.
+    Returns one row per regular session — special sessions are folded into the regular session in
+    progress (see `fold_into_regular_sessions`) unless `special_sessions` keeps them as rows of
+    their own — with columns `session`, `date` (median resolution date), `year` (its year), and
+    per other country `avg_agreement_<iso3>` / `n_votes_<iso3>`. A session's
+    average is NaN below `min_votes` shared votes, and after the last session the other country
+    voted in.
 
     Returns None when `country` and none of `others` ever both voted.
     """
@@ -85,15 +124,22 @@ def session_agreement(
         both_voted = df[[country, col]].notna().all(axis=1)
         agreement[col] = agreement[col].where(both_voted, np.nan)
 
-    tmp = pd.DataFrame({"session": df["session"], "date": df["date"]})
+    tmp = pd.DataFrame(
+        {
+            "session": fold_into_regular_sessions(
+                df["session"], df["date"], keep_special=special_sessions
+            ),
+            "date": df["date"],
+        }
+    )
     for col in selected:
         tmp[f"agreement_{col}"] = agreement[col]
 
-    # Year per session = the median date's year
-    session_year = tmp.groupby("session")["date"].median().dt.year
-    session_year.name = "year"
+    # Date per session = the median resolution date; it places special sessions within the year
+    session_date = tmp.groupby("session")["date"].median().dt.normalize()
+    session_year = session_date.dt.year.rename("year")
 
-    out_parts = [session_year]
+    out_parts = [session_date, session_year]
     for col in selected:
         grouped = tmp.groupby("session")[f"agreement_{col}"]
         avg_agreement = grouped.mean()
@@ -105,7 +151,7 @@ def session_agreement(
         out_parts.extend([avg_agreement, n_votes])
 
     out = pd.concat(out_parts, axis=1).reset_index()
-    out = out.sort_values(["year", "session"]).reset_index(drop=True)
+    out = out.sort_values(["date", "session"]).reset_index(drop=True)
 
     # Last-vote cutoff: nothing after the last session each country voted in
     for col in selected:

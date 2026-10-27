@@ -41,6 +41,21 @@ def test_sessions_below_the_vote_minimum_have_no_value(engine):
     assert out["avg_agreement_BBB"].isna().tolist() == [False, False, True]
 
 
+def test_special_sessions_fold_into_the_regular_session_in_progress():
+    sessions = pd.Series(["32", "8sp", "33", "10emsp", None, "1sp"])
+    dates = pd.to_datetime(
+        pd.Series(
+            ["1977-11-01", "1978-04-20", "1978-11-01", "2003-05-01", "1979-01-01", "1970-01-01"]
+        )
+    )
+    folded = agreement.fold_into_regular_sessions(sessions, dates)
+    # 1sp predates every regular session, so it keeps its own label
+    assert folded.tolist() == ["32", "32", "33", "33", "33", "1sp"]
+    # Kept apart, only the missing label is folded
+    kept = agreement.fold_into_regular_sessions(sessions, dates, keep_special=True)
+    assert kept.tolist() == ["32", "8sp", "33", "10emsp", "33", "1sp"]
+
+
 def test_session_agreement_needs_another_country(engine):
     assert agreement.session_agreement(engine, "AAA", ["AAA"]) is None
 

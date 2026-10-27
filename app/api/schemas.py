@@ -133,6 +133,8 @@ class SessionValue(BaseModel):
 
 class TimelineSession(BaseModel):
     session: str
+    special: bool = Field(description="A special or emergency special session, e.g. 11emsp")
+    date: dt.date = Field(description="Median date of the session's resolutions")
     year: int
     values: dict[str, SessionValue]
 
@@ -141,6 +143,7 @@ class AgreementTimeline(BaseModel):
     country: str
     compare: list[str]
     min_votes: int
+    special_sessions: bool
     sessions: list[TimelineSession]
 
 

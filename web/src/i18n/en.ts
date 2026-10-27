@@ -189,6 +189,8 @@ export default {
     yearCol: 'Year',
     timelineNote:
       'A session needs at least {n} shared votes to get a value. This chart ignores the year filter.',
+    specialSessions: 'Special sessions separately',
+    specialNote: 'Otherwise, votes of special and emergency special sessions count towards the regular session in progress.',
     topicsTitle: 'Agreement by topic',
     topicsText: 'Average agreement in each area of the UNBIS Thesaurus, in the selected years.',
     sharedVotes: '{n} shared votes',
@@ -204,6 +206,8 @@ export default {
   timeline: {
     label: 'Agreement over time',
     session: 'Session {session} ({year})',
+    specialSession: 'Special session {n} ({year})',
+    emergencySession: 'Emergency special session {n} ({year})',
   },
   topics: {
     title: 'Topics',

@@ -191,6 +191,8 @@ const fr: typeof en = {
     yearCol: 'Année',
     timelineNote:
       'Une session doit compter au moins {n} votes communs pour avoir une valeur. Ce graphique ignore le filtre des années.',
+    specialSessions: 'Sessions extraordinaires à part',
+    specialNote: "Sinon, les votes des sessions extraordinaires et extraordinaires d'urgence comptent pour la session ordinaire en cours.",
     topicsTitle: 'Accord par thème',
     topicsText: 'Accord moyen dans chaque domaine du Thésaurus UNBIS, pour les années choisies.',
     sharedVotes: '{n} votes communs',
@@ -206,6 +208,8 @@ const fr: typeof en = {
   timeline: {
     label: "L'accord dans le temps",
     session: 'Session {session} ({year})',
+    specialSession: 'Session extraordinaire {n} ({year})',
+    emergencySession: "Session extraordinaire d'urgence {n} ({year})",
   },
   topics: {
     title: 'Thèmes',

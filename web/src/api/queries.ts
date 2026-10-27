@@ -155,13 +155,23 @@ export function useAgreementMap(filters: MaybeRefOrGetter<Filters>, country: May
   })
 }
 
-export function useTimeline(country: MaybeRefOrGetter<string>, compare: MaybeRefOrGetter<string[]>) {
+export function useTimeline(
+  country: MaybeRefOrGetter<string>,
+  compare: MaybeRefOrGetter<string[]>,
+  specialSessions: MaybeRefOrGetter<boolean> = false,
+) {
   return useQuery({
-    queryKey: ['timeline', r(country), r(compare)],
+    queryKey: ['timeline', r(country), r(compare), r(specialSessions)],
     queryFn: () =>
       unwrap(
         api.GET('/api/v1/agreement/timeline', {
-          params: { query: { country: toValue(country), compare: toValue(compare) } },
+          params: {
+            query: {
+              country: toValue(country),
+              compare: toValue(compare),
+              special_sessions: toValue(specialSessions),
+            },
+          },
         }),
       ),
     enabled: computed(() => toValue(compare).length > 0),

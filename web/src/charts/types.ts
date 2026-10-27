@@ -5,7 +5,8 @@ export interface TimelineSeries {
   country: string
   label: string
   color: string
-  points: { year: number; session: string; agreement: number | null; votes: number }[]
+  /** `x` is the fractional year of the session's median date; `special` marks (emergency) special sessions. */
+  points: { x: number; year: number; session: string; special: boolean; agreement: number | null; votes: number }[]
 }
 
 export interface ScatterPoint {

@@ -387,6 +387,8 @@ export interface components {
             compare: string[];
             /** Min Votes */
             min_votes: number;
+            /** Special Sessions */
+            special_sessions: boolean;
             /** Sessions */
             sessions: components["schemas"]["TimelineSession"][];
         };
@@ -777,6 +779,17 @@ export interface components {
         TimelineSession: {
             /** Session */
             session: string;
+            /**
+             * Special
+             * @description A special or emergency special session, e.g. 11emsp
+             */
+            special: boolean;
+            /**
+             * Date
+             * Format: date
+             * @description Median date of the session's resolutions
+             */
+            date: string;
             /** Year */
             year: number;
             /** Values */
@@ -1254,6 +1267,8 @@ export interface operations {
                 /** @description ISO3 codes to compare with (repeatable or comma-separated) */
                 compare: string[];
                 min_votes?: number;
+                /** @description Give special and emergency special sessions points of their own instead of counting them towards the regular session in progress */
+                special_sessions?: boolean;
             };
             header?: never;
             path?: never;
