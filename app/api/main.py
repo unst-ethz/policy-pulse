@@ -11,6 +11,7 @@ Interactive docs at /api/docs, the OpenAPI schema at /api/openapi.json.
 
 import hashlib
 import os
+import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -25,6 +26,11 @@ API_PREFIX = "/api/v1"
 
 # Origins allowed to call the API from a browser: the Vite dev server by default.
 _DEFAULT_CORS_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+
+# Part of every ETag, so a restart (e.g. a deploy with changed analyses) invalidates what browsers
+# cached even when the data did not change. Drawn at import, i.e. once in the gunicorn master
+# under `--preload`, so all workers agree on it.
+_BUILD_TOKEN = uuid.uuid4().hex
 
 
 @asynccontextmanager
@@ -60,14 +66,15 @@ def create_app() -> FastAPI:
     async def data_version_etag(request: Request, call_next):
         """Answer repeat requests with 304 until the data changes.
 
-        Every response is a pure function of the URL and the loaded data, so the ETag can be
-        derived from those alone — before doing any work, which is what makes a 304 cheap.
+        Every response is a pure function of the URL, the loaded data and the running code, so the
+        ETag can be derived from those alone — before doing any work, which is what makes a 304
+        cheap. The code is identified by `_BUILD_TOKEN`, which changes with every server start.
         """
         if request.method != "GET" or not request.url.path.startswith(API_PREFIX):
             return await call_next(request)
 
         version = reference.data_version()
-        key = f"{version}|{request.url.path}?{request.url.query}"
+        key = f"{_BUILD_TOKEN}|{version}|{request.url.path}?{request.url.query}"
         etag = f'W/"{hashlib.sha1(key.encode()).hexdigest()}"'
         headers = {"ETag": etag, "X-Data-Version": version, "Cache-Control": "no-cache"}
 
