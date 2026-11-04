@@ -38,7 +38,7 @@ let worldLoading: Promise<void> | null = null
 
 /** Register the world map once (public/geo/world.json, built by web/scripts/build_world_geo.py). */
 export function loadWorld(): Promise<void> {
-  worldLoading ??= fetch('/geo/world.json')
+  worldLoading ??= fetch(`${import.meta.env.BASE_URL}geo/world.json`)
     .then((response) => response.json() as Promise<FeatureCollection>)
     .then((world) => {
       // Antarctica has no vote and takes a fifth of the canvas.

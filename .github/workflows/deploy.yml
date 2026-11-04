@@ -5,6 +5,9 @@ on:
     branches:
       - main
       - stable
+      # Temporary, until the move to AWS: the FastAPI/Vue version on MongoDB, served on the VM
+      # under /experimental/. Builds `:api-mongodb` of both images, nothing else.
+      - feature/api-mongodb
 
 env:
   REGISTRY: ghcr.io
@@ -40,6 +43,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=
             type=raw,value=stable,enable=${{ github.ref_name == 'stable' }}
+            type=raw,value=api-mongodb,enable=${{ github.ref_name == 'feature/api-mongodb' }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -52,3 +56,23 @@ jobs:
             BUILD_COMMIT=${{ github.sha }}
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
           no-cache: true
+
+      - name: Extract metadata for the web image
+        if: github.ref_name == 'feature/api-mongodb'
+        id: web_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-web
+          tags: |
+            type=raw,value=api-mongodb
+
+      - name: Build and push the web image
+        if: github.ref_name == 'feature/api-mongodb'
+        uses: docker/build-push-action@v5
+        with:
+          context: web
+          push: true
+          tags: ${{ steps.web_meta.outputs.tags }}
+          labels: ${{ steps.web_meta.outputs.labels }}
+          build-args: |
+            WEB_BASE=/experimental/

@@ -6,6 +6,9 @@ import { defineConfig } from 'vitest/config'
 // /api is proxied, so there is no CORS setup to get wrong and production can serve both under
 // one origin.
 export default defineConfig({
+  // Where the built app is served from. The VM serves it under /experimental/ (WEB_BASE at build
+  // time) while the API stays at /api on the same host, so API calls keep their absolute paths.
+  base: process.env.WEB_BASE ?? '/',
   plugins: [vue()],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
