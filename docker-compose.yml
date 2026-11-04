@@ -1,21 +1,24 @@
-# Local development database, pre-loaded with a recent copy of the production data.
+# Local development database.
 #
 #   uv run init-env               # does everything below, plus .env and a data check
 #
 # or, by hand:
 #
-#   docker login ghcr.io          # once -- the package is private, see the README
 #   docker compose pull
 #   docker compose up -d
 #
-# Then point the app at localhost:5432 with the credentials below (they match .env.example).
+# Then point the app at mongodb://localhost:27017/?directConnection=true (as in .env.example).
 #
 # This is NOT the app: the app's own image is built from ./Dockerfile and runs against whatever
-# PG* settings it is given. This file only provides the database that .env points at.
+# MONGODB_URI it is given. This file only provides the database that .env points at.
 #
-# The image is published weekly by undl-ingest's `undl-snapshot` unit (that repo's
-# deploy/README.md is the source of truth for the publish side). The data is a snapshot, not a
-# live mirror: expect it to be a few days behind the VM.
+# TODO(mongodb phase 5): the MongoDB dev snapshot image does not exist yet. Until undl-ingest
+# publishes it (docs/mongodb_migration_plan.md, phase 5), this starts an EMPTY MongoDB, and
+# `init-env` fails its data check with "These collections are empty". To develop against real
+# data meanwhile, fill it yourself, e.g. with undl-ingest's scripts/copy_postgres_to_mongo.py.
+# When the snapshot lands: swap the image below for it, make the healthcheck test for the data
+# itself (`db.member_states.countDocuments() > 0`, the snapshot restores before it is queryable),
+# and update IMAGE in app/dev/init_env.py. The data is then a snapshot, not a live mirror.
 #
 # To move to a newer snapshot: `uv run update-db`. Note that `pull` + `up -d` is NOT enough --
 # the image restores its dump only into a *fresh* data directory, so recreating the container on
@@ -23,30 +26,28 @@
 # volume has to go: `docker compose pull && docker compose down -v && docker compose up -d`.
 
 services:
-  db:
-    # Pin a dated tag (e.g. :2026-09-15) to freeze the data you develop against.
-    image: ghcr.io/unst-ethz/policy-pulse-db:latest
-    container_name: policy-pulse-db
+  # Not `db`/`policy-pulse-db`: those are the Postgres snapshot's, and reusing the service name
+  # would make compose recreate that container as this one.
+  mongo:
+    # TODO(mongodb phase 5): the snapshot image; pin a dated tag of it to freeze your data.
+    image: mongodb/mongodb-atlas-local:8.0.15
+    container_name: policy-pulse-mongo
     restart: unless-stopped
     ports:
       # Loopback only -- never expose a database to the network. Override the host port if you
-      # already have a Postgres on 5432 (you probably do):
-      #   POLICY_PULSE_DB_PORT=55432 docker compose up -d
-      - "127.0.0.1:${POLICY_PULSE_DB_PORT:-5432}:5432"
-    environment:
-      POSTGRES_USER: policy_pulse
-      POSTGRES_PASSWORD: policy_pulse
-      POSTGRES_DB: policy_pulse
+      # already have a MongoDB on 27017:
+      #   POLICY_PULSE_DB_PORT=27018 docker compose up -d
+      - "127.0.0.1:${POLICY_PULSE_DB_PORT:-27017}:27017"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - mongodata:/data/db
     healthcheck:
-      # The snapshot restore runs *before* the server accepts external connections, so a plain
-      # pg_isready can go green while the tables are still empty. Check for the data itself.
-      test: ["CMD-SHELL", "psql -U policy_pulse -d policy_pulse -c 'select 1 from member_states limit 1' || exit 1"]
+      # The image's own readiness check. TODO(mongodb phase 5): check for the data itself, see
+      # the header.
+      test: ["CMD", "/usr/local/bin/runner", "healthcheck"]
       interval: 5s
       timeout: 5s
       retries: 30
       start_period: 30s
 
 volumes:
-  pgdata:
+  mongodata:

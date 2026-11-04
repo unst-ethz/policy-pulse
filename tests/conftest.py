@@ -6,26 +6,22 @@ import pytest
 
 
 @functools.lru_cache(maxsize=1)
-def postgres_unavailable() -> str | None:
-    """Return why Postgres can't be reached, or None if it can.
+def db_unavailable() -> str | None:
+    """Return why MongoDB can't be reached, or None if it can.
 
-    The app reads every table from Postgres at import time, so anything touching `app.data` needs
-    a live database. Checked once per session, with a real connection rather than a port probe —
-    wrong credentials or a missing database should skip these tests just as cleanly as a stopped
-    server, and say which it was.
+    The app reads every collection from MongoDB at import time, so anything touching `app.data`
+    needs a live database. Checked once per session, with a real round trip rather than a port
+    probe — wrong credentials or a missing database should skip these tests just as cleanly as a
+    stopped server, and say which it was.
     """
     try:
-        import sqlalchemy as sa
-
         from app.un_data_stream.data import db
 
         db.load_env()
-        engine = db.create_engine()
-        try:
-            with engine.connect() as conn:
-                conn.execute(sa.text("SELECT 1"))
-        finally:
-            engine.dispose()
+        with db.connect() as client:
+            client.admin.command("ping")
+            if not db.database(client).list_collection_names():
+                return f"database {db.database(client).name!r} has no collections"
     except Exception as exc:
         return f"{type(exc).__name__}: {exc}"
     return None
@@ -33,19 +29,19 @@ def postgres_unavailable() -> str | None:
 
 def pytest_configure(config):
     config.addinivalue_line(
-        "markers", "needs_postgres: test requires a reachable Postgres (auto-skipped without one)"
+        "markers", "needs_db: test requires a reachable MongoDB (auto-skipped without one)"
     )
 
 
 def pytest_collection_modifyitems(config, items):
-    reason = postgres_unavailable()
+    reason = db_unavailable()
     if reason is None:
         return
 
-    skip_postgres = pytest.mark.skip(reason=f"Postgres not reachable ({reason})")
+    skip_db = pytest.mark.skip(reason=f"MongoDB not reachable ({reason})")
     for item in items:
-        if "needs_postgres" in item.keywords:
-            item.add_marker(skip_postgres)
+        if "needs_db" in item.keywords:
+            item.add_marker(skip_db)
 
 
 @pytest.fixture(scope="module")

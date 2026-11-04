@@ -1,7 +1,7 @@
 """Shared country-level lookup utilities.
 
 M49 regional groupings and country centroids only. Membership and voting-activity dates live in
-`app.data`, which reads them from Postgres rather than from a file here.
+`app.data`, which reads them from MongoDB rather than from a file here.
 """
 
 from functools import lru_cache

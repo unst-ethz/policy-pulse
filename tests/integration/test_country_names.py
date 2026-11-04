@@ -14,7 +14,7 @@ import re
 
 import pytest
 
-pytestmark = pytest.mark.needs_postgres
+pytestmark = pytest.mark.needs_db
 
 # (start–end) appended to retired ISOs by get_country_name; en dash, not hyphen.
 YEAR_RANGE = re.compile(r"\((\d{4})–(\d{4})\)")

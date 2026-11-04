@@ -11,7 +11,7 @@ Watchtower (running on our VM) notices the new image
        ↓
 Old container is removed, new one starts (Site goes down)
        ↓
-App loads its data from Postgres (~25 sec)
+App loads its data from MongoDB (~25 sec)
        ↓
 Site is up again
 ```
@@ -35,7 +35,7 @@ Site is up again
 
 **Gunicorn** — The server that runs our Python app. We use the `--preload` flag, which loads the resolution data once and then spawns worker processes that share it copy-on-write.
 
-**Postgres** — Holds the resolution/vote/thesaurus/member-state tables the app reads at startup. It is written by the `undl-ingest` jobs, not by this app. The app needs `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER` and `PGPASSWORD` in its environment, and fails fast at startup if they're missing. Note that any DB connection must be opened *after* gunicorn forks its workers — the data load opens and closes its own connection inside the master, so nothing is shared across the fork.
+**MongoDB** — Holds the resolution/vote/thesaurus/member-state collections the app reads at startup. It is written by the `undl-ingest` jobs, not by this app. The app needs `MONGODB_URI` and `MONGODB_DATABASE` in its environment, and fails fast at startup if they're missing. Note that no PyMongo client may cross gunicorn's fork — the data load opens and closes its own client inside the master, so nothing is shared across the fork.
 
 ---
 
@@ -44,10 +44,10 @@ Site is up again
 When we push to `main`:
 1. The current container is removed
 2. A new container starts with the updated code
-3. The app reads its tables from Postgres and precomputes the vote-agreement arrays
+3. The app reads its collections from MongoDB and precomputes the vote-agreement arrays
 4. **Site is unavailable for roughly half a minute**
 
-Data freshness is no longer tied to deploys: the ingestion jobs refresh Postgres on their own
+Data freshness is no longer tied to deploys: the ingestion jobs refresh MongoDB on their own
 schedule, so new resolutions arrive without anyone pushing to `main`.
 
 ---
@@ -70,16 +70,16 @@ docker compose logs -f
 
 ## Environment
 
-The container needs the Postgres connection settings at **run** time — they are never baked into
+The container needs the MongoDB connection settings at **run** time — they are never baked into
 the image:
 
 ```bash
 docker run --rm -p 8050:8050 --env-file .env policy-pulse
 ```
 
-`PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`. If any are missing the app refuses to
-start with a message naming them; if the database is unreachable it reports the host, port,
-database and user it tried (never the password), so a broken deploy is diagnosable from
+`MONGODB_URI`, `MONGODB_DATABASE`. If either is missing the app refuses to start with a message
+naming it; if the database is unreachable it reports the host and database it tried (never the
+credentials), so a broken deploy is diagnosable from
 `docker compose logs app` alone.
 
 Note the image copies only `app/` and `config/`, so a local `.env` in the build context cannot end

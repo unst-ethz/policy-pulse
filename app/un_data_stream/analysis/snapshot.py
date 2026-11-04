@@ -95,7 +95,7 @@ class DataSnapshot:
 def empty_snapshot() -> "DataSnapshot":
     """An all-empty snapshot, for tests and for a failed first load."""
     empty = np.empty((0, 0), dtype=bool)
-    # Column names match what a real (if empty) Postgres read returns, so callers see the same
+    # Column names match what a real (if empty) load returns, so callers see the same
     # shape they would in production rather than a columnless frame.
     return DataSnapshot(
         resolution_table=pd.DataFrame(columns=["undl_id", "date"]),

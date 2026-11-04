@@ -1,7 +1,7 @@
 # Build: docker build -t policy-pulse .
 # Run:   docker run --rm -p 8050:8050 --env-file .env policy-pulse
 #
-# Connection settings (PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD) are injected at *run* time via
+# Connection settings (MONGODB_URI/MONGODB_DATABASE) are injected at *run* time via
 # --env-file or the orchestrator's environment, never baked into the image. Note this image only
 # copies `app/` and `config/` — not the whole build context — so a local `.env`, the notebooks and
 # the reference datasets cannot end up in a published layer.
@@ -40,7 +40,7 @@ USER appuser
 #
 # --no-install-project: the app is imported from /app via PYTHONPATH, not installed as a package
 # (src/policy_pulse is a stub), so there is nothing to build from this project itself.
-# psycopg's `binary` extra carries its own libpq, so no apt packages are needed here.
+# PyMongo ships as a pure wheel, so no apt packages are needed here.
 COPY --chown=appuser:appuser pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 
@@ -52,6 +52,6 @@ COPY --chown=appuser:appuser config ./config
 EXPOSE 8050
 
 # --preload loads the data once in the master process before forking workers, which then share it
-# copy-on-write. The data load opens and closes its own Postgres connection inside the master, so
-# no connection is inherited across the fork.
+# copy-on-write. The data load opens and closes its own MongoDB client inside the master, so no
+# client is inherited across the fork.
 CMD ["gunicorn", "--bind", "0.0.0.0:8050", "--workers", "2", "--timeout", "120", "--preload", "app.__main__:server"]

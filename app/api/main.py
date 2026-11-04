@@ -1,6 +1,6 @@
 """The Policy Pulse HTTP API (FastAPI), serving the same data and analyses as the Dash app.
 
-Importing this module loads the data from Postgres (through `app.data`), exactly like the Dash
+Importing this module loads the data from MongoDB (through `app.data`), exactly like the Dash
 app: under gunicorn's `--preload` that happens once in the master and the workers share it.
 
     uv run start-api                                          # dev server on :8000

@@ -1,4 +1,4 @@
-"""Membership and voting-activity dates, against the real Postgres tables.
+"""Membership and voting-activity dates, against the real stored data.
 
 These replace `app/assets/joining_dates.csv`, which was a frozen extract of first/last *vote*
 dates whose end was pinned to whatever the last resolution was the day it was generated. The
@@ -12,7 +12,7 @@ so a failure here means our logic broke, not that the UN edited a record.
 import pandas as pd
 import pytest
 
-pytestmark = pytest.mark.needs_postgres
+pytestmark = pytest.mark.needs_db
 
 
 @pytest.fixture(scope="module")

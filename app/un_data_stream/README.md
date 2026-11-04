@@ -1,14 +1,14 @@
 # unDataStream
 
-The app's data layer: loads the normalized UN resolution tables out of Postgres, precomputes the
+The app's data layer: loads the UN resolution collections out of MongoDB, precomputes the
 vote-agreement arrays, and answers queries over them in memory.
 
 ## Overview
 
-`policy-pulse` is a **read-only consumer** of a Postgres storage layer. Fetching from the UN
+`policy-pulse` is a **read-only consumer** of a MongoDB storage layer. Fetching from the UN
 Digital Library, parsing MARC records and building the thesaurus tables all happen in the separate
 [`undl-ingest`](https://github.com/unst-ethz) repo, whose jobs run on a schedule and write the
-tables described below. This package never talks to UNDL.
+collections it reads. This package never talks to UNDL.
 
 This is a change from how it used to work: until 2026-09 the app fetched bulk CSV/TTL exports
 itself on a cache miss, processed them, and wrote a local CSV + pickle cache — which meant a
@@ -18,7 +18,7 @@ multi-minute startup after every deploy. That pipeline (`fetchers/`, `core/`, `d
 
 ### Key features
 
-- 🐘 **Postgres-sourced**: 7 tables read once at startup (~25s for ~20.8k resolutions and ~950k
+- 🍃 **MongoDB-sourced**: 3 collections read once at startup (~25s for ~20.8k resolutions and ~950k
   votes), no local cache to invalidate
 - 📊 **Precomputed agreement arrays**: per-resolution consensus scores plus a
   (resolutions × countries) alignment matrix, built once at load
@@ -31,7 +31,7 @@ multi-minute startup after every deploy. That pipeline (`fetchers/`, `core/`, `d
 ```
 un_data_stream/
 ├── data/
-│   ├── db.py          # Postgres connection + table reads (SQLAlchemy Core)
+│   ├── db.py          # MongoDB connection + freshness marker (PyMongo)
 │   ├── repository.py   # Main entry point: read → reshape → precompute
 │   ├── processor.py    # Vote-agreement precomputation
 │   ├── reloader.py     # Periodic freshness poll + rebuild
@@ -43,8 +43,8 @@ un_data_stream/
 
 ## Staying fresh
 
-The ingestion jobs refresh Postgres on their own schedule, and each app process notices without a
-deploy: a daemon poller compares `MAX(completed_at)` over successful `ingestion_runs` against the
+The ingestion jobs refresh MongoDB on their own schedule, and each app process notices without a
+deploy: a daemon poller compares the latest `completed_at` of a successful `ingestion_runs` document against the
 marker its data was read with (`snapshot.source_marker`), and on a change rebuilds everything and
 swaps it in with a single assignment. Interval via `RELOAD_INTERVAL_SECONDS` (default 1800, `0`
 disables). A failed rebuild keeps the previous data and retries on the next tick.
@@ -77,8 +77,7 @@ one `ResolutionQueryEngine` at import time and treats them as read-only process-
 
 ## Configuration
 
-Connection settings come from the environment (`PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`,
-`PGPASSWORD`); copy `.env.example` to `.env` for local development. `db.load_env()` validates that
+Connection settings come from the environment (`MONGODB_URI`, `MONGODB_DATABASE`); copy `.env.example` to `.env` for local development. `db.load_env()` validates that
 they are all present and fails with a clear message if not.
 
 `config/data_sources.yaml` now only carries runtime settings:

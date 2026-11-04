@@ -1,7 +1,7 @@
 """
 UN Data Stream - the app's data layer.
 
-Loads the normalized UN resolution tables out of Postgres (written by the `undl-ingest` jobs),
+Loads the UN resolution collections out of MongoDB (written by the `undl-ingest` jobs),
 precomputes the agreement/alignment arrays, and answers queries over them in memory.
 
 This package used to fetch from the UN Digital Library and process raw exports itself; that work

@@ -1,8 +1,8 @@
 """Periodic in-process reload of the app's data.
 
-The ingestion jobs refresh Postgres on their own schedule. Rather than waiting for a deploy to
-pick that up, each app process polls a cheap marker — `MAX(completed_at)` over successful
-`ingestion_runs` — and rebuilds its in-memory copy when the marker moves.
+The ingestion jobs refresh MongoDB on their own schedule. Rather than waiting for a deploy to
+pick that up, each app process polls a cheap marker — the latest `completed_at` of a successful
+`ingestion_runs` document — and rebuilds its in-memory copy when the marker moves.
 
 Two things about the mechanics are easy to get wrong:
 
@@ -55,13 +55,9 @@ def interval_from_env() -> int:
 
 
 def read_marker() -> Optional[datetime]:
-    """Read the live freshness marker on a connection of its own."""
-    engine = db.create_engine()
-    try:
-        with engine.connect() as conn:
-            return db.read_success_marker(conn)
-    finally:
-        engine.dispose()
+    """Read the live freshness marker on a short-lived client of its own (see `db.connect`)."""
+    with db.connect() as client:
+        return db.read_success_marker(db.database(client))
 
 
 def is_stale(loaded_marker: Optional[datetime], live_marker: Optional[datetime]) -> bool:
@@ -102,7 +98,7 @@ def start(reload_now: Callable[[], None], interval_s: Optional[int] = None) -> b
     def loop() -> None:
         while True:
             # Jitter so that N workers, all started by the same burst of traffic, don't rebuild
-            # simultaneously — each rebuild costs ~25s of CPU and a full read of the tables.
+            # simultaneously — each rebuild costs ~25s of CPU and a full read of the collections.
             delay = interval_s * (1 + random.uniform(-JITTER_FRACTION, JITTER_FRACTION))
             threading.Event().wait(delay)
             try:

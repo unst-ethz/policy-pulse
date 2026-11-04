@@ -16,11 +16,10 @@ dependencies = [
     "numpy==2.3.5",
     "pandas==2.3.3",
     "plotly==6.3.0",
-    "psycopg[binary]>=3.3.5",
+    "pymongo>=4.10,<5",
     "python-dotenv>=1.2.3",
     "pyyaml==6.0.3",
     "rapidfuzz==3.13.0",
-    "sqlalchemy>=2.0.52",
     "uvicorn-worker>=0.4.0",
     "uvicorn[standard]>=0.52.4",
     "wordcloud==1.9.4",
@@ -33,7 +32,7 @@ start-app = "app.__main__:main"
 # `uv run start-api` — the HTTP API (FastAPI) on :8000, for the upcoming Vue frontend. Production
 # runs `app.api.main:app` under gunicorn with uvicorn workers instead; see deployment-overview.md.
 start-api = "app.api.main:main"
-# `uv run init-env` — one command from a fresh clone to a local Postgres holding a copy of the
+# `uv run init-env` — one command from a fresh clone to a local MongoDB holding a copy of the
 # production data (docker-compose.yml + the snapshot image). Dev only; see README.
 init-env = "app.dev.init_env:main"
 # `uv run update-db` — pull the newest snapshot and re-seed the local database from it. Separate
@@ -65,7 +64,7 @@ select = ["E", "F", "I"]
 # Pre-existing long lines, as of adopting ruff (2026-09-16). `ruff format` fixed 79 of them; what
 # is left is long prose strings and comments, which the formatter deliberately won't split.
 #
-# This is a ratchet, not a standard: every other file — including all the Postgres data layer and
+# This is a ratchet, not a standard: every other file — including all the data layer and
 # the tests — is clean at 100 columns and stays enforced. Shrink this list when you touch a file;
 # don't add to it. The counts are the debt at adoption time. # TODO: improve this
 [tool.ruff.lint.per-file-ignores]

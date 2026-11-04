@@ -607,7 +607,7 @@ def get_latest_year():
 # ---------------------------------------------------------------------------
 # Periodic reload
 #
-# The ingestion jobs refresh Postgres twice a day; this lets a running process pick that up
+# The ingestion jobs refresh MongoDB twice a day; this lets a running process pick that up
 # without a deploy. See T12 in plans/app_postgres_migration_plan.md.
 # ---------------------------------------------------------------------------
 

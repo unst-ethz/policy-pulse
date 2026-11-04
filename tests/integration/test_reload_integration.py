@@ -1,17 +1,16 @@
-"""The periodic reload, end to end against Postgres.
+"""The periodic reload, end to end against MongoDB.
 
 Exercises the decision path (`reload_if_stale`) and the marker read against the real
-`ingestion_runs` table. Deliberately does *not* leave a synthetic run row behind: the marker it
-inserts is rolled back, because a stray 'success' row would make every other worker — and the
-next developer's app — think there is new data.
+`ingestion_runs` collection. Deliberately does *not* leave a synthetic run behind: the runs it
+inserts are deleted again, and none is a 'success', because a stray 'success' run would make
+every other worker — and the next developer's app — think there is new data.
 """
 
 from datetime import datetime, timedelta, timezone
 
 import pytest
-import sqlalchemy as sa
 
-pytestmark = pytest.mark.needs_postgres
+pytestmark = pytest.mark.needs_db
 
 
 @pytest.fixture(scope="module")
@@ -43,33 +42,36 @@ def test_live_marker_matches_what_was_loaded(data):
 def test_marker_read_uses_only_successful_runs(data):
     """A failed or still-running ingestion must not advance the marker.
 
-    Inserted inside a transaction that is rolled back, so the table is left untouched.
+    The inserted runs are removed in `finally`, so the collection is left as it was.
     """
     from app.un_data_stream.data import db, reloader
 
-    engine = db.create_engine()
-    try:
-        with engine.connect() as conn:
-            before = db.read_success_marker(conn)
-            future = datetime.now(timezone.utc) + timedelta(days=365)
-            # Raw SQL on purpose: the app's db module has no write helpers (it is a read-only
-            # consumer), and this test has no business borrowing the ingest repo's.
-            insert_run = sa.text(
-                "INSERT INTO ingestion_runs (source_dataset, started_at, completed_at, status) "
-                "VALUES ('test_reload', :ts, :ts, :status)"
-            )
+    with db.connect() as client:
+        database = db.database(client)
+        runs = database[db.INGESTION_RUNS]
+        before = db.read_success_marker(database)
+        future = datetime.now(timezone.utc) + timedelta(days=365)
+        try:
+            # Written directly on purpose: the app's db module has no write helpers (it is a
+            # read-only consumer), and this test has no business borrowing the ingest repo's.
             for status in ("failed", "running", "partial"):
-                conn.execute(insert_run, {"ts": future, "status": status})
-                assert db.read_success_marker(conn) == before, (
+                runs.insert_one(
+                    {
+                        "source_dataset": "test_reload",
+                        "started_at": future,
+                        "completed_at": future,
+                        "status": status,
+                    }
+                )
+                assert db.read_success_marker(database) == before, (
                     f"a '{status}' run must not advance the marker"
                 )
-            conn.rollback()
+        finally:
+            runs.delete_many({"source_dataset": "test_reload"})
 
-        # and the rollback really left nothing behind
-        with engine.connect() as conn:
-            assert db.read_success_marker(conn) == before
-    finally:
-        engine.dispose()
+        # and the cleanup really left nothing behind
+        assert runs.count_documents({"source_dataset": "test_reload"}) == 0
+        assert db.read_success_marker(database) == before
 
     assert reloader.read_marker() == before
 

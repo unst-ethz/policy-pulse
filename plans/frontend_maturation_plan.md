@@ -5,10 +5,7 @@ Status: Phase 1 done; a Vue prototype covering phases 2–3 is in `web/` (branch
 ## 1. Where we are
 
 **Keep — this is the asset:**
-- The data layer. `undl-ingest` fills Postgres; the app reads it into an immutable `DataSnapshot`
-  that is swapped atomically on reload; `ResolutionQueryEngine` answers agreement/alignment
-  queries vectorised in NumPy; the data layer has unit + integration tests. None of it depends on
-  Dash.
+- The data layer. `undl-ingest` fills MongoDB; the app reads it into an immutable `DataSnapshot` that is swapped atomically on reload; `ResolutionQueryEngine` answers agreement/alignment queries vectorised in NumPy; the data layer has unit + integration tests. None of it depends on Dash.
 - The analytical ideas, already validated: agreement map, agreement timeline, agreement by subject,
   multilateral scatter, word cloud, country profile, case studies.
 - One-command local setup (`init-env`) against a snapshot of production data.
@@ -36,10 +33,10 @@ Status: Phase 1 done; a Vue prototype covering phases 2–3 is in `web/` (branch
 ## 2. Target architecture
 
 ```
-undl-ingest ──► Postgres ──► API  (FastAPI + existing un_data_stream, in-memory snapshot)
-                                 │  OpenAPI ──► generated TypeScript client
-                                 ▼
-                             web/ (Vue 3 + Vite + TS, static files behind nginx)
+undl-ingest ──► MongoDB ──► API  (FastAPI + existing un_data_stream, in-memory snapshot)
+                                │  OpenAPI ──► generated TypeScript client
+                                ▼
+                            web/ (Vue 3 + Vite + TS, static files behind nginx)
 ```
 
 **Backend:** FastAPI around the existing snapshot/query engine (keeps gunicorn `--preload` and the
@@ -129,7 +126,7 @@ membership periods, trees); it has no Dash dependency.
 | T6 | Dash call sites switched to T1–T5; parity verified against pre-refactor outputs | done |
 | T7 | FastAPI app (`app/api/`): schemas, filter dependency, `lang`, error handling, CORS, ETag/data-version, reloader in lifespan | done |
 | T8 | Endpoints (see below) | done |
-| T9 | Tests: unit tests for T1–T5 on synthetic data, API integration tests against Postgres | done |
+| T9 | Tests: unit tests for T1–T5 on synthetic data, API integration tests against the database | done |
 | T10 | Run scripts (`uv run start-api`), Docker command, README / deployment docs | done |
 
 ### API surface (v1)
@@ -266,10 +263,10 @@ Use on the resolution page: "Previous version: A/RES/78/187", a link to the UN80
 
 ### Order
 
-1. API: sponsors on the resolution endpoints, sponsor filter, `/countries/{iso3}/sponsorship`; merge the Palestine duplicate, exclude UN bodies from country views. **Done 2026-11-04** (reads Postgres): `sponsor`, `original_sponsor`, `sponsorship_known` filter parameters on every filtered endpoint; `sponsor_count` (null = unknown) on list items; `sponsors` + `sponsorship_note` on the detail; `/countries/{iso3}/sponsorship` with per-year counts, top-level domains, other countries' votes on its sponsored texts and the "sponsored but not yes" list. State names come from the country table, so the catalogue's spelling variants don't show. Not done: sponsors in the CSV export.
+1. API: sponsors on the resolution endpoints, sponsor filter, `/countries/{iso3}/sponsorship`; merge the Palestine duplicate, exclude UN bodies from country views. **Done 2026-11-04** (built on Postgres, now reads `derived.sponsors` from MongoDB): `sponsor`, `original_sponsor`, `sponsorship_known` filter parameters on every filtered endpoint; `sponsor_count` (null = unknown) on list items; `sponsors` + `sponsorship_note` on the detail; `/countries/{iso3}/sponsorship` with per-year counts, top-level domains, other countries' votes on its sponsored texts and the "sponsored but not yes" list. State names come from the country table, so the catalogue's spelling variants don't show. Not done: sponsors in the CSV export.
 2. Resolution and country pages; sponsor notable votes.
 3. Topic pages, with leading sponsors.
 4. Sponsorship page, with co-sponsorship agreement.
 5. Recurring series: detection, then the "what changed" panel.
 
-Open: the app reads Postgres, while `../undl-ingest` (branch `feature/mongodb`) is moving its loaders, the sponsors one included, to MongoDB. Decide which store the sponsorship API reads before building step 1.
+Decided: the app reads MongoDB (branch `feature/api-mongodb`); sponsors come from `derived.sponsors` on the `resolutions` documents, as `undl-ingest`'s loaders now write them.

@@ -60,11 +60,11 @@ TIME_BUDGETS = {
 }
 
 
-# These exercise the real data layer through `app.data`, which reads every table from Postgres at
+# These exercise the real data layer through `app.data`, which reads all its data from MongoDB at
 # import time. The marker makes that dependency explicit and auto-skips without a database; the
 # previous gate caught *any* exception from `import app.data`, so a genuinely broken data layer
 # reported as "skipped: data files not available" instead of failing.
-pytestmark = pytest.mark.needs_postgres
+pytestmark = pytest.mark.needs_db
 
 
 # ---------------------------------------------------------------------------

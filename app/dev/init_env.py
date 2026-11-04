@@ -1,14 +1,15 @@
 """
 `uv run init-env` — one command from a fresh clone to a working local database.
 
-It writes a `.env` if there isn't one, starts the snapshot Postgres from the repo's
-`docker-compose.yml`, waits for it to actually hold data, and then connects to it through the
-app's own data layer (`app.un_data_stream.data.db`) and counts the core tables. That last step is
+It writes a `.env` if there isn't one, starts the local MongoDB from the repo's
+`docker-compose.yml`, waits for it to be healthy, and then connects to it through the app's own
+data layer (`app.un_data_stream.data.db`) and counts the core collections. That last step is
 the point of the whole thing: the container can start, report healthy and still be the wrong
 database, so this exits nonzero unless the rows the app needs are really there.
 
 It mirrors `undl-ingest`'s own `init-env` step for step, the same way this repo's `data/db.py`
-mirrors that repo's `common/db.py` — same container, same tables, same checks, no shared code.
+mirrors that repo's `common/db.py` — same container, same collections, same checks, no shared
+code.
 The difference is that this one verifies through `app.data`'s connection settings, so a `.env`
 pointing somewhere else is caught here rather than as a blank page later.
 
@@ -30,28 +31,24 @@ COMPOSE_FILE = REPO_ROOT / "docker-compose.yml"
 ENV_FILE = REPO_ROOT / ".env"
 ENV_EXAMPLE = REPO_ROOT / ".env.example"
 
-CONTAINER_NAME = "policy-pulse-db"
-IMAGE = "ghcr.io/unst-ethz/policy-pulse-db"
+CONTAINER_NAME = "policy-pulse-mongo"
+# TODO(mongodb phase 5): the MongoDB dev snapshot image, once undl-ingest publishes one (see
+# docker-compose.yml). Until then this is the empty base image and the count check below fails.
+IMAGE = "mongodb/mongodb-atlas-local:8.0.15"
 
-# The snapshot image bakes in these credentials (undl-ingest's snapshot/Dockerfile) and accepts no
-# others. `.env.example` ships PGPASSWORD blank because the same file also has to describe a real
-# production connection, so filling it in is this script's job.
-DEV_PASSWORD = "policy_pulse"
-
-# Every table `DataRepository` reads on startup (see repository.py's `read_table` calls). This is
-# a superset of the five undl-ingest smoke-tests before publishing: that check asks "did the dump
-# restore", this one asks "can the app actually run on it", and the app needs `resolution_subject`
-# and `subject_closure` too — an empty closure table silently breaks subject-hierarchy expansion
-# rather than failing outright. `ingestion_runs` is ingestion bookkeeping the app never touches.
-REQUIRED_TABLES = (
-    "member_states",
-    "resolution_outcomes",
-    "resolution_votes",
-    "subject",
-    "resolution_subject",
-    "subject_broader",
-    "subject_closure",
-)
+# What `DataRepository` reads on startup, as {label: (collection, filter)}: the three collections,
+# plus the embedded data that replaced the old vote, subject-pair, broader and closure tables. An
+# empty one of those fails nothing outright — no `ancestors` silently breaks subject-hierarchy
+# expansion — so each is counted on its own. `ingestion_runs` is bookkeeping, only the marker.
+REQUIRED_COUNTS = {
+    "member_states": ("member_states", {}),
+    "resolutions": ("resolutions", {}),
+    "resolutions with votes": ("resolutions", {"votes": {"$exists": True}}),
+    "resolutions with subjects": ("resolutions", {"derived.subject_ids.0": {"$exists": True}}),
+    "subjects": ("subjects", {}),
+    "subjects with broader": ("subjects", {"broader.0": {"$exists": True}}),
+    "subjects with ancestors": ("subjects", {"ancestors.0": {"$exists": True}}),
+}
 
 HEALTH_TIMEOUT_SECONDS = 60
 HEALTH_POLL_SECONDS = 2
@@ -84,11 +81,11 @@ def _compose(*args: str) -> list[str]:
 
 def db_port() -> str:
     """The host port the database is published on — the same default the compose file uses."""
-    return os.environ.get("POLICY_PULSE_DB_PORT", "5432")
+    return os.environ.get("POLICY_PULSE_DB_PORT", "27017")
 
 
 def ensure_env_file() -> None:
-    """Create `.env` from `.env.example` with the dev password filled in, if it doesn't exist."""
+    """Create `.env` from `.env.example` with the local port filled in, if it doesn't exist."""
     if ENV_FILE.exists():
         _say(f"==> {ENV_FILE.name} already exists, leaving it alone")
         return
@@ -102,10 +99,8 @@ def ensure_env_file() -> None:
         # the reader's situation once this has written it; the header below replaces it.
         if not lines and (line.startswith("#") or not line.strip()):
             continue
-        if line.startswith("PGPASSWORD="):
-            line = f"PGPASSWORD={DEV_PASSWORD}"
-        elif line.startswith("PGPORT="):
-            line = f"PGPORT={port}"
+        if line.startswith("MONGODB_URI="):
+            line = f"MONGODB_URI=mongodb://localhost:{port}/?directConnection=true"
         lines.append(line)
     header = (
         "# Written by `uv run init-env` for the local snapshot database (docker-compose.yml).\n"
@@ -135,7 +130,7 @@ def check_docker() -> None:
 
 def compose_pull(image: str | None = None) -> None:
     """Pull the snapshot image, translating the two failures people actually hit."""
-    _say(f"==> Pulling {image or IMAGE} (private package — needs `docker login ghcr.io`)")
+    _say(f"==> Pulling {image or IMAGE}")
     result = _run(_compose("pull"), cwd=REPO_ROOT)
     if result.returncode == 0:
         return
@@ -172,10 +167,10 @@ def compose_up() -> None:
     lowered = stderr.lower()
     if "already allocated" in lowered or "address already in use" in lowered:
         raise InitEnvError(
-            f"Host port {port} is already in use — most likely by a Postgres you already run.\n"
-            "Start the snapshot database on a different port instead:\n"
-            "    POLICY_PULSE_DB_PORT=55432 uv run init-env\n"
-            f"(then make sure PGPORT in {ENV_FILE.name} says 55432 too).\n\n"
+            f"Host port {port} is already in use — most likely by a MongoDB you already run.\n"
+            "Start the local database on a different port instead:\n"
+            "    POLICY_PULSE_DB_PORT=27018 uv run init-env\n"
+            f"(then make sure MONGODB_URI in {ENV_FILE.name} says localhost:27018 too).\n\n"
             f"{stderr}"
         )
     raise InitEnvError(f"`docker compose up -d` failed.\n\n{stderr}")
@@ -192,11 +187,10 @@ def _health_status() -> str | None:
 def wait_for_healthy() -> None:
     """Poll until the container's healthcheck passes.
 
-    The healthcheck queries `member_states` rather than running `pg_isready`, because the snapshot
-    is restored by the entrypoint *before* Postgres starts accepting external connections: a plain
-    readiness probe can go green against a database whose tables are still empty.
+    Healthy only means MongoDB is up (see docker-compose.yml's TODO for the snapshot's data
+    check); whether the data is there is `check_counts`' question.
     """
-    _say(f"==> Waiting for {CONTAINER_NAME} to be healthy (restoring the snapshot)")
+    _say(f"==> Waiting for {CONTAINER_NAME} to be healthy")
     deadline = time.monotonic() + HEALTH_TIMEOUT_SECONDS
     status = None
     while time.monotonic() < deadline:
@@ -219,62 +213,60 @@ def wait_for_healthy() -> None:
 
 
 def read_counts() -> dict[str, int]:
-    """Count the core tables over the app's own connection settings.
+    """Count the core collections over the app's own connection settings.
 
-    Going through `app.un_data_stream.data.db` rather than `docker exec ... psql` is the point:
+    Going through `app.un_data_stream.data.db` rather than `docker exec ... mongosh` is the point:
     it proves the database is reachable *the way the app reaches it*, `.env` included, instead of
     only proving that something is alive inside the container.
     """
-    # Imported here, not at module scope: this pulls in pandas and SQLAlchemy, and the Docker and
+    # Imported here, not at module scope: this pulls in pandas and PyMongo, and the Docker and
     # compose steps above should be able to fail fast without paying for that.
-    import sqlalchemy as sa
-
     from app.un_data_stream.data import db
 
     db.load_env()
-    configured_port = os.environ.get("PGPORT")
+    configured_port = db.host().rpartition(":")[2]
     if configured_port != db_port():
         raise InitEnvError(
-            f"PGPORT in {ENV_FILE.name} is {configured_port}, but the database is published on "
-            f"{db_port()}.\nUpdate {ENV_FILE.name} (or unset POLICY_PULSE_DB_PORT) so the app "
-            "connects to the container this command started."
+            f"MONGODB_URI in {ENV_FILE.name} points at {db.host()}, but the database is published "
+            f"on port {db_port()}.\nUpdate {ENV_FILE.name} (or unset POLICY_PULSE_DB_PORT) so the "
+            "app connects to the container this command started."
         )
 
-    engine = db.create_engine()
-    try:
-        with db.connect_or_explain(engine) as conn:
-            return {
-                table: conn.execute(sa.text(f"select count(*) from {table}")).scalar_one()
-                for table in REQUIRED_TABLES
-            }
-    finally:
-        # NullPool or not, the engine is disposed explicitly — see db.create_engine's docstring.
-        engine.dispose()
+    with db.connect_or_explain() as client:
+        database = db.database(client)
+        return {
+            label: database[collection].count_documents(query)
+            for label, (collection, query) in REQUIRED_COUNTS.items()
+        }
 
 
-def check_tables(previous: dict[str, int] | None = None) -> dict[str, int]:
-    """Print the core tables' row counts, with deltas when we know the old ones.
+def check_counts(previous: dict[str, int] | None = None) -> dict[str, int]:
+    """Print the core document counts, with deltas when we know the old ones.
 
-    Fails if any table is empty — that is the snapshot not having restored.
+    Fails if any is zero — that is the snapshot not having restored.
     """
     _say("==> Checking the data through the app's own connection settings")
     counts = read_counts()
 
-    width = max(len(table) for table in counts)
-    for table, count in counts.items():
-        line = f"    {table.ljust(width)}  {count:>9,}"
+    width = max(len(label) for label in counts)
+    for label, count in counts.items():
+        line = f"    {label.ljust(width)}  {count:>9,}"
         if previous is not None:
-            delta = count - previous.get(table, 0)
+            delta = count - previous.get(label, 0)
             line += f"   {delta:+,}" if delta else "   ="
         _say(line)
 
-    empty = [table for table, count in counts.items() if count == 0]
+    empty = [label for label, count in counts.items() if count == 0]
     if empty:
+        # TODO(mongodb phase 5): until the snapshot image exists, the database starts empty and
+        # this is expected; see docker-compose.yml.
         raise InitEnvError(
-            f"These tables are empty: {', '.join(empty)}.\n"
-            "The snapshot did not restore — most likely an old `pgdata` volume survived, which "
+            f"These collections are empty: {', '.join(empty)}.\n"
+            "The snapshot did not restore — most likely an old `mongodata` volume survived, which "
             "the image's restore step deliberately leaves alone. Wipe it and try again:\n"
-            "    docker compose down -v && uv run init-env"
+            "    docker compose down -v && uv run init-env\n"
+            "(Until the MongoDB snapshot image exists, the local database starts empty: see the "
+            "TODO in docker-compose.yml.)"
         )
     return counts
 
@@ -309,7 +301,7 @@ def _running_image_id() -> str | None:
 # reports the new image while serving the old rows — so comparing the running image to the pulled
 # one says "up to date" precisely when the data is stale. This marker records what actually seeded
 # the volume, which is the question.
-SEED_MARKER = "/var/lib/postgresql/data/.policy-pulse-seeded-from"
+SEED_MARKER = "/data/db/.policy-pulse-seeded-from"
 
 
 def read_seed_marker() -> str | None:
@@ -343,7 +335,7 @@ def main() -> None:
         compose_pull()
         compose_up()
         wait_for_healthy()
-        check_tables()
+        check_counts()
         # Record what seeded this volume so `update-db` can tell later whether it is still current.
         image_id = _image_id(compose_image())
         if image_id is not None:
@@ -354,7 +346,7 @@ def main() -> None:
 
     port = db_port()
     _say("")
-    _say(f"Ready. Postgres is on localhost:{port} (database policy_pulse, user policy_pulse).")
+    _say(f"Ready. MongoDB is on localhost:{port} (database policy_pulse).")
     _say("Start the app with `uv run start-app` — http://127.0.0.1:8050")
     _say("The data is a weekly snapshot; `uv run update-db` moves you to a newer one.")
 
@@ -363,11 +355,10 @@ def update() -> None:
     """Entry point for `uv run update-db` — move the local database to the newest snapshot.
 
     `docker compose pull && docker compose up -d` is *not* enough on its own, and fails silently
-    when it is wrong. The image restores its dump from `/docker-entrypoint-initdb.d` only on a
-    fresh data directory, so an existing `pgdata` volume means the new image starts up against the
-    old data: the container is healthy, the tables are full, and nothing has changed. The volume
-    has to go for the new snapshot to land, which is why this wipes it rather than just recreating
-    the container.
+    when it is wrong. The image restores its dump only on a fresh data directory, so an existing
+    `mongodata` volume means the new image starts up against the old data: the container is
+    healthy, the collections are full, and nothing has changed. The volume has to go for the new
+    snapshot to land, which is why this wipes it rather than just recreating the container.
 
     Since that wipe is destructive, it is skipped when the pulled image is the one already running
     (`--force` re-seeds anyway, for a dev database someone has scribbled on).
@@ -416,7 +407,7 @@ def update() -> None:
         compose_down(remove_volumes=True)
         compose_up()
         wait_for_healthy()
-        check_tables(previous=previous)
+        check_counts(previous=previous)
         if pulled is not None:
             write_seed_marker(pulled)
     except InitEnvError as exc:
@@ -424,7 +415,7 @@ def update() -> None:
         raise SystemExit(1) from None
 
     _say("")
-    _say(f"Updated. Postgres is on localhost:{db_port()} with the newest snapshot.")
+    _say(f"Updated. MongoDB is on localhost:{db_port()} with the newest snapshot.")
     _say("Restart the app (`uv run start-app`) to load it — data is read once, at import.")
 
 

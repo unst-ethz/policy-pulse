@@ -2,7 +2,7 @@
 
 Four countries, six resolutions over three sessions, a three-node subject tree and a handful of
 keywords. The vote arrays are built by the real `DataProcessor`, so the engine under test sees
-exactly the shapes the Postgres load produces.
+exactly the shapes the MongoDB load produces.
 
 Votes (Y/N/A, X = did not vote):
 

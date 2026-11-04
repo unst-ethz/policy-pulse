@@ -9,7 +9,7 @@ import pytest
 
 from app.un_data_stream.analysis.keywords import EXCLUDED_TERMS_BY_AXIS, EXCLUDED_TERMS_BY_MODE
 
-pytestmark = pytest.mark.needs_postgres
+pytestmark = pytest.mark.needs_db
 
 # Mirrors the app's four keyword panels; 'category' is excluded deliberately -- it is built from
 # `resolution_subject`, not from keywords.

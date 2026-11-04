@@ -27,7 +27,7 @@ status are in [plans/frontend_maturation_plan.md](plans/frontend_maturation_plan
 ## Code layout
 
 ```
-app/un_data_stream/data/       loading from Postgres, the precomputed vote arrays, periodic reload
+app/un_data_stream/data/       loading from MongoDB, the precomputed vote arrays, periodic reload
 app/un_data_stream/analysis/   every analysis, framework-free: filtering, keywords, agreement,
                                word cloud, country profile, overview — used by Dash *and* the API
 app/data.py                    the loaded data plus country names, membership periods, trees
@@ -56,25 +56,20 @@ interactive documentation at `/api/docs` lists every endpoint with its parameter
 
 ## Local database
 
-The app is a read-only consumer of a Postgres database that the separate `undl-ingest` repo fills.
-You do **not** need a production connection or to run any ingestion job to work on the frontend:
-the ingest VM dumps its database every Monday and publishes it as a ready-to-run Postgres image,
-and `init-env` pulls that image and starts it.
+The app is a read-only consumer of a MongoDB database that the separate `undl-ingest` repo fills. `init-env` starts a local MongoDB for it:
 
 ```bash
-docker login ghcr.io -u <your-github-username>   # once: private package, token needs read:packages
 uv run init-env
 ```
 
-That writes a `.env` if you don't have one, pulls and starts the database, waits for it to finish
-restoring, then connects through the app's own settings and counts the core tables — so it fails
-loudly if the container came up empty rather than leaving you to discover it as a blank page. When
-it prints `Ready`, `uv run start-app` will work.
+That writes a `.env` if you don't have one, pulls and starts the database, waits for it to be healthy, then connects through the app's own settings and counts the core collections, so it fails loudly if the database came up empty rather than leaving you to discover it as a blank page. When it prints `Ready`, `uv run start-app` will work.
 
-If port 5432 is already taken by a Postgres of your own:
+> **Not yet a snapshot.** The MongoDB dev snapshot image (a weekly dump of production, phase 5 of undl-ingest's `docs/mongodb_migration_plan.md`) does not exist yet, so `docker-compose.yml` starts an *empty* `mongodb-atlas-local` and `init-env` stops at its data check. Until then, fill it yourself, e.g. with undl-ingest's `scripts/copy_postgres_to_mongo.py` against the Postgres snapshot. The sections below describe how it works once the snapshot image is in place.
+
+If port 27017 is already taken by a MongoDB of your own:
 
 ```bash
-POLICY_PULSE_DB_PORT=55432 uv run init-env       # remember to set PGPORT=55432 in .env too
+POLICY_PULSE_DB_PORT=27018 uv run init-env       # remember to set the port in MONGODB_URI in .env too
 ```
 
 ### Without the Python wrapper
@@ -82,15 +77,13 @@ POLICY_PULSE_DB_PORT=55432 uv run init-env       # remember to set PGPORT=55432 
 `init-env` is a convenience around `docker-compose.yml`; everything it does can be done by hand:
 
 ```bash
-cp .env.example .env     # then set PGPASSWORD=policy_pulse
-docker login ghcr.io
+cp .env.example .env
 docker compose pull
 docker compose up -d
 docker compose ps        # wait for the healthcheck to say "healthy"
 ```
 
-The container is `policy-pulse-db`, listening on `127.0.0.1:5432`, database/user/password all
-`policy_pulse`.
+The container is `policy-pulse-mongo`, listening on `127.0.0.1:27017`, database `policy_pulse`, no credentials.
 
 ### Updating to a newer snapshot
 

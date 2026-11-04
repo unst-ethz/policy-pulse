@@ -9,7 +9,7 @@ import math
 
 import pytest
 
-pytestmark = pytest.mark.needs_postgres
+pytestmark = pytest.mark.needs_db
 
 
 @pytest.fixture(scope="module")

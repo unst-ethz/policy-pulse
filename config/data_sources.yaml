@@ -1,12 +1,12 @@
 # config/data_sources.yaml
 #
 # App runtime settings. The data sources themselves are no longer configured here: the app reads
-# the already-normalized tables from Postgres (connection via PGHOST/PGPORT/PGDATABASE/PGUSER/
-# PGPASSWORD, see .env.example), and fetching from the UN Digital Library is the `undl-ingest`
+# its collections from MongoDB (connection via MONGODB_URI/MONGODB_DATABASE, see .env.example),
+# and fetching from the UN Digital Library is the `undl-ingest`
 # repo's job.
 #
 # This file previously also carried a `version` key used to invalidate a local CSV/pickle cache.
-# There is no cache any more — the app loads from Postgres in ~25s on every start — so there is
+# There is no cache any more — the app loads from MongoDB in ~25s on every start — so there is
 # nothing to bump when the data or processing changes.
 
 debug: true
