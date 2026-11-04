@@ -14,13 +14,19 @@ const props = withDefaults(
     votes: Record<string, Vote>
     name: (iso3: string) => string
     highlight?: string | null
+    /** Countries to mark with a dot (e.g. the sponsors), named by `markedLabel` for screen readers. */
+    marked?: string[]
+    markedLabel?: string
     /** Hide the not-voting group (it includes states that were not yet members). */
     showAbsent?: boolean
   }>(),
-  { highlight: null, showAbsent: true },
+  { highlight: null, showAbsent: true, marked: () => [], markedLabel: '' },
 )
 
 const { t } = useI18n()
+
+const label = (iso3: string, vote: Vote) =>
+  `${props.name(iso3)}: ${t(`vote.${vote}`)}${props.marked.includes(iso3) ? `, ${props.markedLabel}` : ''}`
 
 const ORDER: Vote[] = ['Y', 'N', 'A', 'X']
 
@@ -49,9 +55,9 @@ const groups = computed(() =>
           <RouterLink
             :to="{ name: 'country', params: { iso3 } }"
             class="cell"
-            :class="{ highlighted: iso3 === highlight }"
-            :title="`${name(iso3)}: ${t(`vote.${group.vote}`)}`"
-            :aria-label="`${name(iso3)}: ${t(`vote.${group.vote}`)}`"
+            :class="{ highlighted: iso3 === highlight, marked: marked.includes(iso3) }"
+            :title="label(iso3, group.vote)"
+            :aria-label="label(iso3, group.vote)"
           >
             {{ iso3 }}
           </RouterLink>
@@ -122,6 +128,21 @@ const groups = computed(() =>
 .cell:hover {
   outline: 2px solid var(--ink);
   outline-offset: -1px;
+}
+
+.cell.marked {
+  position: relative;
+}
+
+.cell.marked::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-end: 2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--cell-ink, #fff);
 }
 
 .cell.highlighted {

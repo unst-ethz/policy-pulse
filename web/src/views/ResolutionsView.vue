@@ -70,6 +70,7 @@ const download = computed(() => csvUrl(filters.value, votes.value, locale.value 
               })
             }}
           </template>
+          <small v-if="filters.sponsor" class="coverage">{{ t('resolutions.sponsorCoverage') }}</small>
         </p>
         <label class="field inline">
           <span>{{ t('resolutions.sort') }}</span>
@@ -98,7 +99,7 @@ const download = computed(() => csvUrl(filters.value, votes.value, locale.value 
           min-height="240px"
           @retry="result.refetch()"
         >
-          <ResolutionTable :items="result.data.value?.items ?? []" :vote-columns="voteColumns" />
+          <ResolutionTable :items="result.data.value?.items ?? []" :vote-columns="voteColumns" sponsors />
         </QueryState>
       </div>
 
@@ -131,6 +132,13 @@ const download = computed(() => csvUrl(filters.value, votes.value, locale.value 
 .summary {
   margin-inline-end: auto;
   font-weight: 500;
+}
+
+.coverage {
+  display: block;
+  font-weight: 400;
+  color: var(--muted);
+  font-size: var(--text-xs);
 }
 
 .inline {

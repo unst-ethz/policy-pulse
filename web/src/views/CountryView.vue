@@ -7,6 +7,7 @@ import {
   useAgreementMap,
   useCountryIndex,
   useProfile,
+  useSponsorship,
   useTimeline,
 } from '@/api/queries'
 import AgreementBars from '@/components/AgreementBars.vue'
@@ -16,6 +17,7 @@ import CountryPicker from '@/components/CountryPicker.vue'
 import FilterBar from '@/components/FilterBar.vue'
 import QueryState from '@/components/QueryState.vue'
 import ScaleLegend from '@/components/ScaleLegend.vue'
+import SponsorshipChart from '@/components/SponsorshipChart.vue'
 import TimelineChart from '@/components/TimelineChart.vue'
 import type { TimelineSeries } from '@/charts/types'
 import VoteBar from '@/components/VoteBar.vue'
@@ -65,7 +67,7 @@ const compareModel = computed({
 })
 
 // --- agreement map -------------------------------------------------------------------------
-const mapFilters = computed(() => ({ ...filters.value, subjects: [], keyword: '', mode: 'none' as const, country: null }))
+const mapFilters = computed(() => ({ ...filters.value, subjects: [], keyword: '', mode: 'none' as const, country: null, sponsor: null }))
 const map = useAgreementMap(mapFilters, () => props.iso3)
 // Centred by default: most pairs agree 0.7-0.95, which on a fixed 0-1 scale is all one blue.
 const centred = ref(true)
@@ -144,6 +146,26 @@ const subjectRows = computed(() =>
     to: { name: 'resolutions', query: { subject: s.subject_id, country: props.iso3, mode: 'voted' } },
   })),
 )
+
+// --- sponsorship ---------------------------------------------------------------------------
+const sponsorship = useSponsorship(() => props.iso3, range)
+const sp = computed(() => sponsorship.data.value)
+const years = computed(() => ({
+  from: filters.value.from ? String(filters.value.from) : undefined,
+  to: filters.value.to ? String(filters.value.to) : undefined,
+}))
+const sponsoredLink = computed(() => ({ name: 'resolutions', query: { ...years.value, sponsor: props.iso3 } }))
+const domainRows = computed(() => {
+  const rows = sp.value?.by_subject ?? []
+  const max = Math.max(1, ...rows.map((s) => s.count))
+  return rows.map((s) => ({
+    key: s.subject_id,
+    label: sentenceCase(s.label),
+    value: s.count / max,
+    display: n(s.count),
+    to: { name: 'resolutions', query: { ...years.value, sponsor: props.iso3, subject: s.subject_id } },
+  }))
+})
 
 const period = computed(() => (p.value ? yearSpan(p.value.start_date, p.value.end_date) : ''))
 const membershipText = computed(() => {
@@ -347,6 +369,108 @@ const membershipText = computed(() => {
       </QueryState>
     </section>
 
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>{{ t('sponsorship.title') }}</h2>
+          <p>{{ t('sponsorship.lead') }}</p>
+        </div>
+      </div>
+      <QueryState
+        :loading="sponsorship.isLoading.value"
+        :fetching="sponsorship.isFetching.value"
+        :error="sponsorship.error.value"
+        min-height="200px"
+        @retry="sponsorship.refetch()"
+      >
+        <div v-if="sp" class="section">
+          <div class="panel overview">
+            <div class="figures">
+              <div>
+                <span class="figure">{{ n(sp.sponsored) }}</span>
+                <span class="caption">{{ t('sponsorship.sponsoredOf', { n: n(sp.with_data) }) }}</span>
+              </div>
+              <div>
+                <span class="figure">{{ n(sp.original) }}</span>
+                <span class="caption">{{ t('sponsorship.asOriginal') }}</span>
+              </div>
+            </div>
+            <p class="hint">
+              {{ t('sponsorship.coverage', { n: n(sp.with_data), total: n(sp.resolutions) }) }}
+            </p>
+            <p>
+              <RouterLink :to="sponsoredLink">{{ t('sponsorship.list', { name: name(iso3) }) }}</RouterLink>
+            </p>
+          </div>
+
+          <ChartFrame :title="t('sponsorship.chartTitle')" :description="t('sponsorship.chartText', { name: name(iso3) })">
+            <SponsorshipChart :years="sp.per_year" />
+            <template #table>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th scope="col">{{ t('country.yearCol') }}</th>
+                    <th scope="col" class="numeric">{{ t('sponsorship.original') }}</th>
+                    <th scope="col" class="numeric">{{ t('sponsorship.additional') }}</th>
+                    <th scope="col" class="numeric">{{ t('sponsorship.withData') }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="y in sp.per_year" :key="y.year">
+                    <td>{{ y.year }}</td>
+                    <td class="numeric">{{ n(y.original) }}</td>
+                    <td class="numeric">{{ n(y.additional) }}</td>
+                    <td class="numeric">{{ n(y.with_data) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </template>
+            <template #note>
+              <p>{{ t('sponsorship.chartNote') }}</p>
+            </template>
+          </ChartFrame>
+
+          <div class="grid-2">
+            <div class="panel notable">
+              <h3>{{ t('sponsorship.domains') }}</h3>
+              <p class="hint">{{ t('sponsorship.domainsText') }}</p>
+              <AgreementBars v-if="domainRows.length" :rows="domainRows" />
+              <p v-else class="hint">{{ t('sponsorship.none') }}</p>
+            </div>
+            <div class="panel notable">
+              <h3>{{ t('sponsorship.reception') }}</h3>
+              <p class="hint">{{ t('sponsorship.receptionText', { name: name(iso3) }) }}</p>
+              <div v-if="sp.reception.length" class="reception">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">{{ t('country.country') }}</th>
+                      <th scope="col" class="numeric">{{ t('vote.N') }}</th>
+                      <th scope="col" class="numeric">{{ t('vote.A') }}</th>
+                      <th scope="col" class="numeric">{{ t('vote.Y') }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="row in sp.reception" :key="row.country">
+                      <td>
+                        <RouterLink :to="{ name: 'country', params: { iso3: row.country }, query: route.query }">
+                          {{ name(row.country) }}
+                        </RouterLink>
+                      </td>
+                      <td class="numeric">{{ n(row.no) }}</td>
+                      <td class="numeric">{{ n(row.abstain) }}</td>
+                      <td class="numeric">{{ n(row.yes) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p v-else class="hint">{{ t('sponsorship.none') }}</p>
+            </div>
+          </div>
+        </div>
+      </QueryState>
+    </section>
+
     <section v-if="p" class="section">
       <h2>{{ t('country.notable') }}</h2>
       <div class="grid-2">
@@ -375,6 +499,20 @@ const membershipText = computed(() => {
               </span>
             </li>
           </ol>
+        </div>
+        <div v-if="sp" class="panel notable">
+          <h3>{{ t('sponsorship.notYes') }}</h3>
+          <p class="hint">{{ t('sponsorship.notYesText') }}</p>
+          <ol v-if="sp.not_yes.length">
+            <li v-for="v in sp.not_yes" :key="v.undl_id">
+              <VoteChip :vote="v.vote" />
+              <span>
+                <RouterLink :to="{ name: 'resolution', params: { id: v.undl_id } }">{{ cleanTitle(v.title) }}</RouterLink>
+                <small>{{ v.symbol }}, {{ t('country.consensusOf', { value: n(v.consensus_score, 'score') }) }}</small>
+              </span>
+            </li>
+          </ol>
+          <p v-else class="hint">{{ t('sponsorship.notYesNone') }}</p>
         </div>
       </div>
     </section>
@@ -463,6 +601,17 @@ const membershipText = computed(() => {
 
 .with {
   width: 240px;
+}
+
+.reception {
+  max-height: 360px;
+  overflow: auto;
+}
+
+.reception thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
 }
 
 .notable {

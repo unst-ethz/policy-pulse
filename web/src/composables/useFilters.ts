@@ -1,7 +1,8 @@
 /**
  * The resolution filter, kept in the URL so every view is shareable and the back button works.
  *
- * URL keys are short and human-readable (`from=1990&to=2020&subject=…&country=CHE&mode=voted&q=…`);
+ * URL keys are short and human-readable (`from=1990&to=2020&subject=…&country=CHE&mode=voted&q=…`,
+ * `sponsor=CHE&original=1`);
  * `toApiParams` turns them into the API's filter parameters.
  */
 import { computed } from 'vue'
@@ -16,6 +17,9 @@ export interface Filters {
   country: string | null
   mode: CountryMode
   keyword: string
+  sponsor: string | null
+  /** Only resolutions `sponsor` was an original sponsor of. */
+  original: boolean
 }
 
 const MODES: CountryMode[] = ['voted', 'member', 'none']
@@ -42,6 +46,8 @@ export function parseFilters(query: LocationQuery): Filters {
     country: one(query.country)?.toUpperCase() ?? null,
     mode: mode && MODES.includes(mode) ? mode : 'none',
     keyword: one(query.q) ?? '',
+    sponsor: one(query.sponsor)?.toUpperCase() ?? null,
+    original: one(query.original) === '1',
   }
 }
 
@@ -53,6 +59,8 @@ export function serializeFilters(filters: Filters): Record<string, string | stri
   if (filters.country) query.country = filters.country
   if (filters.country && filters.mode !== 'none') query.mode = filters.mode
   if (filters.keyword.trim()) query.q = filters.keyword.trim()
+  if (filters.sponsor) query.sponsor = filters.sponsor
+  if (filters.sponsor && filters.original) query.original = '1'
   return query
 }
 
@@ -65,6 +73,8 @@ export function toApiParams(filters: Filters) {
     country: filters.country ?? undefined,
     country_mode: filters.country ? filters.mode : undefined,
     keyword: filters.keyword.trim() || undefined,
+    sponsor: filters.sponsor ?? undefined,
+    original_sponsor: filters.sponsor && filters.original ? true : undefined,
   }
 }
 
@@ -73,7 +83,8 @@ export function countActive(filters: Filters): number {
     (filters.from || filters.to ? 1 : 0) +
     (filters.subjects.length ? 1 : 0) +
     (filters.country && filters.mode !== 'none' ? 1 : 0) +
-    (filters.keyword.trim() ? 1 : 0)
+    (filters.keyword.trim() ? 1 : 0) +
+    (filters.sponsor ? 1 : 0)
   )
 }
 
@@ -88,7 +99,7 @@ export function useFilters() {
     const next = { ...filters.value, ...patch }
     const kept = Object.fromEntries(
       Object.entries(route.query).filter(
-        ([key]) => !['from', 'to', 'subject', 'country', 'mode', 'q', 'page'].includes(key),
+        ([key]) => !['from', 'to', 'subject', 'country', 'mode', 'q', 'sponsor', 'original', 'page'].includes(key),
       ),
     )
     const query: Record<string, unknown> = { ...kept, ...serializeFilters(next) }
@@ -100,7 +111,7 @@ export function useFilters() {
   }
 
   function clear() {
-    update({ from: null, to: null, subjects: [], country: null, mode: 'none', keyword: '' })
+    update({ from: null, to: null, subjects: [], country: null, mode: 'none', keyword: '', sponsor: null, original: false })
   }
 
   return { filters, update, clear }

@@ -12,6 +12,8 @@ describe('URL filters', () => {
       country: 'CHE',
       mode: 'member' as const,
       keyword: 'nuclear & weapons',
+      sponsor: 'USA',
+      original: true,
     }
     expect(parseFilters(serializeFilters(filters))).toEqual(filters)
   })
@@ -25,6 +27,8 @@ describe('URL filters', () => {
       country: 'CHE',
       mode: 'none',
       keyword: '',
+      sponsor: null,
+      original: false,
     })
   })
 
@@ -33,9 +37,23 @@ describe('URL filters', () => {
     expect(query).toEqual({})
   })
 
+  it('drops "original sponsors only" without a sponsor', () => {
+    expect(serializeFilters({ ...parseFilters({}), original: true })).toEqual({})
+    expect(toApiParams(parseFilters({ original: '1' })).original_sponsor).toBeUndefined()
+  })
+
   it('maps to the API filter parameters', () => {
     expect(
-      toApiParams({ from: 2000, to: 2001, subjects: [], country: 'USA', mode: 'voted', keyword: ' x ' }),
+      toApiParams({
+        from: 2000,
+        to: 2001,
+        subjects: [],
+        country: 'USA',
+        mode: 'voted',
+        keyword: ' x ',
+        sponsor: 'CHE',
+        original: true,
+      }),
     ).toEqual({
       start_date: '2000-01-01',
       end_date: '2001-12-31',
@@ -43,11 +61,13 @@ describe('URL filters', () => {
       country: 'USA',
       country_mode: 'voted',
       keyword: 'x',
+      sponsor: 'CHE',
+      original_sponsor: true,
     })
   })
 
   it('counts active filters the way the clear button reports them', () => {
-    expect(countActive(parseFilters({ from: '2000', to: '2010', q: 'a', country: 'CHE' }))).toBe(2)
+    expect(countActive(parseFilters({ from: '2000', to: '2010', q: 'a', country: 'CHE', sponsor: 'CHE' }))).toBe(3)
   })
 })
 

@@ -1,5 +1,5 @@
 /** ECharts, registered piecewise so only what the app draws ends up in the bundle. */
-import { LineChart, MapChart, ScatterChart } from 'echarts/charts'
+import { BarChart, LineChart, MapChart, ScatterChart } from 'echarts/charts'
 import {
   GeoComponent,
   GridComponent,
@@ -13,6 +13,7 @@ import { geoEqualEarth } from 'd3-geo'
 import type { FeatureCollection } from 'geojson'
 
 echarts.use([
+  BarChart,
   LineChart,
   MapChart,
   ScatterChart,

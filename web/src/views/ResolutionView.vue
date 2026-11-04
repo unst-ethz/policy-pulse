@@ -47,10 +47,31 @@ const exactTerm = (term: string) => `"${term}"`
 const keywordGroups = computed(() =>
   Object.entries(r.value?.keywords ?? {}).filter(([, terms]) => terms.length),
 )
+const sponsors = computed(() => r.value?.sponsors ?? [])
+const originals = computed(() => sponsors.value.filter((s) => s.kind === 'original'))
+const additionals = computed(() => sponsors.value.filter((s) => s.kind === 'additional'))
+const sponsorKind = computed(() => new Map(sponsors.value.filter((s) => s.country).map((s) => [s.country!, s.kind])))
+const sponsorStates = computed(() => [...sponsorKind.value.keys()])
+// The ingest's placeholder notes, in plain words; anything new falls back to the generic line.
+const noteText = computed(() => {
+  switch (r.value?.sponsorship_note) {
+    case 'no draft backlinked, report to library':
+      return t('resolution.noteNoDraft')
+    case 'draft symbol not in catalogue, report to library':
+      return t('resolution.noteDraftMissing')
+    case 'draft has no authors catalogued':
+      return t('resolution.noteNoAuthors')
+    case 'linked record is not a draft, report to library':
+      return t('resolution.noteNotDraft')
+    default:
+      return t('resolution.sponsorsUnknown')
+  }
+})
+
 const tableRows = computed(() =>
   Object.entries(votes.value)
     .filter(([, v]) => v !== 'X')
-    .map(([iso3, vote]) => ({ iso3, name: name(iso3), vote }))
+    .map(([iso3, vote]) => ({ iso3, name: name(iso3), vote, sponsor: sponsorKind.value.get(iso3) }))
     .sort((a, b) => a.name.localeCompare(b.name)),
 )
 </script>
@@ -116,6 +137,7 @@ const tableRows = computed(() =>
                   <tr>
                     <th scope="col">{{ t('country.country') }}</th>
                     <th scope="col">{{ t('resolution.vote') }}</th>
+                    <th v-if="sponsors.length" scope="col">{{ t('resolution.sponsor') }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -124,6 +146,7 @@ const tableRows = computed(() =>
                       <RouterLink :to="{ name: 'country', params: { iso3: row.iso3 } }">{{ row.name }}</RouterLink>
                     </td>
                     <td>{{ t(`vote.${row.vote}`) }}</td>
+                    <td v-if="sponsors.length">{{ row.sponsor ? t(`resolution.kinds.${row.sponsor}`) : '' }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -135,10 +158,39 @@ const tableRows = computed(() =>
 
           <section class="section panel">
             <h2>{{ t('resolution.boardTitle') }}</h2>
-            <VoteBoard :votes="votes" :name="name" />
+            <p v-if="sponsorStates.length" class="hint">
+              <span class="dot" aria-hidden="true" /> {{ t('resolution.boardSponsors') }}
+            </p>
+            <VoteBoard :votes="votes" :name="name" :marked="sponsorStates" :marked-label="t('resolution.sponsor')" />
           </section>
         </template>
         <p v-else class="panel unrecorded">{{ t('resolution.noVotes') }}</p>
+
+        <section class="section panel">
+          <h2>{{ t('resolution.sponsors') }}</h2>
+          <template v-if="sponsors.length">
+            <div v-for="group in [{ key: 'original', list: originals }, { key: 'additional', list: additionals }]" :key="group.key">
+              <template v-if="group.list.length">
+                <h3>{{ t(`resolution.sponsorGroups.${group.key}`, { n: group.list.length }) }}</h3>
+                <ul class="tags sponsor-list">
+                  <li v-for="s in group.list" :key="s.name">
+                    <RouterLink v-if="s.country" class="tag" :to="{ name: 'country', params: { iso3: s.country } }">
+                      {{ s.name }}
+                    </RouterLink>
+                    <span v-else class="tag plain">
+                      {{ s.name }} <small>{{ t(`resolution.sponsorTypes.${s.type}`) }}</small>
+                    </span>
+                  </li>
+                </ul>
+              </template>
+            </div>
+            <p class="hint">{{ t('resolution.sponsorsText') }}</p>
+          </template>
+          <template v-else>
+            <p>{{ noteText }}</p>
+            <p class="hint">{{ t('resolution.sponsorsCoverage') }}</p>
+          </template>
+        </section>
 
         <section v-if="r.subjects.length || keywordGroups.length" class="section">
           <h2>{{ t('resolution.about') }}</h2>
@@ -228,6 +280,30 @@ h1 {
   background: var(--surface);
   font-size: var(--text-sm);
   text-decoration: none;
+}
+
+.sponsor-list {
+  list-style: none;
+  margin: var(--space-2) 0 var(--space-4);
+  padding: 0;
+}
+
+.tag.plain small {
+  color: var(--muted);
+}
+
+.hint {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-2);
+  vertical-align: middle;
 }
 
 .tag:hover {

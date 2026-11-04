@@ -2,11 +2,12 @@
 /**
  * Agreement scores (0..1) as labelled horizontal bars, best first. Plain HTML: the labels are
  * long (thesaurus domains, country names), and HTML wraps and translates them properly.
+ * `display` replaces the score as the shown value (e.g. a count, with `value` its share of the bar).
  */
 import { useI18n } from 'vue-i18n'
 
 defineProps<{
-  rows: { key: string; label: string; value: number; detail?: string; to?: object }[]
+  rows: { key: string; label: string; value: number; display?: string; detail?: string; to?: object }[]
 }>()
 const { n } = useI18n()
 </script>
@@ -22,7 +23,7 @@ const { n } = useI18n()
       <span class="track" aria-hidden="true">
         <span class="fill" :style="{ inlineSize: `${row.value * 100}%` }" />
       </span>
-      <span class="value numeric">{{ n(row.value, 'score') }}</span>
+      <span class="value numeric">{{ row.display ?? n(row.value, 'score') }}</span>
     </li>
   </ol>
 </template>

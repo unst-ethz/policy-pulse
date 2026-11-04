@@ -5,7 +5,7 @@ import type { Resolution } from '@/api/client'
 import { cleanTitle } from '@/format'
 import VoteChip from './VoteChip.vue'
 
-defineProps<{ items: Resolution[]; voteColumns?: { iso3: string; label: string }[] }>()
+defineProps<{ items: Resolution[]; voteColumns?: { iso3: string; label: string }[]; sponsors?: boolean }>()
 const { t, d, n } = useI18n()
 
 function outcome(r: Resolution): string {
@@ -25,6 +25,7 @@ function outcome(r: Resolution): string {
           <th scope="col" class="numeric">
             <abbr :title="t('resolution.consensusHelp')">{{ t('resolution.consensus') }}</abbr>
           </th>
+          <th v-if="sponsors" scope="col" class="numeric">{{ t('resolution.sponsorCount') }}</th>
           <th v-for="col in voteColumns ?? []" :key="col.iso3" scope="col">{{ col.label }}</th>
         </tr>
       </thead>
@@ -39,6 +40,10 @@ function outcome(r: Resolution): string {
           </td>
           <td class="outcome" :class="{ unrecorded: r.yes == null }">{{ outcome(r) }}</td>
           <td class="numeric">{{ r.consensus_score == null ? '' : n(r.consensus_score, 'score') }}</td>
+          <!-- null is "not known", never zero sponsors -->
+          <td v-if="sponsors" class="numeric" :class="{ unrecorded: r.sponsor_count == null }">
+            {{ r.sponsor_count == null ? t('resolution.unknown') : n(r.sponsor_count) }}
+          </td>
           <td v-for="col in voteColumns ?? []" :key="col.iso3">
             <!-- No chip without a recorded vote: nobody cast an individual vote to show. -->
             <VoteChip v-if="r.yes != null" :vote="r.votes?.[col.iso3]" />
@@ -89,7 +94,8 @@ function outcome(r: Resolution): string {
   white-space: nowrap;
 }
 
-.outcome.unrecorded {
+.outcome.unrecorded,
+.numeric.unrecorded {
   color: var(--muted);
 }
 </style>

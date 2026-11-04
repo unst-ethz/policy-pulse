@@ -10,10 +10,10 @@ import { type CountryMode, countActive, useFilters } from '@/composables/useFilt
 import CountryPicker from './CountryPicker.vue'
 import SubjectPicker from './SubjectPicker.vue'
 
-type Field = 'years' | 'subjects' | 'keyword' | 'country'
+type Field = 'years' | 'subjects' | 'keyword' | 'country' | 'sponsor'
 
 const props = withDefaults(defineProps<{ fields?: Field[] }>(), {
-  fields: () => ['years', 'subjects', 'keyword', 'country'],
+  fields: () => ['years', 'subjects', 'keyword', 'country', 'sponsor'],
 })
 
 const { t } = useI18n()
@@ -47,6 +47,11 @@ const country = computed({
   get: () => filters.value.country,
   set: (value: string | null) =>
     update({ country: value, mode: value ? (filters.value.mode === 'none' ? 'voted' : filters.value.mode) : 'none' }),
+})
+
+const sponsor = computed({
+  get: () => filters.value.sponsor,
+  set: (value: string | null) => update({ sponsor: value }),
 })
 
 const modes: CountryMode[] = ['voted', 'member', 'none']
@@ -108,6 +113,14 @@ const active = computed(() => countActive(filters.value))
           {{ t(`filters.modes.${mode}`) }}
         </label>
       </div>
+    </div>
+
+    <div v-if="has('sponsor')" class="country">
+      <CountryPicker v-model="sponsor" :label="t('filters.sponsor')" :placeholder="t('filters.anyCountry')" />
+      <label v-if="filters.sponsor" class="modes">
+        <input type="checkbox" :checked="filters.original" @change="update({ original: ($event.target as HTMLInputElement).checked })" />
+        {{ t('filters.originalOnly') }}
+      </label>
     </div>
 
     <button v-if="active" type="button" class="button reset" @click="clear">

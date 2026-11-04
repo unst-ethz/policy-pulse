@@ -267,12 +267,38 @@ export function useProfile(
   })
 }
 
+export function useSponsorship(
+  country: MaybeRefOrGetter<string>,
+  range: MaybeRefOrGetter<{ from: number | null; to: number | null }>,
+) {
+  const lang = useLang()
+  return useQuery({
+    queryKey: ['sponsorship', r(country), r(range), lang],
+    queryFn: () => {
+      const { from, to } = toValue(range)
+      return unwrap(
+        api.GET('/api/v1/countries/{iso3}/sponsorship', {
+          params: {
+            path: { iso3: toValue(country) },
+            query: {
+              start_date: from ? `${from}-01-01` : undefined,
+              end_date: to ? `${to}-12-31` : undefined,
+              lang: lang.value,
+            },
+          },
+        }),
+      )
+    },
+    placeholderData: keepPreviousData,
+  })
+}
+
 /** Build the CSV download URL for the current filters (a plain link: the browser downloads it). */
 export function csvUrl(filters: Filters, votes: string[], lang: Lang): string {
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(toApiParams(filters))) {
     if (Array.isArray(value)) value.forEach((v) => params.append(key, v))
-    else if (value) params.append(key, value)
+    else if (value) params.append(key, String(value))
   }
   votes.forEach((v) => params.append('votes', v))
   params.set('lang', lang)
