@@ -354,6 +354,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/countries/{iso3}/sponsorship": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Country Sponsorship
+         * @description What a state sponsored over a period, and how others voted on it.
+         *
+         *     Coverage follows the UN catalogue (mostly since 2000), so compare `sponsored` with `with_data`,
+         *     not with `resolutions`. The sponsored resolutions themselves: `/resolutions?sponsor=<iso3>`.
+         */
+        get: operations["country_sponsorship_api_v1_countries__iso3__sponsorship_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -532,6 +555,51 @@ export interface components {
             /** Score */
             score: number | null;
         };
+        /** CountrySponsorship */
+        CountrySponsorship: {
+            /** Country */
+            country: string;
+            /** Name */
+            name: string;
+            /** Start Date */
+            start_date: string | null;
+            /** End Date */
+            end_date: string | null;
+            /**
+             * Resolutions
+             * @description Resolutions in the period
+             */
+            resolutions: number;
+            /**
+             * With Data
+             * @description Of those, with sponsorship data
+             */
+            with_data: number;
+            /** Sponsored */
+            sponsored: number;
+            /**
+             * Original
+             * @description Of `sponsored`, as an original sponsor
+             */
+            original: number;
+            /** Per Year */
+            per_year: components["schemas"]["SponsorshipYear"][];
+            /**
+             * By Subject
+             * @description Per thesaurus domain, most first
+             */
+            by_subject: components["schemas"]["SubjectCount"][];
+            /**
+             * Reception
+             * @description Other countries' votes on the recorded-vote resolutions it sponsored, most votes against first
+             */
+            reception: components["schemas"]["SponsorReception"][];
+            /**
+             * Not Yes
+             * @description Resolutions it sponsored but then abstained on or voted against
+             */
+            not_yes: components["schemas"]["NotableVote"][];
+        };
         /** DatasetStats */
         DatasetStats: {
             /** Total Resolutions */
@@ -685,6 +753,11 @@ export interface components {
             };
             /** Category */
             category?: string | null;
+            /**
+             * Sponsor Count
+             * @description null when sponsorship is unknown (no draft could be read)
+             */
+            sponsor_count?: number | null;
         };
         /** ResolutionDetail */
         ResolutionDetail: {
@@ -723,6 +796,11 @@ export interface components {
             };
             /** Category */
             category?: string | null;
+            /**
+             * Sponsor Count
+             * @description null when sponsorship is unknown (no draft could be read)
+             */
+            sponsor_count?: number | null;
             /** Agenda Title */
             agenda_title: string | null;
             /** Draft */
@@ -745,6 +823,16 @@ export interface components {
             all_votes: {
                 [key: string]: "Y" | "N" | "A" | "X";
             };
+            /**
+             * Sponsors
+             * @description Original sponsors first; empty when unknown
+             */
+            sponsors: components["schemas"]["Sponsor"][];
+            /**
+             * Sponsorship Note
+             * @description Why the sponsors are unknown, if they are
+             */
+            sponsorship_note: string | null;
         };
         /** ResolutionPage */
         ResolutionPage: {
@@ -769,6 +857,51 @@ export interface components {
             /** Shared Votes */
             shared_votes: number;
         };
+        /** Sponsor */
+        Sponsor: {
+            /** Name */
+            name: string;
+            /**
+             * Country
+             * @description ISO3 for states; null for observers, bodies, groups
+             */
+            country: string | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "state" | "observer" | "un_body" | "group";
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "original" | "additional";
+        };
+        /** SponsorReception */
+        SponsorReception: {
+            /** Country */
+            country: string;
+            /** Yes */
+            yes: number;
+            /** No */
+            no: number;
+            /** Abstain */
+            abstain: number;
+        };
+        /** SponsorshipYear */
+        SponsorshipYear: {
+            /** Year */
+            year: number;
+            /**
+             * With Data
+             * @description Resolutions that year with sponsorship data
+             */
+            with_data: number;
+            /** Original */
+            original: number;
+            /** Additional */
+            additional: number;
+        };
         /** Subject */
         Subject: {
             /** Id */
@@ -786,6 +919,15 @@ export interface components {
             agreement: number;
             /** Shared Votes */
             shared_votes: number;
+        };
+        /** SubjectCount */
+        SubjectCount: {
+            /** Subject Id */
+            subject_id: string;
+            /** Label */
+            label: string;
+            /** Count */
+            count: number;
         };
         /** TimelineSession */
         TimelineSession: {
@@ -1091,6 +1233,12 @@ export interface operations {
                 country_mode?: "voted" | "member" | "none";
                 /** @description Title/keyword search: "," = OR, "&" = AND, "\"…\"" = exact term */
                 keyword?: string | null;
+                /** @description ISO3 code: only resolutions this state sponsored */
+                sponsor?: string | null;
+                /** @description With `sponsor`: only where it was an original sponsor */
+                original_sponsor?: boolean;
+                /** @description Only resolutions with sponsorship data (mostly since 2000) */
+                sponsorship_known?: boolean;
             };
             header?: never;
             path?: never;
@@ -1137,6 +1285,12 @@ export interface operations {
                 country_mode?: "voted" | "member" | "none";
                 /** @description Title/keyword search: "," = OR, "&" = AND, "\"…\"" = exact term */
                 keyword?: string | null;
+                /** @description ISO3 code: only resolutions this state sponsored */
+                sponsor?: string | null;
+                /** @description With `sponsor`: only where it was an original sponsor */
+                original_sponsor?: boolean;
+                /** @description Only resolutions with sponsorship data (mostly since 2000) */
+                sponsorship_known?: boolean;
             };
             header?: never;
             path?: never;
@@ -1245,6 +1399,12 @@ export interface operations {
                 country_mode?: "voted" | "member" | "none";
                 /** @description Title/keyword search: "," = OR, "&" = AND, "\"…\"" = exact term */
                 keyword?: string | null;
+                /** @description ISO3 code: only resolutions this state sponsored */
+                sponsor?: string | null;
+                /** @description With `sponsor`: only where it was an original sponsor */
+                original_sponsor?: boolean;
+                /** @description Only resolutions with sponsorship data (mostly since 2000) */
+                sponsorship_known?: boolean;
             };
             header?: never;
             path?: never;
@@ -1363,6 +1523,12 @@ export interface operations {
                 country_mode?: "voted" | "member" | "none";
                 /** @description Title/keyword search: "," = OR, "&" = AND, "\"…\"" = exact term */
                 keyword?: string | null;
+                /** @description ISO3 code: only resolutions this state sponsored */
+                sponsor?: string | null;
+                /** @description With `sponsor`: only where it was an original sponsor */
+                original_sponsor?: boolean;
+                /** @description Only resolutions with sponsorship data (mostly since 2000) */
+                sponsorship_known?: boolean;
             };
             header?: never;
             path?: never;
@@ -1408,6 +1574,12 @@ export interface operations {
                 country_mode?: "voted" | "member" | "none";
                 /** @description Title/keyword search: "," = OR, "&" = AND, "\"…\"" = exact term */
                 keyword?: string | null;
+                /** @description ISO3 code: only resolutions this state sponsored */
+                sponsor?: string | null;
+                /** @description With `sponsor`: only where it was an original sponsor */
+                original_sponsor?: boolean;
+                /** @description Only resolutions with sponsorship data (mostly since 2000) */
+                sponsorship_known?: boolean;
             };
             header?: never;
             path?: never;
@@ -1461,6 +1633,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CountryProfile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    country_sponsorship_api_v1_countries__iso3__sponsorship_get: {
+        parameters: {
+            query?: {
+                start_date?: string | null;
+                end_date?: string | null;
+                /** @description Language for country and subject names */
+                lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
+            };
+            header?: never;
+            path: {
+                iso3: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CountrySponsorship"];
                 };
             };
             /** @description Validation Error */

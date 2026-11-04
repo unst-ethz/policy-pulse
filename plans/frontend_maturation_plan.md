@@ -228,3 +228,48 @@ Presentation choices that differ from Dash (not data fixes; the API is unchanged
 Not done yet: CI for `web/`, Playwright end-to-end tests, a production container for `web/`
 (nginx serving `dist/`, proxying `/api`), Arabic/Chinese/Russian/Spanish UI strings, a compare
 page for more than one country at a time, and the five behaviour decisions listed in section 6.
+
+## 8. Sponsorship, topic pages and recurring resolutions (2026-11-04)
+
+Ideas for using `resolution_sponsor` (filled by `derive-resolution-sponsors` in `../undl-ingest`), which the app does not read yet. Nothing here is built.
+
+### The data, as of the local ingestion of 2026-11-03
+
+- 290k rows over all 20,833 resolutions; 198 countries appear as sponsors. Each row is a sponsor (name, country code for states, type `state`/`observer`/`un_body`/`group`, kind `original`/`additional`) or a placeholder with a `note` saying why no sponsor could be read.
+- Coverage follows the catalogue: resolutions with sponsors are ~0% in the 1940s–60s, 7% in the 1970s, 15% in the 1980s, 29% in the 1990s and ~90% from 2000 on (10,665 placeholders say "no draft backlinked"). Every sponsorship view has to state its coverage, so a gap never reads as "never sponsored".
+- Of the 9.5k resolutions with sponsors, 6.7k were adopted without a vote. Sponsorship is the signal exactly where vote-based agreement is silent.
+- Sponsors almost always vote yes on their own texts: of ~91k sponsor votes on recorded votes, 88k Y, 2.5k X, 127 A, 21 N.
+- Median 34 state sponsors per sponsored resolution, 95th percentile 106, so "original sponsor" says much more than "sponsor".
+- Clean-up before use: "State of Palestine" and "Palestine" are separate sponsors; ~3k `un_body` rows (mostly 5th/2nd Committee chairs, GA President) should be excluded from country views by default; groups (G77, African Group) have no country code.
+
+### Features
+
+- **Resolutions:** filter by sponsor country, optionally original sponsors only, and by "has sponsorship data".
+- **Resolution page:** sponsor list split into original and additional; sponsors highlighted on the vote map.
+- **Country page:** sponsored resolutions (list, grouped by subject); sponsorship over time (per year, original vs additional); how other countries vote on resolutions this country sponsored (who opposes its agenda); "sponsored but did not vote yes" cases under notable votes.
+- **Sponsorship page** (questions across countries): co-sponsorship agreement map or network (who sponsors with whom, also covering the resolutions adopted without a vote); most active sponsors by subject and period; coalitions and how cross-regional they are; a coverage explainer.
+- **Topics, reworked:** `/topics` becomes the subject tree with the common-keywords cloud as an entry point; `/topics/:subject` shows resolutions and consensus over time, the leading original sponsors, the most divisive votes, the subject's keyword cloud and its recurring resolutions.
+
+### Recurring resolutions
+
+Nothing in the data marks a recurrence yet: `agenda` is empty for every resolution since session 55 (the ingest parser does not fill it) and `related_documents` is set on 5.
+
+A first cut by normalized title (lowercased, the "resolution / adopted by the General Assembly" suffix stripped) over sessions 55–80 gives 793 recurring titles covering 6,903 of 8,729 resolutions (79%). Not yet checked for false matches. Known problems:
+
+- 75 titles occur several times in one session, mostly budget items ("Financing of UNIFIL" 30 times over 25 sessions); title alone cannot order these. The agenda item or the draft symbol could.
+- Renamed or merged texts break the chain. The "Recalling its resolution …" references in the text would be the most reliable link but need the full texts.
+- Recurrence is not always annual ("Rights of the child": 76, 78, 80), so link to the previous resolution in the series, not the previous session.
+
+Plan: group into series by normalized title (plus the agenda item once ingest fills it), flag ambiguous series instead of guessing, add text references later.
+
+Use on the resolution page: "Previous version: A/RES/78/187", a link to the UN80 diff viewer (`https://diff.un-two-zero.org/?symbol1=<old>&symbol2=<new>`; no API or embed, it renders client-side, so link only), sponsors who joined or left, and countries whose vote changed. On the country page: recurring texts the country stopped (or started) sponsoring, with the year and the diff link.
+
+### Order
+
+1. API: sponsors on the resolution endpoints, sponsor filter, `/countries/{iso3}/sponsorship`; merge the Palestine duplicate, exclude UN bodies from country views. **Done 2026-11-04** (reads Postgres): `sponsor`, `original_sponsor`, `sponsorship_known` filter parameters on every filtered endpoint; `sponsor_count` (null = unknown) on list items; `sponsors` + `sponsorship_note` on the detail; `/countries/{iso3}/sponsorship` with per-year counts, top-level domains, other countries' votes on its sponsored texts and the "sponsored but not yes" list. State names come from the country table, so the catalogue's spelling variants don't show. Not done: sponsors in the CSV export.
+2. Resolution and country pages; sponsor notable votes.
+3. Topic pages, with leading sponsors.
+4. Sponsorship page, with co-sponsorship agreement.
+5. Recurring series: detection, then the "what changed" panel.
+
+Open: the app reads Postgres, while `../undl-ingest` (branch `feature/mongodb`) is moving its loaders, the sponsors one included, to MongoDB. Decide which store the sponsorship API reads before building step 1.

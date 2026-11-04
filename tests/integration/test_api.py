@@ -56,6 +56,8 @@ ENDPOINTS = [
     "/api/v1/multilateral?start_date=2015-01-01",
     "/api/v1/keywords/cloud?mode=thematic",
     "/api/v1/countries/ZAF/profile?compare=NGA&compare=EGY",
+    "/api/v1/resolutions?sponsor=CHE&original_sponsor=true&limit=20",
+    "/api/v1/countries/CHE/sponsorship?start_date=2000-01-01",
 ]
 
 
@@ -140,6 +142,37 @@ def test_resolution_detail(client):
     assert len(detail["all_votes"]) == get(client, "/api/v1/meta")["country_count"]
 
 
+def test_sponsor_filter_and_detail(client):
+    page = get(client, "/api/v1/resolutions?sponsor=CHE&original_sponsor=true&limit=5")
+    everything = get(client, "/api/v1/resolutions?sponsor=CHE&limit=5")
+    assert 0 < page["total"] < everything["total"]
+    detail = get(client, f"/api/v1/resolutions/{page['items'][0]['undl_id']}?lang=fr")
+    swiss = [s for s in detail["sponsors"] if s["country"] == "CHE"]
+    assert swiss == [{"name": "Suisse", "country": "CHE", "type": "state", "kind": "original"}]
+    assert detail["sponsor_count"] == len(detail["sponsors"])
+    assert detail["sponsorship_note"] is None
+    kinds = [s["kind"] for s in detail["sponsors"]]
+    assert kinds == sorted(kinds, key=lambda k: k != "original")  # originals first
+
+
+def test_unknown_sponsorship_is_not_zero(client):
+    page = get(client, "/api/v1/resolutions?end_date=1960-12-31&limit=500")
+    unknown = [r for r in page["items"] if r["sponsor_count"] is None]
+    assert unknown
+    detail = get(client, f"/api/v1/resolutions/{unknown[0]['undl_id']}")
+    assert detail["sponsors"] == [] and detail["sponsorship_note"]
+
+
+def test_country_sponsorship(client):
+    record = get(client, "/api/v1/countries/CHE/sponsorship?start_date=2010-01-01")
+    assert 0 < record["original"] <= record["sponsored"] <= record["with_data"]
+    assert record["with_data"] <= record["resolutions"]
+    listed = get(client, "/api/v1/resolutions?sponsor=CHE&start_date=2010-01-01&limit=1")
+    assert listed["total"] == record["sponsored"]
+    assert sum(y["original"] + y["additional"] for y in record["per_year"]) == record["sponsored"]
+    assert "CHE" not in {r["country"] for r in record["reception"]}
+
+
 def test_agreement_map(client):
     result = get(client, "/api/v1/agreement/map?country=CHE&start_date=2010-01-01")
     scores = {s["country"]: s["score"] for s in result["scores"]}
@@ -196,6 +229,8 @@ def test_csv_export(client):
         ("/api/v1/resolutions?vote=Y", 422),
         ("/api/v1/resolutions?country=USA&pair=GBR", 422),
         ("/api/v1/resolutions?limit=0", 422),
+        ("/api/v1/resolutions?sponsor=XYZ", 422),
+        ("/api/v1/countries/XYZ/sponsorship", 404),
         ("/api/v1/agreement/map", 422),
         ("/api/v1/agreement/timeline?country=USA&compare=USA", 422),
         ("/api/v1/agreement/by-subject?country=USA&compare=USA", 422),

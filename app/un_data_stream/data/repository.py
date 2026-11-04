@@ -16,6 +16,7 @@ from urllib.parse import quote
 
 import pandas as pd
 import yaml
+from sqlalchemy import inspect as sa_inspect
 
 from . import db
 from .processor import DataProcessor
@@ -52,6 +53,14 @@ RESOLUTION_COLUMNS: Dict[str, str] = {
 }
 
 VOTE_COLUMNS = ["undl_id", "country_code", "vote"]
+
+# `resolution_sponsor`: one row per sponsor of a resolution, or one placeholder row (sponsor NULL,
+# `note` saying why) when the draft could not be read. NULL sponsor means "unknown", never
+# "unsponsored". States always carry a `country_code` matching the vote columns.
+SPONSOR_COLUMNS = ["undl_id", "sponsor", "country_code", "sponsor_type", "sponsor_kind", "note"]
+
+# Spellings of one non-state sponsor as catalogued over the years -> the name we show.
+_SPONSOR_ALIASES = {"palestine": "State of Palestine", "state of palestine": "State of Palestine"}
 
 # Vote codes: Yes / No / Abstained / non-voting. Stored as a category rather than object dtype —
 # 19 MB instead of 167 MB for the wide frame, and the same dtype the old CSV cache used.
@@ -94,6 +103,26 @@ def _undl_search_links(symbols: pd.Series, undl_ids: pd.Series) -> List[str]:
     return links
 
 
+def clean_sponsors(raw: pd.DataFrame) -> pd.DataFrame:
+    """Tidy `resolution_sponsor` names: collapse whitespace, drop a leading "the ", merge aliases.
+
+    Only the display name changes. States are identified by `country_code` anyway; this matters
+    for observers and groups, which have no code (e.g. "Palestine" vs "State of Palestine").
+    """
+    sponsors = raw[SPONSOR_COLUMNS].copy()
+    names = sponsors["sponsor"].str.replace(r"\s+", " ", regex=True).str.strip()
+    names = names.str.replace(r"^the ", "", case=False, regex=True)
+    sponsors["sponsor"] = names.map(
+        lambda n: _SPONSOR_ALIASES.get(n.lower(), n), na_action="ignore"
+    )
+    return sponsors
+
+
+def sponsor_counts(sponsors: pd.DataFrame) -> pd.Series:
+    """undl_id -> number of sponsors; resolutions without sponsorship data are absent."""
+    return sponsors.dropna(subset=["sponsor"]).groupby("undl_id").size()
+
+
 class DataRepository:
     """Loads and holds the app's processed UN data, sourced from Postgres."""
 
@@ -104,6 +133,7 @@ class DataRepository:
         self.resolution_table: pd.DataFrame
         self.resolution_subject_table: pd.DataFrame
         self.keyword_table: pd.DataFrame
+        self.sponsor_table: pd.DataFrame
         self.subject_table: pd.DataFrame
         self.closure_table: pd.DataFrame
         self.broader_table: pd.DataFrame
@@ -131,8 +161,8 @@ class DataRepository:
         """Return all processed data as a dict consumed by ResolutionQueryEngine.
 
         Keys:
-            resolution, resolution_subject, resolution_keyword, subject, closure, broader,
-            member_states, voting_activity
+            resolution, resolution_subject, resolution_keyword, resolution_sponsor, subject,
+            closure, broader, member_states, voting_activity
                                 — pd.DataFrames
             country_columns     — List[str] of ISO3 country codes (length C)
             multilateral_scores — (R x C) np.ndarray, float32
@@ -142,6 +172,7 @@ class DataRepository:
             "resolution": self.resolution_table,
             "resolution_subject": self.resolution_subject_table,
             "resolution_keyword": self.keyword_table,
+            "resolution_sponsor": self.sponsor_table,
             "subject": self.subject_table,
             "closure": self.closure_table,
             "broader": self.broader_table,
@@ -231,6 +262,12 @@ class DataRepository:
                 self.keyword_table = db.read_table(
                     conn, "resolution_keyword_cloud", columns=["undl_id", "dimension", "keyword"]
                 )
+                # Optional: databases restored from snapshots older than 2026-10-27 lack it.
+                if sa_inspect(conn).has_table("resolution_sponsor"):
+                    raw_sponsors = db.read_table(conn, "resolution_sponsor", SPONSOR_COLUMNS)
+                else:
+                    self.logger.warning("No resolution_sponsor table; sponsorship stays empty")
+                    raw_sponsors = pd.DataFrame(columns=SPONSOR_COLUMNS)
                 self.closure_table = db.read_table(conn, "subject_closure")
                 self.broader_table = db.read_table(conn, "subject_broader")
                 self.member_states_table = db.read_table(conn, "member_states")
@@ -238,6 +275,7 @@ class DataRepository:
             engine.dispose()
 
         self.voting_activity_table = self._build_voting_activity(outcomes, votes)
+        self.sponsor_table = clean_sponsors(raw_sponsors)
 
         self.logger.info(f"Data ingested up to {self.source_marker}")
         self.logger.info(
@@ -245,11 +283,16 @@ class DataRepository:
             f"{len(self.subject_table)} subjects, "
             f"{len(self.resolution_subject_table)} resolution-subject pairs, "
             f"{len(self.keyword_table)} keyword rows, "
+            f"{len(self.sponsor_table)} sponsor rows, "
             f"{len(self.member_states_table)} member states, "
             f"{len(self.voting_activity_table)} countries with voting activity"
         )
 
         self.resolution_table, self.country_columns = self._build_resolution_table(outcomes, votes)
+        # NaN where the sponsorship is unknown, so "no data" never reads as "no sponsors".
+        self.resolution_table["sponsor_count"] = self.resolution_table["undl_id"].map(
+            sponsor_counts(self.sponsor_table)
+        )
 
         # Precompute the arrays every agreement/alignment query broadcasts over.
         # `country_columns` is passed in, not inferred: the query engine turns a country code into
@@ -352,6 +395,7 @@ class DataRepository:
             ("Resolution Table", self.resolution_table),
             ("Resolution Subject Table", self.resolution_subject_table),
             ("Keyword Table", self.keyword_table),
+            ("Sponsor Table", self.sponsor_table),
             ("Subject Table", self.subject_table),
             ("Closure Table", self.closure_table),
             ("Broader Table", self.broader_table),

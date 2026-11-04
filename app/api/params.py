@@ -42,6 +42,15 @@ def resolution_filter(
         str | None,
         Query(description='Title/keyword search: "," = OR, "&" = AND, "\\"…\\"" = exact term'),
     ] = None,
+    sponsor: Annotated[
+        str | None, Query(description="ISO3 code: only resolutions this state sponsored")
+    ] = None,
+    original_sponsor: Annotated[
+        bool, Query(description="With `sponsor`: only where it was an original sponsor")
+    ] = False,
+    sponsorship_known: Annotated[
+        bool, Query(description="Only resolutions with sponsorship data (mostly since 2000)")
+    ] = False,
 ) -> ResolutionFilter:
     """The resolution selection every list and analysis endpoint works from."""
     return ResolutionFilter(
@@ -51,6 +60,9 @@ def resolution_filter(
         country=known_country(country, "country") if country else None,
         country_mode=country_mode,
         keyword=keyword.strip() if keyword and keyword.strip() else None,
+        sponsor=known_country(sponsor, "sponsor") if sponsor else None,
+        original_sponsor=original_sponsor,
+        sponsorship_known=sponsorship_known,
     )
 
 

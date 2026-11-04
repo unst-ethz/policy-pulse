@@ -18,6 +18,8 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 
+from ..data.repository import SPONSOR_COLUMNS
+
 
 @dataclass(frozen=True)
 class DataSnapshot:
@@ -26,6 +28,8 @@ class DataSnapshot:
     resolution_table: pd.DataFrame
     resolution_subject_table: pd.DataFrame
     keyword_table: pd.DataFrame
+    # `resolution_sponsor`, names cleaned (see repository.clean_sponsors)
+    sponsor_table: pd.DataFrame
     subject_table: pd.DataFrame
     closure_table: pd.DataFrame
     country_columns: List[str]
@@ -65,6 +69,7 @@ class DataSnapshot:
             resolution_table=resolution_table,
             resolution_subject_table=data.get("resolution_subject", pd.DataFrame()),
             keyword_table=data.get("resolution_keyword", pd.DataFrame()),
+            sponsor_table=data.get("resolution_sponsor", pd.DataFrame(columns=SPONSOR_COLUMNS)),
             subject_table=data.get("subject", pd.DataFrame()),
             closure_table=data.get("closure", pd.DataFrame()),
             country_columns=country_columns,
@@ -96,6 +101,7 @@ def empty_snapshot() -> "DataSnapshot":
         resolution_table=pd.DataFrame(columns=["undl_id", "date"]),
         resolution_subject_table=pd.DataFrame(columns=["undl_id", "subject_id"]),
         keyword_table=pd.DataFrame(columns=["undl_id", "dimension", "keyword"]),
+        sponsor_table=pd.DataFrame(columns=SPONSOR_COLUMNS),
         subject_table=pd.DataFrame(columns=["subject_id", "label_en", "node_type"]),
         closure_table=pd.DataFrame(columns=["ancestor_id", "descendant_id", "depth"]),
         country_columns=[],

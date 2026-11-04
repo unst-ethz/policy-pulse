@@ -12,6 +12,7 @@ import pytest
 
 from app.un_data_stream.analysis.snapshot import DataSnapshot, empty_snapshot
 from app.un_data_stream.data import reloader
+from app.un_data_stream.data.repository import SPONSOR_COLUMNS
 
 NOW = datetime(2026, 9, 17, 12, 0, tzinfo=timezone.utc)
 EARLIER = NOW - timedelta(hours=12)
@@ -109,6 +110,7 @@ def _snapshot(n_resolutions: int, marker: datetime) -> DataSnapshot:
         resolution_table=pd.DataFrame({"undl_id": ids, "date": ["2020-01-01"] * n_resolutions}),
         resolution_subject_table=pd.DataFrame(columns=["undl_id", "subject_id"]),
         keyword_table=pd.DataFrame(columns=["undl_id", "dimension", "keyword"]),
+        sponsor_table=pd.DataFrame(columns=SPONSOR_COLUMNS),
         subject_table=pd.DataFrame(columns=["subject_id", "label_en", "node_type"]),
         closure_table=pd.DataFrame(columns=["ancestor_id", "descendant_id", "depth"]),
         country_columns=countries,

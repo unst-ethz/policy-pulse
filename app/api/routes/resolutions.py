@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 
 from ... import data
-from ...un_data_stream.analysis import filtering, overview
+from ...un_data_stream.analysis import filtering, overview, sponsorship
 from ...un_data_stream.analysis.filtering import ResolutionFilter
 from .. import schemas
 from ..params import (
@@ -45,6 +45,7 @@ def _resolution(row: dict, vote_countries: list[str]) -> schemas.Resolution:
         undl_link=text(row.get("undl_link")),
         votes={c: row[c] for c in vote_countries if c in row},
         category=text(row.get("category_tag")),
+        sponsor_count=integer(row.get("sponsor_count")),
     )
 
 
@@ -164,6 +165,7 @@ def resolution_detail(undl_id: str, lang: LangParam = "en") -> schemas.Resolutio
     for dimension, keyword in keyword_rows[["dimension", "keyword"]].itertuples(index=False):
         keywords.setdefault(str(dimension), []).append(keyword)
 
+    sponsors, sponsorship_note = sponsorship.resolution_sponsors(snapshot, undl_id)
     base = _resolution(row, [])
     return schemas.ResolutionDetail(
         **base.model_dump(),
@@ -173,4 +175,15 @@ def resolution_detail(undl_id: str, lang: LangParam = "en") -> schemas.Resolutio
         subjects=[schemas.Subject(id=s, label=labels.get(s, s)) for s in subject_ids],
         keywords=keywords,
         all_votes={c: row[c] for c in snapshot.country_columns if not pd.isna(row[c])},
+        sponsors=[
+            schemas.Sponsor(
+                # States by code, so a name catalogued in a dozen spellings reads the same.
+                name=data.get_country_name(s.country_code, lang) if s.country_code else s.sponsor,
+                country=s.country_code,
+                type=s.sponsor_type,
+                kind=s.sponsor_kind,
+            )
+            for s in sponsors.itertuples(index=False)
+        ],
+        sponsorship_note=text(sponsorship_note),
     )

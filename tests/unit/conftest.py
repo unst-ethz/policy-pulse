@@ -14,6 +14,10 @@ Votes (Y/N/A, X = did not vote):
     105      2002-02-01  57       International Day of Peace     X   X   X   X    PEACE (no vote)
     106      2002-05-01  57       Women in development           A   Y   Y   N    -
 
+Sponsors: 101 AAA (original) + BBB (additional); 103 AAA + the GA President (both original);
+104 AAA (additional); 106 CCC + the Group of 77 (original). 102 has a placeholder (draft not
+found), 105 no rows at all — both "unknown".
+
 DISARMAMENT is a child of PEACE. Pairwise agreement is 1 for equal votes, 0.5 one step apart
 (Y/A, A/N), 0 for Y/N; resolutions where either side did not vote are skipped. So:
 
@@ -78,8 +82,23 @@ KEYWORDS = pd.DataFrame(
 )
 
 
+SPONSORS = pd.DataFrame(
+    [
+        ("101", "AAA land", "AAA", "state", "original", None),
+        ("101", "BBB land", "BBB", "state", "additional", None),
+        ("103", "AAA land", "AAA", "state", "original", None),
+        ("103", "UN. General Assembly. President", None, "un_body", "original", None),
+        ("104", "AAA land", "AAA", "state", "additional", None),
+        ("106", "CCC land", "CCC", "state", "original", None),
+        ("106", "Group of 77", None, "group", "original", None),
+        ("102", None, None, None, None, "no draft backlinked, report to library"),
+    ],
+    columns=["undl_id", "sponsor", "country_code", "sponsor_type", "sponsor_kind", "note"],
+)
+
+
 def build_resolution_table() -> pd.DataFrame:
-    from app.un_data_stream.data.repository import VOTE_DTYPE
+    from app.un_data_stream.data.repository import VOTE_DTYPE, sponsor_counts
 
     rows = []
     for undl_id, date, session, title, votes in RESOLUTIONS:
@@ -106,6 +125,7 @@ def build_resolution_table() -> pd.DataFrame:
         )
     table = pd.DataFrame(rows)
     table[COUNTRIES] = table[COUNTRIES].astype(VOTE_DTYPE)
+    table["sponsor_count"] = table["undl_id"].map(sponsor_counts(SPONSORS))
     return table
 
 
@@ -126,6 +146,7 @@ class _Repo:
             "resolution": table,
             "resolution_subject": RESOLUTION_SUBJECTS,
             "resolution_keyword": KEYWORDS,
+            "resolution_sponsor": SPONSORS,
             "subject": SUBJECTS,
             "closure": CLOSURE,
             "country_columns": COUNTRIES,

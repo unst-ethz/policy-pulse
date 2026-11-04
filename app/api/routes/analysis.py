@@ -10,7 +10,14 @@ from typing import Annotated, Literal, get_args
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ... import data
-from ...un_data_stream.analysis import agreement, filtering, keywords, profile, word_cloud
+from ...un_data_stream.analysis import (
+    agreement,
+    filtering,
+    keywords,
+    profile,
+    sponsorship,
+    word_cloud,
+)
 from ...un_data_stream.analysis.filtering import ResolutionFilter
 from .. import schemas
 from ..params import (
@@ -314,4 +321,45 @@ def country_profile(
         ],
         opposed_high_consensus=_notable(prof.opposed_high_consensus, country),
         supported_low_consensus=_notable(prof.supported_low_consensus, country),
+    )
+
+
+@router.get("/countries/{iso3}/sponsorship", response_model=schemas.CountrySponsorship)
+def country_sponsorship(
+    iso3: str,
+    start_date: dt.date | None = None,
+    end_date: dt.date | None = None,
+    lang: LangParam = "en",
+) -> schemas.CountrySponsorship:
+    """What a state sponsored over a period, and how others voted on it.
+
+    Coverage follows the UN catalogue (mostly since 2000), so compare `sponsored` with `with_data`,
+    not with `resolutions`. The sponsored resolutions themselves: `/resolutions?sponsor=<iso3>`.
+    """
+    country = known_country(iso3, "iso3", status_code=404)
+    record = sponsorship.country_sponsorship(
+        data.query_engine, country, _iso(start_date), _iso(end_date), data.TOP_LEVEL_SUBJECTS
+    )
+    labels = subject_labels(lang)
+    return schemas.CountrySponsorship(
+        country=country,
+        name=data.get_country_name(country, lang),
+        start_date=start_date,
+        end_date=end_date,
+        resolutions=record.resolutions,
+        with_data=record.with_data,
+        sponsored=record.sponsored,
+        original=record.original,
+        per_year=[schemas.SponsorshipYear(**r) for r in record.per_year.to_dict("records")],
+        by_subject=[
+            schemas.SubjectCount(subject_id=s, label=labels.get(s, s), count=int(n))
+            for s, n in record.by_subject.items()
+        ],
+        reception=[
+            schemas.SponsorReception(
+                country=r["country"], yes=int(r["yes"]), no=int(r["no"]), abstain=int(r["abstain"])
+            )
+            for r in record.reception.to_dict("records")
+        ],
+        not_yes=_notable(record.not_yes, country),
     )

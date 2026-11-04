@@ -9,6 +9,7 @@ from typing import Callable, Literal
 
 import pandas as pd
 
+from . import sponsorship
 from .keywords import keyword_index, matched_ids
 from .query_engine import ResolutionQueryEngine
 
@@ -31,6 +32,7 @@ COLUMNS = [
     "total_abstentions",
     "modality",
     "undl_link",
+    "sponsor_count",
 ]
 
 # The columns of a CSV export, before the per-country vote columns.
@@ -60,6 +62,9 @@ class ResolutionFilter:
     country: str | None = None  # ISO3; only used by `country_mode`
     country_mode: CountryMode = "none"
     keyword: str | None = None  # see keywords.matched_ids for the syntax
+    sponsor: str | None = None  # ISO3; only resolutions this state sponsored
+    original_sponsor: bool = False  # with `sponsor`: only as an original sponsor
+    sponsorship_known: bool = False  # only resolutions with sponsorship data
 
     @classmethod
     def from_filter_store(cls, filter_data: dict) -> "ResolutionFilter":
@@ -113,6 +118,14 @@ def filter_resolutions(
             # redundant: membership periods are keyed by ISO code, so a state that voted under a
             # predecessor's code has votes outside its recorded periods.
             df = df[membership_mask(country, df["date"]) | cast_a_vote]
+
+    if criteria.sponsor:
+        ids = sponsorship.sponsored_ids(
+            engine.snapshot, criteria.sponsor, criteria.original_sponsor
+        )
+        df = df[df["undl_id"].isin(ids)]
+    if criteria.sponsorship_known:
+        df = df[df["undl_id"].isin(sponsorship.known_ids(engine.snapshot))]
 
     if apply_keyword:
         df = filter_by_keyword(engine, df, criteria.keyword)

@@ -82,6 +82,9 @@ class Resolution(BaseModel):
     undl_link: str | None
     votes: dict[str, Vote] = Field(default={}, description="Votes of the requested countries")
     category: str | None = None
+    sponsor_count: int | None = Field(
+        default=None, description="null when sponsorship is unknown (no draft could be read)"
+    )
 
 
 class ResolutionPage(BaseModel):
@@ -97,6 +100,13 @@ class Subject(BaseModel):
     label: str
 
 
+class Sponsor(BaseModel):
+    name: str
+    country: str | None = Field(description="ISO3 for states; null for observers, bodies, groups")
+    type: Literal["state", "observer", "un_body", "group"]
+    kind: Literal["original", "additional"]
+
+
 class ResolutionDetail(Resolution):
     agenda_title: str | None
     draft: str | None
@@ -104,6 +114,8 @@ class ResolutionDetail(Resolution):
     subjects: list[Subject]
     keywords: dict[str, list[str]] = Field(description="Keyword terms per dimension")
     all_votes: dict[str, Vote] = Field(description="Every country's vote (X = did not vote)")
+    sponsors: list[Sponsor] = Field(description="Original sponsors first; empty when unknown")
+    sponsorship_note: str | None = Field(description="Why the sponsors are unknown, if they are")
 
 
 class ConsensusScale(BaseModel):
@@ -238,3 +250,43 @@ class CountryProfile(BaseModel):
     yearly_alignment: list[YearlyAlignment]
     opposed_high_consensus: list[NotableVote]
     supported_low_consensus: list[NotableVote]
+
+
+class SponsorshipYear(BaseModel):
+    year: int
+    with_data: int = Field(description="Resolutions that year with sponsorship data")
+    original: int
+    additional: int
+
+
+class SubjectCount(BaseModel):
+    subject_id: str
+    label: str
+    count: int
+
+
+class SponsorReception(BaseModel):
+    country: str
+    yes: int
+    no: int
+    abstain: int
+
+
+class CountrySponsorship(BaseModel):
+    country: str
+    name: str
+    start_date: dt.date | None
+    end_date: dt.date | None
+    resolutions: int = Field(description="Resolutions in the period")
+    with_data: int = Field(description="Of those, with sponsorship data")
+    sponsored: int
+    original: int = Field(description="Of `sponsored`, as an original sponsor")
+    per_year: list[SponsorshipYear]
+    by_subject: list[SubjectCount] = Field(description="Per thesaurus domain, most first")
+    reception: list[SponsorReception] = Field(
+        description="Other countries' votes on the recorded-vote resolutions it sponsored, "
+        "most votes against first"
+    )
+    not_yes: list[NotableVote] = Field(
+        description="Resolutions it sponsored but then abstained on or voted against"
+    )
