@@ -168,9 +168,13 @@ PairAgreement = Literal["AGREED", "DISAGREED", "STRONGLY_DISAGREED"]
 
 
 def sort_resolutions(df: pd.DataFrame, order: str | None) -> pd.DataFrame:
-    """Sort by one of `SORT_ORDERS` (default newest first); missing values last."""
+    """Sort by one of `SORT_ORDERS` (default newest first); missing values last.
+
+    Ties (same date, same score) are broken by `undl_id`, so the order, and with it every page
+    of a paginated list, doesn't depend on the row order the data happened to load in.
+    """
     sort_by, ascending = SORT_ORDERS.get(order or "", SORT_ORDERS["date_desc"])
-    return df.copy().sort_values(sort_by, ascending=ascending, na_position="last")
+    return df.sort_values([sort_by, "undl_id"], ascending=ascending, na_position="last")
 
 
 def filter_by_pair_agreement(

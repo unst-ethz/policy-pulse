@@ -93,6 +93,21 @@ def test_sort_orders(engine, order, first):
     assert filtering.sort_resolutions(df, order)["undl_id"].iloc[0] == first
 
 
+def test_ties_sort_the_same_whatever_the_input_order():
+    df = pd.DataFrame(
+        {
+            "undl_id": ["3", "1", "4", "2"],
+            "date": pd.to_datetime(["2026-01-01"] * 3 + ["2025-01-01"]),
+            "consensus_score": [0.5, 0.5, None, 0.5],
+        }
+    )
+    for order in filtering.SORT_ORDERS:
+        forward = filtering.sort_resolutions(df, order)["undl_id"].tolist()
+        backward = filtering.sort_resolutions(df.iloc[::-1], order)["undl_id"].tolist()
+        assert forward == backward, order
+    assert filtering.sort_resolutions(df, "date_desc")["undl_id"].tolist() == ["4", "3", "1", "2"]
+
+
 def test_unscored_resolutions_sort_last(engine):
     df = filtering.filter_resolutions(engine, ResolutionFilter())
     for order in ("consensus_asc", "consensus_desc"):
