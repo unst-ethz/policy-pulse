@@ -19,6 +19,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write # OIDC -> AWS role for the ECR push, no stored AWS keys
 
     steps:
       - name: Checkout repository
@@ -33,6 +34,19 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ECR (AWS move): repo variables AWS_ROLE_ARN and AWS_REGION come from policy-pulse-infra/bootstrap.
+      - name: Configure AWS credentials
+        if: github.ref_name == 'feature/api-mongodb'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Log in to ECR
+        if: github.ref_name == 'feature/api-mongodb'
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Extract metadata for Docker
         id: meta
@@ -50,7 +64,10 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          # ECR gets only the immutable sha tag (task definitions pin it); the line is empty on other branches.
+          tags: |
+            ${{ steps.meta.outputs.tags }}
+            ${{ steps.ecr.outputs.registry && format('{0}/policy-pulse:{1}', steps.ecr.outputs.registry, github.sha) || '' }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             BUILD_COMMIT=${{ github.sha }}
