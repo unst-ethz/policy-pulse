@@ -64,6 +64,8 @@ jobs:
         with:
           context: .
           push: true
+          # One plain image, no index + attestation: ECR's untagged-image lifecycle rule would hit the image under the index.
+          provenance: false
           # ECR gets only the immutable sha tag (task definitions pin it); the line is empty on other branches.
           tags: |
             ${{ steps.meta.outputs.tags }}
