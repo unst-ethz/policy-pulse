@@ -50,6 +50,7 @@ ENDPOINTS = [
     "/api/v1/stats/overview",
     "/api/v1/resolutions?votes=USA,CHN&sort=consensus_asc&limit=20",
     "/api/v1/resolutions/recent",
+    "/api/v1/resolutions/facets?keyword=women&lang=fr",
     "/api/v1/agreement/map?country=BRA&start_date=1990-01-01",
     "/api/v1/agreement/timeline?country=IND&compare=PAK,USA",
     "/api/v1/agreement/by-subject?country=FRA&compare=DEU",
@@ -173,6 +174,61 @@ def test_country_sponsorship(client):
     assert listed["total"] == record["sponsored"]
     assert sum(y["original"] + y["additional"] for y in record["per_year"]) == record["sponsored"]
     assert "CHE" not in {r["country"] for r in record["reception"]}
+
+
+def test_facets_ignore_their_own_filter(client):
+    base = "/api/v1/resolutions"
+    facets = get(client, f"{base}/facets?keyword=nuclear&start_date=2000-01-01&end_date=2009-12-31")
+    years = {y["year"]: y["resolutions"] for y in facets["years"]}
+    assert min(years) < 2000  # the period does not narrow its own facet
+    assert (
+        years[2005]
+        == get(client, f"{base}?keyword=nuclear&start_date=2005-01-01&end_date=2005-12-31")["total"]
+    )
+
+    first = facets["domains"][0]
+    narrowed = get(
+        client,
+        f"{base}/facets?keyword=nuclear&start_date=2000-01-01&end_date=2009-12-31&subject={first['subject_id']}",
+    )
+    assert narrowed["domains"] == facets["domains"]
+    listed = get(
+        client,
+        f"{base}?keyword=nuclear&start_date=2000-01-01&end_date=2009-12-31&subject={first['subject_id']}",
+    )
+    assert listed["total"] == first["resolutions"]
+    get(client, f"{base}/facets?sponsor=XXX", status=422)
+
+
+def test_group_vote_filter_and_facet(client):
+    base = "/api/v1/resolutions"
+    query = "group=CHE,FRA&group=155&group_vote=split&start_date=2000-01-01"  # 155: Western Europe
+    counts = {
+        g["group_vote"]: g["resolutions"]
+        for g in get(client, f"{base}/facets?{query}")["group_votes"]
+    }
+    assert counts["split"] == get(client, f"{base}?{query}")["total"] > 0
+    alike = get(client, f"{base}?{query.replace('split', 'alike')}")["total"]
+    assert alike == counts["alike"]
+    strict = get(client, f"{base}?{query}&group_all_voted=true")["total"]
+    assert strict <= counts["split"]
+    assert get(client, f"{base}/facets?start_date=2000-01-01")["group_votes"] == []
+    get(client, f"{base}?group=XXX&group_vote=alike", status=422)
+
+
+def test_adoption_filter_and_facet(client):
+    base = "/api/v1/resolutions"
+    counts = {
+        a["adoption"]: a["resolutions"]
+        for a in get(client, f"{base}/facets?adoption=recorded")["adoption"]
+    }
+    assert set(counts) == {"recorded", "non_recorded", "without_vote"}
+    assert sum(counts.values()) == get(client, base)["total"]  # the facet ignores its own filter
+    recorded = get(client, f"{base}?adoption=recorded")
+    assert recorded["total"] == recorded["recorded_votes"] == counts["recorded"]
+    both = get(client, f"{base}?adoption=non_recorded&adoption=without_vote")["total"]
+    assert both == counts["non_recorded"] + counts["without_vote"]
+    get(client, f"{base}?adoption=maybe", status=422)
 
 
 def test_subject_domains_and_sponsors(client):

@@ -1,5 +1,7 @@
 /** Display helpers shared by views. */
 
+import type { TreeNode } from '@/api/client'
+
 /**
  * Resolution titles from the Digital Library end in catalogue boilerplate
  * (" : resolution / adopted by the General Assembly"); drop it for display.
@@ -15,6 +17,14 @@ export function sentenceCase(label: string): string {
   if (label !== label.toUpperCase() || label === label.toLowerCase()) return label
   const lower = label.toLocaleLowerCase()
   return lower.charAt(0).toLocaleUpperCase() + lower.slice(1)
+}
+
+/** Every node of the subject tree, labels in sentence case, each with its domain's label. */
+export function flatSubjects(nodes: TreeNode[], domain: string | null = null): { id: string; label: string; domain: string }[] {
+  return nodes.flatMap((node) => {
+    const label = sentenceCase(node.label)
+    return [{ id: node.id, label, domain: domain ?? '' }, ...flatSubjects(node.children ?? [], domain ?? label)]
+  })
 }
 
 /** First and last year of an ISO date range, as "1990–2020" (or a single year). */

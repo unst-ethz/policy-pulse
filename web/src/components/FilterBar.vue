@@ -3,11 +3,12 @@
  * The resolution filter, in one row above everything it applies to. A page shows only the
  * filters that change what it displays, instead of greying out the ones that don't.
  */
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useMeta } from '@/api/queries'
 import { type CountryMode, countActive, useFilters } from '@/composables/useFilters'
 import CountryPicker from './CountryPicker.vue'
+import KeywordField from './KeywordField.vue'
 import SubjectPicker from './SubjectPicker.vue'
 
 type Field = 'years' | 'subjects' | 'keyword' | 'country' | 'sponsor'
@@ -27,17 +28,6 @@ const years = computed(() => {
   const last = Number(meta.data.value?.latest_date?.slice(0, 4) ?? new Date().getFullYear())
   return Array.from({ length: last - first + 1 }, (_, i) => first + i)
 })
-
-const keyword = ref(filters.value.keyword)
-watch(
-  () => filters.value.keyword,
-  (value) => (keyword.value = value),
-)
-let timer: ReturnType<typeof setTimeout> | undefined
-function onKeyword() {
-  clearTimeout(timer)
-  timer = setTimeout(() => update({ keyword: keyword.value }), 400)
-}
 
 const subjects = computed({
   get: () => filters.value.subjects,
@@ -87,17 +77,7 @@ const active = computed(() => countActive(filters.value))
 
     <SubjectPicker v-if="has('subjects')" v-model="subjects" :label="t('filters.subjects')" class="subjects" />
 
-    <label v-if="has('keyword')" class="field keyword">
-      <span>{{ t('filters.keyword') }}</span>
-      <input
-        v-model="keyword"
-        class="input"
-        type="search"
-        :placeholder="t('filters.keywordHint')"
-        @input="onKeyword"
-        @keydown.enter="update({ keyword })"
-      />
-    </label>
+    <KeywordField v-if="has('keyword')" class="keyword" />
 
     <div v-if="has('country')" class="country">
       <CountryPicker v-model="country" :label="t('filters.country')" :placeholder="t('filters.anyCountry')" />
@@ -154,10 +134,6 @@ const active = computed(() => countActive(filters.value))
 .keyword {
   flex: 1 1 220px;
   max-width: 360px;
-}
-
-.keyword .input {
-  width: 100%;
 }
 
 .country {

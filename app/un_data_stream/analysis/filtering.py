@@ -14,6 +14,8 @@ from .keywords import keyword_index, matched_ids
 from .query_engine import ResolutionQueryEngine
 
 CountryMode = Literal["voted", "member", "none"]
+# How a group of states voted: all alike, split, or a majority one way
+GroupVote = Literal["alike", "split", "yes", "no", "abstain"]
 
 # Votes a country can cast; the vote columns also hold "X" for "did not vote".
 CAST_VOTES = ("Y", "N", "A")
@@ -65,6 +67,10 @@ class ResolutionFilter:
     sponsor: str | None = None  # ISO3; only resolutions this state sponsored
     original_sponsor: bool = False  # with `sponsor`: only as an original sponsor
     sponsorship_known: bool = False  # only resolutions with sponsorship data
+    modalities: tuple[str, ...] | None = None  # how adopted: `modality` values, any of them
+    group: tuple[str, ...] | None = None  # ISO3 codes, judged together by `group_vote`
+    group_vote: GroupVote | None = None
+    group_all_voted: bool = False  # with `group_vote`: only where every state in `group` voted
 
     @classmethod
     def from_filter_store(cls, filter_data: dict) -> "ResolutionFilter":
@@ -127,12 +133,40 @@ def filter_resolutions(
     if criteria.sponsorship_known:
         df = df[df["undl_id"].isin(sponsorship.known_ids(engine.snapshot))]
 
+    if criteria.modalities:
+        df = df[df["modality"].isin(criteria.modalities)]
+    if criteria.group and criteria.group_vote:
+        df = df[group_vote_masks(df, criteria.group, criteria.group_all_voted)[criteria.group_vote]]
+
     if apply_keyword:
         df = filter_by_keyword(engine, df, criteria.keyword)
 
     if columns is None:
         return df
     return df[[column for column in columns if column in df.columns]]
+
+
+def group_vote_masks(
+    df: pd.DataFrame, group: tuple[str, ...], all_voted: bool = False
+) -> dict[GroupVote, pd.Series]:
+    """Per `GroupVote`, which rows of `df` (with vote columns) the group voted that way on.
+
+    Only states that cast a vote count, and a row needs at least two of them; `all_voted`
+    instead needs every state of the group. A majority is more than half of the votes cast.
+    """
+    votes = df[[c for c in group if c in df.columns]]
+    yes, no, abstain = ((votes == v).sum(axis=1) for v in CAST_VOTES)
+    cast = yes + no + abstain
+    judged = cast == len(group) if all_voted else cast >= 2
+    judged &= cast >= 2  # a group of one has nothing to agree or split on
+    alike = (yes == cast) | (no == cast) | (abstain == cast)
+    return {
+        "alike": judged & alike,
+        "split": judged & ~alike,
+        "yes": judged & (yes * 2 > cast),
+        "no": judged & (no * 2 > cast),
+        "abstain": judged & (abstain * 2 > cast),
+    }
 
 
 def filter_by_keyword(

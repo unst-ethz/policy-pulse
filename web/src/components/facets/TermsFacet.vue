@@ -2,7 +2,8 @@
 /**
  * The most common terms of the listed resolutions as chips: a chip adds its term to the keyword
  * filter, or takes it out again. "More terms" opens the full word cloud in a side drawer, beside
- * the list it narrows.
+ * the list it narrows. Unlike the other facets its counts include its own filter: each is what
+ * adding that term would give.
  */
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -23,7 +24,8 @@ import {
   toggleTerm,
   useFilters,
 } from "@/composables/useFilters";
-import TermCloud from "./TermCloud.vue";
+import TermCloud from "../TermCloud.vue";
+import FacetPanel from "./FacetPanel.vue";
 
 const CHIPS = 8;
 
@@ -65,12 +67,19 @@ watch(open, (isOpen) => {
 function toggle(term: string) {
   update({ keyword: toggleTerm(filters.value.keyword, term) });
 }
+
+// Takes out the chips' terms only; the rest of a typed search stays
+const active = computed(() => exactTerms(filters.value.keyword).length > 0);
+function clear() {
+  update({ keyword: exactTerms(filters.value.keyword).reduce(toggleTerm, filters.value.keyword) });
+}
 </script>
 
 <template>
+  <FacetPanel
+    :info="t('facets.info.terms')" :title="t('facets.terms')" :active="active" @clear="clear">
   <div class="terms" :class="{ fetching: cloud.isFetching.value }">
     <template v-if="chips.length">
-      <span class="lead">{{ t("cloud.common") }}</span>
       <button
         v-for="chip in chips"
         :key="chip.term"
@@ -109,6 +118,7 @@ function toggle(term: string) {
       </DialogPortal>
     </DialogRoot>
   </div>
+  </FacetPanel>
 </template>
 
 <style scoped>
@@ -123,10 +133,6 @@ function toggle(term: string) {
 
 .terms.fetching {
   opacity: 0.6;
-}
-
-.lead {
-  color: var(--ink-2);
 }
 
 .chip {

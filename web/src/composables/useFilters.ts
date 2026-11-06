@@ -2,13 +2,20 @@
  * The resolution filter, kept in the URL so every view is shareable and the back button works.
  *
  * URL keys are short and human-readable (`from=1990&to=2020&subject=…&country=CHE&mode=voted&q=…`,
- * `sponsor=CHE&original=1`);
+ * `sponsor=CHE&original=1`, `adopted=recorded&adopted=without_vote`,
+ * `group=CHE&group=155&together=split&allvoted=1`);
  * `toApiParams` turns them into the API's filter parameters.
  */
 import { computed } from 'vue'
 import { type LocationQuery, useRoute, useRouter } from 'vue-router'
 
 export type CountryMode = 'voted' | 'member' | 'none'
+/** How a resolution was adopted, as the API names it. */
+export type Adoption = 'recorded' | 'non_recorded' | 'without_vote'
+export const ADOPTIONS: Adoption[] = ['recorded', 'non_recorded', 'without_vote']
+/** How a group of states voted: all alike, split, or a majority one way. */
+export type GroupVote = 'alike' | 'split' | 'yes' | 'no' | 'abstain'
+export const GROUP_VOTES: GroupVote[] = ['alike', 'split', 'yes', 'no', 'abstain']
 
 export interface Filters {
   from: number | null
@@ -20,9 +27,20 @@ export interface Filters {
   sponsor: string | null
   /** Only resolutions `sponsor` was an original sponsor of. */
   original: boolean
+  /** Any of these ways of adoption; empty = all. */
+  adoption: Adoption[]
+  /** ISO3 codes, judged together by `together`. */
+  group: string[]
+  together: GroupVote | null
+  /** With `together`: only where every state of the group voted. */
+  allVoted: boolean
 }
 
 const MODES: CountryMode[] = ['voted', 'member', 'none']
+
+function many(value: LocationQuery[string] | undefined): string[] {
+  return (Array.isArray(value) ? value : value ? [value] : []).filter((v): v is string => !!v)
+}
 
 function one(value: LocationQuery[string] | undefined): string | null {
   const v = Array.isArray(value) ? value[0] : value
@@ -35,19 +53,22 @@ function year(value: LocationQuery[string] | undefined): number | null {
 }
 
 export function parseFilters(query: LocationQuery): Filters {
-  const subjects = query.subject
   const mode = one(query.mode) as CountryMode | null
   return {
     from: year(query.from),
     to: year(query.to),
-    subjects: (Array.isArray(subjects) ? subjects : subjects ? [subjects] : []).filter(
-      (s): s is string => !!s,
-    ),
+    subjects: many(query.subject),
     country: one(query.country)?.toUpperCase() ?? null,
     mode: mode && MODES.includes(mode) ? mode : 'none',
     keyword: one(query.q) ?? '',
     sponsor: one(query.sponsor)?.toUpperCase() ?? null,
     original: one(query.original) === '1',
+    adoption: many(query.adopted).filter((a): a is Adoption => ADOPTIONS.includes(a as Adoption)),
+    group: many(query.group)
+      .map((code) => code.toUpperCase())
+      .filter((code) => /^[A-Z]{3}$/.test(code)),
+    together: GROUP_VOTES.find((v) => v === one(query.together)) ?? null,
+    allVoted: one(query.allvoted) === '1',
   }
 }
 
@@ -61,6 +82,10 @@ export function serializeFilters(filters: Filters): Record<string, string | stri
   if (filters.keyword.trim()) query.q = filters.keyword.trim()
   if (filters.sponsor) query.sponsor = filters.sponsor
   if (filters.sponsor && filters.original) query.original = '1'
+  if (filters.adoption.length) query.adopted = filters.adoption
+  if (filters.group.length) query.group = filters.group
+  if (filters.group.length && filters.together) query.together = filters.together
+  if (filters.group.length && filters.together && filters.allVoted) query.allvoted = '1'
   return query
 }
 
@@ -75,6 +100,11 @@ export function toApiParams(filters: Filters) {
     keyword: filters.keyword.trim() || undefined,
     sponsor: filters.sponsor ?? undefined,
     original_sponsor: filters.sponsor && filters.original ? true : undefined,
+    adoption: filters.adoption.length ? filters.adoption : undefined,
+    // The group alone filters nothing: it goes along only with a way of voting
+    ...(filters.group.length && filters.together
+      ? { group: filters.group, group_vote: filters.together, group_all_voted: filters.allVoted || undefined }
+      : {}),
   }
 }
 
@@ -113,13 +143,18 @@ export function toggleTerm(keyword: string, term: string): string {
   return (kept.length < parts.length ? kept : [...parts, `"${term}"`]).join(' & ')
 }
 
+/** Whether the group-vote filter narrows the list (a group and a way of voting). */
+export const groupActive = (filters: Filters) => filters.group.length > 0 && !!filters.together
+
 export function countActive(filters: Filters): number {
   return (
     (filters.from || filters.to ? 1 : 0) +
     (filters.subjects.length ? 1 : 0) +
     (filters.country && filters.mode !== 'none' ? 1 : 0) +
     (filters.keyword.trim() ? 1 : 0) +
-    (filters.sponsor ? 1 : 0)
+    (filters.sponsor ? 1 : 0) +
+    (filters.adoption.length ? 1 : 0) +
+    (groupActive(filters) ? 1 : 0)
   )
 }
 
@@ -130,11 +165,11 @@ export function useFilters() {
   const filters = computed(() => parseFilters(route.query))
 
   /** Merge a change into the URL. Other query keys (page, sort, view options) are kept. */
-  function update(patch: Partial<Filters>, extra: Record<string, string | undefined> = {}) {
+  function update(patch: Partial<Filters>, extra: Record<string, string | string[] | undefined> = {}) {
     const next = { ...filters.value, ...patch }
     const kept = Object.fromEntries(
       Object.entries(route.query).filter(
-        ([key]) => !['from', 'to', 'subject', 'country', 'mode', 'q', 'sponsor', 'original', 'page'].includes(key),
+        ([key]) => !['from', 'to', 'subject', 'country', 'mode', 'q', 'sponsor', 'original', 'adopted', 'group', 'together', 'allvoted', 'page'].includes(key),
       ),
     )
     const query: Record<string, unknown> = { ...kept, ...serializeFilters(next) }
@@ -146,7 +181,7 @@ export function useFilters() {
   }
 
   function clear() {
-    update({ from: null, to: null, subjects: [], country: null, mode: 'none', keyword: '', sponsor: null, original: false })
+    update({ from: null, to: null, subjects: [], country: null, mode: 'none', keyword: '', sponsor: null, original: false, adoption: [], group: [], together: null, allVoted: false })
   }
 
   return { filters, update, clear }

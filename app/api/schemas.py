@@ -312,6 +312,42 @@ class Domains(BaseModel):
     domains: list[Domain] = Field(description="Most resolutions first")
 
 
+class YearCount(BaseModel):
+    year: int
+    resolutions: int
+
+
+class AdoptionCount(BaseModel):
+    adoption: Literal["recorded", "non_recorded", "without_vote"]
+    resolutions: int
+
+
+class GroupVoteCount(BaseModel):
+    group_vote: Literal["alike", "split", "yes", "no", "abstain"]
+    resolutions: int
+
+
+class DomainCount(BaseModel):
+    subject_id: str
+    label: str
+    resolutions: int
+
+
+class ResolutionFacets(BaseModel):
+    years: list[YearCount] = Field(
+        description="Every filter but the period applied; years without a resolution left out"
+    )
+    adoption: list[AdoptionCount] = Field(
+        description="Every filter but `adoption` applied; every kind, zero included"
+    )
+    group_votes: list[GroupVoteCount] = Field(
+        description="With `group`: every filter but `group_vote` applied; empty without a group"
+    )
+    domains: list[DomainCount] = Field(
+        description="Every filter but the subjects applied; most first, empty domains left out"
+    )
+
+
 class SubjectSponsor(BaseModel):
     country: str
     sponsored: int

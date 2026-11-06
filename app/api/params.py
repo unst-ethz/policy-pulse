@@ -12,10 +12,19 @@ import pandas as pd
 from fastapi import HTTPException, Query
 
 from .. import data
-from ..un_data_stream.analysis.filtering import CountryMode, ResolutionFilter
+from ..un_data_stream.analysis.filtering import CountryMode, GroupVote, ResolutionFilter
+from ..un_data_stream.analysis.profile import NON_RECORDED_VOTE, RECORDED_VOTE, WITHOUT_VOTE
 
 Lang = Literal["en", "fr", "es", "ar", "zh", "ru"]
 LangParam = Annotated[Lang, Query(description="Language for country and subject names")]
+
+# How a resolution was adopted, as the API names it -> the data's `modality`
+Adoption = Literal["recorded", "non_recorded", "without_vote"]
+MODALITIES: dict[str, str] = {
+    "recorded": RECORDED_VOTE,
+    "non_recorded": NON_RECORDED_VOTE,
+    "without_vote": WITHOUT_VOTE,
+}
 
 
 def resolution_filter(
@@ -51,6 +60,30 @@ def resolution_filter(
     sponsorship_known: Annotated[
         bool, Query(description="Only resolutions with sponsorship data (mostly since 2000)")
     ] = False,
+    group: Annotated[
+        list[str] | None,
+        Query(
+            description="ISO3 codes and/or M49 region codes (repeatable or comma-separated), "
+            "judged together by `group_vote`; a region stands for its states"
+        ),
+    ] = None,
+    group_vote: Annotated[
+        GroupVote | None,
+        Query(
+            description="With `group`: the states that voted all voted `alike`, `split`, or a "
+            "majority voted `yes`/`no`/`abstain`. Needs two of them voting"
+        ),
+    ] = None,
+    group_all_voted: Annotated[
+        bool, Query(description="With `group_vote`: only where every state of `group` voted")
+    ] = False,
+    adoption: Annotated[
+        list[Adoption] | None,
+        Query(
+            description="How adopted (repeatable, any of them): `recorded` vote with each "
+            "state's vote, `non_recorded` vote, or `without_vote`"
+        ),
+    ] = None,
 ) -> ResolutionFilter:
     """The resolution selection every list and analysis endpoint works from."""
     return ResolutionFilter(
@@ -63,6 +96,10 @@ def resolution_filter(
         sponsor=known_country(sponsor, "sponsor") if sponsor else None,
         original_sponsor=original_sponsor,
         sponsorship_known=sponsorship_known,
+        modalities=tuple(MODALITIES[a] for a in adoption) if adoption else None,
+        group=group_states(group) or None,
+        group_vote=group_vote,
+        group_all_voted=group_all_voted,
     )
 
 
@@ -72,6 +109,40 @@ def known_country(code: str, param: str, status_code: int = 422) -> str:
     if iso3 not in data.available_countries:
         raise HTTPException(status_code, f"{param}: unknown country code {code!r}")
     return iso3
+
+
+def _region_members(nodes: list[dict], code: str) -> list[str] | None:
+    """The countries (leaves) below region `code` of the region tree, or None if no such region."""
+    for node in nodes:
+        children = node.get("children") or []
+        if node["value"] == code and children:
+            leaves: list[str] = []
+            stack = list(children)
+            while stack:
+                child = stack.pop()
+                if child.get("children"):
+                    stack.extend(child["children"])
+                else:
+                    leaves.append(child["value"])
+            return leaves
+        found = _region_members(children, code)
+        if found is not None:
+            return found
+    return None
+
+
+def group_states(values: list[str] | None) -> tuple[str, ...]:
+    """ISO3 and region codes as the states they stand for: validated, deduplicated, in order."""
+    states: list[str] = []
+    for value in values or []:
+        for part in (p.strip() for p in value.split(",")):
+            if not part:
+                continue
+            members = _region_members(data.REGION_TREE_DATA, part)
+            if members is None:
+                members = [known_country(part, "group")]
+            states += [s for s in members if s in data.available_countries and s not in states]
+    return tuple(states)
 
 
 def country_list(values: list[str] | None, param: str) -> list[str]:

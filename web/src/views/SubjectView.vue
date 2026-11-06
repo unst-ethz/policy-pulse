@@ -50,6 +50,10 @@ const yearsOnly = computed<Filters>(() => ({
   keyword: '',
   sponsor: null,
   original: false,
+  adoption: [],
+  group: [],
+  together: null,
+  allVoted: false,
 }))
 const yearsQuery = computed(() => serializeFilters(yearsOnly.value))
 const selection = computed<Filters>(() => ({ ...yearsOnly.value, subjects: [props.id] }))
