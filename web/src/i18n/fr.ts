@@ -61,6 +61,18 @@ const fr: typeof en = {
     clear: 'Effacer',
     expand: 'Afficher les sujets de {name}',
   },
+  facets: {
+    title: 'Filtres',
+    open: 'Filtres',
+    openActive: 'Filtres ({n})',
+    show: 'Afficher {n} résolutions',
+    active: 'Filtre actif',
+    clear: 'Effacer',
+    yearTitle: '{year} : {n} résolutions',
+    terms: 'Termes fréquents',
+    moreSubjects: 'Plus de sujets',
+    removeSubject: 'Retirer {name} du filtre',
+  },
   filters: {
     label: 'Filtrer les résolutions',
     years: 'Années',
@@ -264,7 +276,6 @@ const fr: typeof en = {
     emergencySession: "Session extraordinaire d'urgence {n} ({year})",
   },
   cloud: {
-    common: 'Termes fréquents :',
     more: 'Plus de termes',
     close: 'Fermer',
     remove: 'Retirer {term} du filtre',

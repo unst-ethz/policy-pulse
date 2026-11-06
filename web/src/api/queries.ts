@@ -293,6 +293,21 @@ export function useSponsorship(
   })
 }
 
+/** Counts beside the list's filters; each facet ignores its own filter (see the endpoint). */
+export function useFacets(filters: MaybeRefOrGetter<Filters>) {
+  const lang = useLang()
+  return useQuery({
+    queryKey: ['facets', r(filters), lang],
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/v1/resolutions/facets', {
+          params: { query: { ...toApiParams(toValue(filters)), lang: lang.value } },
+        }),
+      ),
+    placeholderData: keepPreviousData,
+  })
+}
+
 type YearRange = { from: number | null; to: number | null }
 const period = ({ from, to }: YearRange) => ({
   start_date: from ? `${from}-01-01` : undefined,

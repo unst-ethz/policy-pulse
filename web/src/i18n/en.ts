@@ -59,6 +59,18 @@ export default {
     clear: 'Clear',
     expand: 'Show subjects in {name}',
   },
+  facets: {
+    title: 'Filters',
+    open: 'Filters',
+    openActive: 'Filters ({n})',
+    show: 'Show {n} resolutions',
+    active: 'Filter set',
+    clear: 'Clear',
+    yearTitle: '{year}: {n} resolutions',
+    terms: 'Common terms',
+    moreSubjects: 'More subjects',
+    removeSubject: 'Remove {name} from the filter',
+  },
   filters: {
     label: 'Filter resolutions',
     years: 'Years',
@@ -262,7 +274,6 @@ export default {
     emergencySession: 'Emergency special session {n} ({year})',
   },
   cloud: {
-    common: 'Common terms:',
     more: 'More terms',
     close: 'Close',
     remove: 'Remove {term} from the filter',

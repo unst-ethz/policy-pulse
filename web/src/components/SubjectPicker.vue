@@ -2,13 +2,13 @@
 /**
  * Pick thesaurus subjects. A subject includes everything below it, so picking a domain selects
  * the whole branch. Typing searches every level and shows each hit with its domain.
+ * The `trigger` slot swaps the select-like button for another PopoverTrigger.
  */
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { TreeNode } from '@/api/client'
 import { useSubjectTree } from '@/api/queries'
-import { sentenceCase } from '@/format'
+import { flatSubjects, sentenceCase } from '@/format'
 
 const NO_SUBJECT = '__no_subject__'
 
@@ -20,23 +20,7 @@ const tree = useSubjectTree()
 const search = ref('')
 const expanded = ref(new Set<string>())
 
-interface Flat {
-  id: string
-  label: string
-  domain: string
-}
-
-const flat = computed(() => {
-  const out: Flat[] = []
-  const walk = (nodes: TreeNode[], domain: string | null) => {
-    for (const node of nodes) {
-      out.push({ id: node.id, label: sentenceCase(node.label), domain: domain ?? '' })
-      walk(node.children ?? [], domain ?? sentenceCase(node.label))
-    }
-  }
-  walk(tree.data.value ?? [], null)
-  return out
-})
+const flat = computed(() => flatSubjects(tree.data.value ?? []))
 
 const labels = computed(() => new Map(flat.value.map((f) => [f.id, f.label])))
 // Not `label`: that name is the prop the template shows as the field label.
@@ -69,12 +53,15 @@ const summary = computed(() => {
 
 <template>
   <div class="field subject-picker">
-    <span>{{ label }}</span>
+    <span v-if="!$slots.trigger">{{ label }}</span>
     <PopoverRoot>
-      <PopoverTrigger class="input trigger" :aria-label="`${label}: ${summary}`">
-        <span class="summary">{{ summary }}</span>
-        <span aria-hidden="true" class="caret">▾</span>
-      </PopoverTrigger>
+      <!-- A custom trigger (a PopoverTrigger) replaces the select-like button and its label -->
+      <slot name="trigger">
+        <PopoverTrigger class="input trigger" :aria-label="`${label}: ${summary}`">
+          <span class="summary">{{ summary }}</span>
+          <span aria-hidden="true" class="caret">▾</span>
+        </PopoverTrigger>
+      </slot>
       <PopoverPortal>
         <PopoverContent class="popover subjects" :side-offset="4" align="start">
           <div class="search">
