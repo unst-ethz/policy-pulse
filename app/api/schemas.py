@@ -317,6 +317,11 @@ class YearCount(BaseModel):
     resolutions: int
 
 
+class AdoptionCount(BaseModel):
+    adoption: Literal["recorded", "non_recorded", "without_vote"]
+    resolutions: int
+
+
 class DomainCount(BaseModel):
     subject_id: str
     label: str
@@ -326,6 +331,9 @@ class DomainCount(BaseModel):
 class ResolutionFacets(BaseModel):
     years: list[YearCount] = Field(
         description="Every filter but the period applied; years without a resolution left out"
+    )
+    adoption: list[AdoptionCount] = Field(
+        description="Every filter but `adoption` applied; every kind, zero included"
     )
     domains: list[DomainCount] = Field(
         description="Every filter but the subjects applied; most first, empty domains left out"

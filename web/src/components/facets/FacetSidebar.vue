@@ -6,6 +6,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { countActive, useFilters } from '@/composables/useFilters'
+import AdoptionFacet from './AdoptionFacet.vue'
 import CountryFacet from './CountryFacet.vue'
 import SponsorFacet from './SponsorFacet.vue'
 import SubjectsFacet from './SubjectsFacet.vue'
@@ -26,6 +27,7 @@ const active = computed(() => countActive(filters.value))
       </button>
     </div>
     <YearsFacet />
+    <AdoptionFacet />
     <SubjectsFacet />
     <TermsFacet />
     <CountryFacet />

@@ -15,6 +15,7 @@ NOTABLE_VOTES = 5
 # ("Without a vote") or by a vote not recorded per country ("Vote, non-recorded").
 RECORDED_VOTE = "Vote, recorded"
 NON_RECORDED_VOTE = "Vote, non-recorded"
+WITHOUT_VOTE = "Without a vote"
 
 
 @dataclass(frozen=True)

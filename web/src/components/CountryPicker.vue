@@ -133,7 +133,7 @@ const display = (iso3: string | null) => (iso3 ? (byIso.value.get(iso3)?.name ??
 <style>
 /* Portaled outside the component, so unscoped. Shared by the pickers. */
 .popover {
-  z-index: 50;
+  z-index: 300; /* above dialogs and drawers (201) */
   min-width: var(--reka-combobox-trigger-width, 240px);
   max-height: min(360px, var(--reka-combobox-content-available-height, 360px));
   background: var(--surface);

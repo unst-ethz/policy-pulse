@@ -17,23 +17,21 @@ const sponsor = computed({
 
 <template>
   <FacetPanel
+    :info="t('facets.info.sponsor')"
     :title="t('filters.sponsor')"
     :active="!!filters.sponsor"
     collapsed
     @clear="update({ sponsor: null, original: false })"
   >
     <CountryPicker v-model="sponsor" :label="t('filters.sponsor')" :placeholder="t('filters.anyCountry')" hide-label />
-    <template v-if="filters.sponsor">
-      <label class="option">
-        <input
-          type="checkbox"
-          :checked="filters.original"
-          @change="update({ original: ($event.target as HTMLInputElement).checked })"
-        />
-        {{ t('filters.originalOnly') }}
-      </label>
-      <p class="note">{{ t('resolutions.sponsorCoverage') }}</p>
-    </template>
+    <label v-if="filters.sponsor" class="option">
+      <input
+        type="checkbox"
+        :checked="filters.original"
+        @change="update({ original: ($event.target as HTMLInputElement).checked })"
+      />
+      {{ t('filters.originalOnly') }}
+    </label>
   </FacetPanel>
 </template>
 
@@ -50,11 +48,5 @@ const sponsor = computed({
 .option input {
   margin: 0;
   accent-color: var(--ink);
-}
-
-.note {
-  margin: 0;
-  font-size: var(--text-xs);
-  color: var(--muted);
 }
 </style>

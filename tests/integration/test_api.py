@@ -200,6 +200,21 @@ def test_facets_ignore_their_own_filter(client):
     get(client, f"{base}/facets?sponsor=XXX", status=422)
 
 
+def test_adoption_filter_and_facet(client):
+    base = "/api/v1/resolutions"
+    counts = {
+        a["adoption"]: a["resolutions"]
+        for a in get(client, f"{base}/facets?adoption=recorded")["adoption"]
+    }
+    assert set(counts) == {"recorded", "non_recorded", "without_vote"}
+    assert sum(counts.values()) == get(client, base)["total"]  # the facet ignores its own filter
+    recorded = get(client, f"{base}?adoption=recorded")
+    assert recorded["total"] == recorded["recorded_votes"] == counts["recorded"]
+    both = get(client, f"{base}?adoption=non_recorded&adoption=without_vote")["total"]
+    assert both == counts["non_recorded"] + counts["without_vote"]
+    get(client, f"{base}?adoption=maybe", status=422)
+
+
 def test_subject_domains_and_sponsors(client):
     domains = get(client, "/api/v1/subjects/domains?start_date=2010-01-01")
     counts = [d["resolutions"] for d in domains["domains"]]

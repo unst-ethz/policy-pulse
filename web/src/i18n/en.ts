@@ -59,7 +59,24 @@ export default {
     clear: 'Clear',
     expand: 'Show subjects in {name}',
   },
+  info: {
+    about: 'About {name}',
+  },
   facets: {
+    adoption: 'How adopted',
+    adoptions: {
+      recorded: 'Recorded vote',
+      non_recorded: 'Vote, not recorded',
+      without_vote: 'Without a vote',
+    },
+    info: {
+      years: 'The year the General Assembly adopted the resolution. The bars count resolutions per year under all your other filters, so they show what moving or widening the range would add.',
+      adoption: "A recorded vote lists how every state voted; only these resolutions show individual votes. A vote that was not recorded gives only the totals. Most resolutions are adopted without a vote, by consensus. The numbers apply all your other filters.",
+      subjects: 'The areas of the UNBIS Thesaurus that the UN Library files resolutions under; a subject includes everything below it. About a third of resolutions have no subject, and none adopted before 1980 has one. The numbers are what each subject would give with your other filters.',
+      terms: 'The most frequent keywords of the resolutions listed. Click a term to keep only resolutions with it, and click it again to remove it. The number is how many resolutions would remain.',
+      country: "Narrows the list to one state's perspective: only resolutions it voted on, or those adopted while it was a UN member. To see how states voted without narrowing the list, use \"Show the votes of\" above the list instead.",
+      sponsor: 'Only resolutions this state sponsored, or with "original sponsors only", those it put forward from the start rather than joined later. Sponsorship data covers about 90% of resolutions since 2000 and few before.',
+    },
     title: 'Filters',
     open: 'Filters',
     openActive: 'Filters ({n})',
@@ -133,6 +150,8 @@ export default {
     },
     download: 'Download CSV',
     showVotes: 'Show the votes of',
+    showVotesInfo:
+      "Adds a column with each chosen state's vote. Unlike the Country filter, it does not change which resolutions are listed.",
     empty: 'No resolution matches these filters. Remove a filter to see more.',
     pages: 'Pages',
     previous: 'Previous',

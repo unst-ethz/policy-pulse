@@ -1,7 +1,8 @@
 """Counts for the resolution list's facets: how many resolutions each choice would give.
 
 Each facet ignores its own filter and keeps all others, so its counts show what picking another
-value would return (the years ignore the period, the domains ignore the subjects).
+value would return (the years ignore the period, the domains ignore the subjects, the modalities
+ignore how a resolution was adopted).
 """
 
 from dataclasses import replace
@@ -24,6 +25,18 @@ def year_counts(
         engine, replace(criteria, start_date=None, end_date=None), membership_mask=membership_mask
     )
     return df.groupby(df["date"].dt.year).size().astype(int)
+
+
+def modality_counts(
+    engine: ResolutionQueryEngine,
+    criteria: ResolutionFilter,
+    membership_mask: MembershipMask | None = None,
+) -> pd.Series:
+    """Resolutions per `modality` (how adopted) under every filter but the modality."""
+    df = filter_resolutions(
+        engine, replace(criteria, modalities=None), membership_mask=membership_mask
+    )
+    return df["modality"].value_counts().astype(int)
 
 
 def domain_counts(

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * Subjects: the thesaurus domains with how many resolutions each would give, under every filter
- * but the subjects. Picked subjects below the domain level show as chips; "More subjects" opens
- * the full picker with search and the levels below.
+ * Subjects: the largest thesaurus domains with how many resolutions each would give, under every
+ * filter but the subjects. Picked subjects below the domain level show as chips; "More subjects"
+ * opens the whole tree, with search and the levels below.
  */
 import { PopoverTrigger } from 'reka-ui'
 import { computed } from 'vue'
@@ -14,6 +14,7 @@ import SubjectPicker from '../SubjectPicker.vue'
 import FacetPanel from './FacetPanel.vue'
 
 const NO_SUBJECT = '__no_subject__'
+const SHOWN = 5
 
 const { t, n } = useI18n()
 const { filters, update } = useFilters()
@@ -25,7 +26,7 @@ const subjects = computed({
   set: (value: string[]) => update({ subjects: value }),
 })
 
-// Every domain, empty ones too (last), so the list does not jump about as filters change
+// Every domain, largest first; empty ones count as such rather than vanish
 const domains = computed(() => {
   const counts = new Map((facets.data.value?.domains ?? []).map((d) => [d.subject_id, d.resolutions]))
   const rows = flatSubjects(tree.data.value ?? [])
@@ -35,6 +36,11 @@ const domains = computed(() => {
   const max = Math.max(1, ...rows.map((r) => r.count))
   return rows.map((r) => ({ ...r, width: (r.count / max) * 100 }))
 })
+
+// The largest few, plus any picked domain further down so it can be unticked here
+const shown = computed(() =>
+  domains.value.filter((d, i) => i < SHOWN || subjects.value.includes(d.id)),
+)
 
 const deeper = computed(() => {
   const labels = new Map(flatSubjects(tree.data.value ?? []).map((s) => [s.id, s.label]))
@@ -50,7 +56,8 @@ function toggle(id: string) {
 </script>
 
 <template>
-  <FacetPanel :title="t('filters.subjects')" :active="subjects.length > 0" @clear="subjects = []">
+  <FacetPanel
+    :info="t('facets.info.subjects')" :title="t('filters.subjects')" :active="subjects.length > 0" @clear="subjects = []">
     <div v-if="deeper.length" class="chips">
       <button
         v-for="s in deeper"
@@ -64,7 +71,7 @@ function toggle(id: string) {
       </button>
     </div>
     <ul class="domains" :class="{ fetching: facets.isFetching.value }">
-      <li v-for="d in domains" :key="d.id">
+      <li v-for="d in shown" :key="d.id">
         <label class="row" :class="{ empty: !d.count }">
           <input type="checkbox" :checked="subjects.includes(d.id)" @change="toggle(d.id)" />
           <span class="name">{{ d.label }}</span>

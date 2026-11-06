@@ -22,12 +22,20 @@ describe('URL filters', () => {
       keyword: 'nuclear & weapons',
       sponsor: 'USA',
       original: true,
+      adoption: ['recorded' as const, 'without_vote' as const],
     }
     expect(parseFilters(serializeFilters(filters))).toEqual(filters)
   })
 
   it('ignores junk and normalises codes', () => {
-    const parsed = parseFilters({ from: 'abc', to: '1800', country: 'che', mode: 'sideways', subject: '07' })
+    const parsed = parseFilters({
+      from: 'abc',
+      to: '1800',
+      country: 'che',
+      mode: 'sideways',
+      subject: '07',
+      adopted: ['recorded', 'maybe'],
+    })
     expect(parsed).toEqual({
       from: null,
       to: null,
@@ -37,6 +45,7 @@ describe('URL filters', () => {
       keyword: '',
       sponsor: null,
       original: false,
+      adoption: ['recorded'],
     })
   })
 
@@ -61,6 +70,7 @@ describe('URL filters', () => {
         keyword: ' x ',
         sponsor: 'CHE',
         original: true,
+        adoption: ['non_recorded'],
       }),
     ).toEqual({
       start_date: '2000-01-01',
@@ -71,6 +81,7 @@ describe('URL filters', () => {
       keyword: 'x',
       sponsor: 'CHE',
       original_sponsor: true,
+      adoption: ['non_recorded'],
     })
   })
 

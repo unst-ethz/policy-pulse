@@ -1,6 +1,6 @@
 """Facet counts over the synthetic world in conftest.py."""
 
-from app.un_data_stream.analysis import facets
+from app.un_data_stream.analysis import facets, filtering
 from app.un_data_stream.analysis.filtering import ResolutionFilter
 
 from .conftest import ENVIRONMENT, PEACE
@@ -22,3 +22,11 @@ def test_domains_ignore_the_subjects_but_keep_the_other_filters(engine):
 def test_unfiltered_domains_count_each_resolution_once(engine):
     counts = facets.domain_counts(engine, ResolutionFilter(), [PEACE, ENVIRONMENT])
     assert counts.to_dict() == {PEACE: 4, ENVIRONMENT: 1}
+
+
+def test_modalities_ignore_their_own_filter(engine):
+    # 105 nobody voted on: adopted without a vote; the other PEACE ones were recorded votes
+    criteria = ResolutionFilter(subject_ids=(PEACE,), modalities=("Without a vote",))
+    assert len(filtering.filter_resolutions(engine, criteria)) == 1
+    counts = facets.modality_counts(engine, criteria)
+    assert counts.to_dict() == {"Vote, recorded": 3, "Without a vote": 1}

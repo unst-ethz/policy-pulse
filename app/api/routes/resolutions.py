@@ -11,6 +11,7 @@ from ...un_data_stream.analysis import facets, filtering, overview, sponsorship
 from ...un_data_stream.analysis.filtering import ResolutionFilter
 from .. import schemas
 from ..params import (
+    MODALITIES,
     LangParam,
     country_list,
     day,
@@ -134,7 +135,7 @@ def resolution_facets(
     criteria: Annotated[ResolutionFilter, Depends(resolution_filter)],
     lang: LangParam = "en",
 ) -> schemas.ResolutionFacets:
-    """Counts beside the list's filters: per year, and per thesaurus domain.
+    """Counts beside the list's filters: per year, per way of adoption, per thesaurus domain.
 
     Each facet ignores its own filter, so its counts show what choosing differently would give.
     A resolution counts towards every domain one of its subjects falls under.
@@ -142,9 +143,14 @@ def resolution_facets(
     engine, mask = data.query_engine, data.membership_mask
     years = facets.year_counts(engine, criteria, mask)
     domains = facets.domain_counts(engine, criteria, data.TOP_LEVEL_SUBJECTS, mask)
+    modalities = facets.modality_counts(engine, criteria, mask)
     labels = subject_labels(lang)
     return schemas.ResolutionFacets(
         years=[schemas.YearCount(year=y, resolutions=c) for y, c in years.items()],
+        adoption=[
+            schemas.AdoptionCount(adoption=a, resolutions=int(modalities.get(m, 0)))
+            for a, m in MODALITIES.items()
+        ],
         domains=sorted(
             (
                 schemas.DomainCount(subject_id=s, label=labels.get(s, s), resolutions=c)

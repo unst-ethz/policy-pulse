@@ -76,7 +76,8 @@ function clear() {
 </script>
 
 <template>
-  <FacetPanel :title="t('facets.terms')" :active="active" @clear="clear">
+  <FacetPanel
+    :info="t('facets.info.terms')" :title="t('facets.terms')" :active="active" @clear="clear">
   <div class="terms" :class="{ fetching: cloud.isFetching.value }">
     <template v-if="chips.length">
       <button

@@ -188,7 +188,7 @@ export interface paths {
         };
         /**
          * Resolution Facets
-         * @description Counts beside the list's filters: per year, and per thesaurus domain.
+         * @description Counts beside the list's filters: per year, per way of adoption, per thesaurus domain.
          *
          *     Each facet ignores its own filter, so its counts show what choosing differently would give.
          *     A resolution counts towards every domain one of its subjects falls under.
@@ -451,6 +451,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AdoptionCount */
+        AdoptionCount: {
+            /**
+             * Adoption
+             * @enum {string}
+             */
+            adoption: "recorded" | "non_recorded" | "without_vote";
+            /** Resolutions */
+            resolutions: number;
+        };
         /** AgreementBySubject */
         AgreementBySubject: {
             /** Country */
@@ -967,6 +977,11 @@ export interface components {
              */
             years: components["schemas"]["YearCount"][];
             /**
+             * Adoption
+             * @description Every filter but `adoption` applied; every kind, zero included
+             */
+            adoption: components["schemas"]["AdoptionCount"][];
+            /**
              * Domains
              * @description Every filter but the subjects applied; most first, empty domains left out
              */
@@ -1423,6 +1438,8 @@ export interface operations {
                 original_sponsor?: boolean;
                 /** @description Only resolutions with sponsorship data (mostly since 2000) */
                 sponsorship_known?: boolean;
+                /** @description How adopted (repeatable, any of them): `recorded` vote with each state's vote, `non_recorded` vote, or `without_vote` */
+                adoption?: ("recorded" | "non_recorded" | "without_vote")[] | null;
             };
             header?: never;
             path?: never;
@@ -1475,6 +1492,8 @@ export interface operations {
                 original_sponsor?: boolean;
                 /** @description Only resolutions with sponsorship data (mostly since 2000) */
                 sponsorship_known?: boolean;
+                /** @description How adopted (repeatable, any of them): `recorded` vote with each state's vote, `non_recorded` vote, or `without_vote` */
+                adoption?: ("recorded" | "non_recorded" | "without_vote")[] | null;
             };
             header?: never;
             path?: never;
@@ -1525,6 +1544,8 @@ export interface operations {
                 original_sponsor?: boolean;
                 /** @description Only resolutions with sponsorship data (mostly since 2000) */
                 sponsorship_known?: boolean;
+                /** @description How adopted (repeatable, any of them): `recorded` vote with each state's vote, `non_recorded` vote, or `without_vote` */
+                adoption?: ("recorded" | "non_recorded" | "without_vote")[] | null;
             };
             header?: never;
             path?: never;
@@ -1639,6 +1660,8 @@ export interface operations {
                 original_sponsor?: boolean;
                 /** @description Only resolutions with sponsorship data (mostly since 2000) */
                 sponsorship_known?: boolean;
+                /** @description How adopted (repeatable, any of them): `recorded` vote with each state's vote, `non_recorded` vote, or `without_vote` */
+                adoption?: ("recorded" | "non_recorded" | "without_vote")[] | null;
             };
             header?: never;
             path?: never;
@@ -1763,6 +1786,8 @@ export interface operations {
                 original_sponsor?: boolean;
                 /** @description Only resolutions with sponsorship data (mostly since 2000) */
                 sponsorship_known?: boolean;
+                /** @description How adopted (repeatable, any of them): `recorded` vote with each state's vote, `non_recorded` vote, or `without_vote` */
+                adoption?: ("recorded" | "non_recorded" | "without_vote")[] | null;
             };
             header?: never;
             path?: never;
@@ -1814,6 +1839,8 @@ export interface operations {
                 original_sponsor?: boolean;
                 /** @description Only resolutions with sponsorship data (mostly since 2000) */
                 sponsorship_known?: boolean;
+                /** @description How adopted (repeatable, any of them): `recorded` vote with each state's vote, `non_recorded` vote, or `without_vote` */
+                adoption?: ("recorded" | "non_recorded" | "without_vote")[] | null;
             };
             header?: never;
             path?: never;

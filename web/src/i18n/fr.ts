@@ -61,7 +61,24 @@ const fr: typeof en = {
     clear: 'Effacer',
     expand: 'Afficher les sujets de {name}',
   },
+  info: {
+    about: 'À propos : {name}',
+  },
   facets: {
+    adoption: 'Mode d’adoption',
+    adoptions: {
+      recorded: 'Vote enregistré',
+      non_recorded: 'Vote non enregistré',
+      without_vote: 'Sans vote',
+    },
+    info: {
+      years: 'L’année où l’Assemblée générale a adopté la résolution. Les barres comptent les résolutions par année avec tous vos autres filtres : elles montrent ce que déplacer ou élargir la période ajouterait.',
+      adoption: 'Un vote enregistré indique le vote de chaque État ; seules ces résolutions montrent des votes individuels. Un vote non enregistré ne donne que les totaux. La plupart des résolutions sont adoptées sans vote, par consensus. Les nombres tiennent compte de vos autres filtres.',
+      subjects: 'Les domaines du Thésaurus UNBIS sous lesquels la Bibliothèque de l’ONU classe les résolutions ; un sujet inclut tout ce qui se trouve en dessous. Environ un tiers des résolutions n’ont pas de sujet, et aucune adoptée avant 1980. Les nombres indiquent ce que chaque sujet donnerait avec vos autres filtres.',
+      terms: 'Les mots-clés les plus fréquents des résolutions affichées. Cliquez sur un terme pour ne garder que les résolutions qui le contiennent, et cliquez à nouveau pour le retirer. Le nombre indique combien de résolutions resteraient.',
+      country: 'Restreint la liste au point de vue d’un État : seulement les résolutions sur lesquelles il a voté, ou celles adoptées pendant qu’il était membre de l’ONU. Pour voir comment des États ont voté sans restreindre la liste, utilisez plutôt « Afficher les votes de » au-dessus de la liste.',
+      sponsor: 'Seulement les résolutions que cet État a parrainées, ou avec « Auteurs initiaux seulement », celles qu’il a présentées dès le départ plutôt que rejointes ensuite. Les données de parrainage couvrent environ 90 % des résolutions depuis 2000, et peu avant.',
+    },
     title: 'Filtres',
     open: 'Filtres',
     openActive: 'Filtres ({n})',
@@ -135,6 +152,7 @@ const fr: typeof en = {
     },
     download: 'Télécharger (CSV)',
     showVotes: 'Afficher les votes de',
+    showVotesInfo: 'Ajoute une colonne avec le vote de chaque État choisi. Contrairement au filtre Pays, cela ne change pas les résolutions affichées.',
     empty: 'Aucune résolution ne correspond. Retirez un filtre pour en voir davantage.',
     pages: 'Pages',
     previous: 'Précédente',

@@ -43,6 +43,7 @@ function commit([from, to]: number[]) {
 
 <template>
   <FacetPanel
+    :info="t('facets.info.years')"
     :title="t('filters.years')"
     :active="!!(filters.from || filters.to)"
     @clear="update({ from: null, to: null })"

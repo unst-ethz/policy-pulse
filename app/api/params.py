@@ -13,9 +13,18 @@ from fastapi import HTTPException, Query
 
 from .. import data
 from ..un_data_stream.analysis.filtering import CountryMode, ResolutionFilter
+from ..un_data_stream.analysis.profile import NON_RECORDED_VOTE, RECORDED_VOTE, WITHOUT_VOTE
 
 Lang = Literal["en", "fr", "es", "ar", "zh", "ru"]
 LangParam = Annotated[Lang, Query(description="Language for country and subject names")]
+
+# How a resolution was adopted, as the API names it -> the data's `modality`
+Adoption = Literal["recorded", "non_recorded", "without_vote"]
+MODALITIES: dict[str, str] = {
+    "recorded": RECORDED_VOTE,
+    "non_recorded": NON_RECORDED_VOTE,
+    "without_vote": WITHOUT_VOTE,
+}
 
 
 def resolution_filter(
@@ -51,6 +60,13 @@ def resolution_filter(
     sponsorship_known: Annotated[
         bool, Query(description="Only resolutions with sponsorship data (mostly since 2000)")
     ] = False,
+    adoption: Annotated[
+        list[Adoption] | None,
+        Query(
+            description="How adopted (repeatable, any of them): `recorded` vote with each "
+            "state's vote, `non_recorded` vote, or `without_vote`"
+        ),
+    ] = None,
 ) -> ResolutionFilter:
     """The resolution selection every list and analysis endpoint works from."""
     return ResolutionFilter(
@@ -63,6 +79,7 @@ def resolution_filter(
         sponsor=known_country(sponsor, "sponsor") if sponsor else None,
         original_sponsor=original_sponsor,
         sponsorship_known=sponsorship_known,
+        modalities=tuple(MODALITIES[a] for a in adoption) if adoption else None,
     )
 
 

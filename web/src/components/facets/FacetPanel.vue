@@ -1,12 +1,14 @@
 <script setup lang="ts">
 /**
- * The frame every facet shares: a title that collapses it, and "Clear" while its filter is set.
+ * The frame every facet shares: a title that collapses it, an "i" that explains it, and "Clear"
+ * while its filter is set.
  * A facet is open by default; `collapsed` starts it closed unless its filter is active.
  */
 import { ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
+import InfoTip from '../InfoTip.vue'
 
-const props = defineProps<{ title: string; active?: boolean; collapsed?: boolean }>()
+const props = defineProps<{ title: string; info: string; active?: boolean; collapsed?: boolean }>()
 defineEmits<{ clear: [] }>()
 
 const { t } = useI18n()
@@ -24,6 +26,7 @@ const body = useId()
           <span v-if="active" class="dot" :title="t('facets.active')" />
         </button>
       </h2>
+      <InfoTip :text="info" :about="title" />
       <button v-if="active" type="button" class="clear" @click="$emit('clear')">
         {{ t('facets.clear') }}<span class="visually-hidden">: {{ title }}</span>
       </button>
@@ -45,8 +48,11 @@ const body = useId()
 .head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-2);
+}
+
+.clear {
+  margin-inline-start: auto;
 }
 
 h2 {

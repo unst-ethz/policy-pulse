@@ -8,6 +8,7 @@ import CountryList from '@/components/CountryList.vue'
 import QueryState from '@/components/QueryState.vue'
 import ResolutionTable from '@/components/ResolutionTable.vue'
 import FacetSidebar from '@/components/facets/FacetSidebar.vue'
+import InfoTip from '@/components/InfoTip.vue'
 import KeywordField from '@/components/KeywordField.vue'
 import { countActive, useFilters } from '@/composables/useFilters'
 
@@ -120,6 +121,7 @@ const active = computed(() => countActive(filters.value))
       </div>
       <div class="votes-of">
         <span>{{ t('resolutions.showVotes') }}</span>
+        <InfoTip :text="t('resolutions.showVotesInfo')" :about="t('resolutions.showVotes')" />
         <CountryList v-model="votes" :label="t('resolutions.showVotes')" :max="4" />
       </div>
 

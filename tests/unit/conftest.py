@@ -118,7 +118,7 @@ def build_resolution_table() -> pd.DataFrame:
                 "total_abstentions": votes.count("A") if recorded else None,
                 "total_non_voting": votes.count("X") if recorded else None,
                 "total_ms": 4,
-                "modality": "Vote, recorded" if recorded else "Adopted without vote",
+                "modality": "Vote, recorded" if recorded else "Without a vote",
                 "undl_link": f"https://example.org/{undl_id}",
                 **dict(zip(COUNTRIES, votes)),
             }

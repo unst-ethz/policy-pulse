@@ -65,6 +65,7 @@ class ResolutionFilter:
     sponsor: str | None = None  # ISO3; only resolutions this state sponsored
     original_sponsor: bool = False  # with `sponsor`: only as an original sponsor
     sponsorship_known: bool = False  # only resolutions with sponsorship data
+    modalities: tuple[str, ...] | None = None  # how adopted: `modality` values, any of them
 
     @classmethod
     def from_filter_store(cls, filter_data: dict) -> "ResolutionFilter":
@@ -126,6 +127,9 @@ def filter_resolutions(
         df = df[df["undl_id"].isin(ids)]
     if criteria.sponsorship_known:
         df = df[df["undl_id"].isin(sponsorship.known_ids(engine.snapshot))]
+
+    if criteria.modalities:
+        df = df[df["modality"].isin(criteria.modalities)]
 
     if apply_keyword:
         df = filter_by_keyword(engine, df, criteria.keyword)

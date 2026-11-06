@@ -19,6 +19,7 @@ const modes: CountryMode[] = ['voted', 'member', 'none']
 
 <template>
   <FacetPanel
+    :info="t('facets.info.country')"
     :title="t('filters.country')"
     :active="!!filters.country"
     collapsed
