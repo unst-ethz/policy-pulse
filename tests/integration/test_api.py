@@ -216,6 +216,31 @@ def test_group_vote_filter_and_facet(client):
     get(client, f"{base}?group=XXX&group_vote=alike", status=422)
 
 
+def test_country_pages_narrow_to_a_subject(client):
+    base = "/api/v1/countries/FRA"
+    whole = get(client, f"{base}/profile?start_date=2000-01-01")
+    domain = get(client, "/api/v1/subjects/domains?start_date=2000-01-01")["domains"][0]
+    narrowed = get(client, f"{base}/profile?start_date=2000-01-01&subject={domain['subject_id']}")
+    assert 0 < narrowed["total_resolutions"] < whole["total_resolutions"]
+    sponsoring = get(client, f"{base}/sponsorship?start_date=2000-01-01")
+    narrowed = get(
+        client, f"{base}/sponsorship?start_date=2000-01-01&subject={domain['subject_id']}"
+    )
+    assert narrowed["resolutions"] == domain["resolutions"] < sponsoring["resolutions"]
+    assert [s["subject_id"] for s in narrowed["by_subject"]][:1] == [domain["subject_id"]]
+
+
+def test_country_profile_can_leave_out_historical_states(client):
+    base = "/api/v1/countries/CHE/profile?start_date=2000-01-01"
+    every = get(client, base)
+    current = get(client, f"{base}&exclude_historical=true")
+    ranked = [r["country"] for r in every["most_aligned"] + every["least_aligned"]]
+    assert "SCG" in ranked  # Serbia and Montenegro, 2003-2006
+    kept = [r["country"] for r in current["most_aligned"] + current["least_aligned"]]
+    assert "SCG" not in kept and len(current["most_aligned"]) == len(every["most_aligned"])
+    assert current["multilateral_ranked"] < every["multilateral_ranked"]
+
+
 def test_adoption_filter_and_facet(client):
     base = "/api/v1/resolutions"
     counts = {

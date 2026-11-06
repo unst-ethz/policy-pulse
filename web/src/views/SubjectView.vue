@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
  * One area of the UNBIS Thesaurus: how much the Assembly adopts on it, who sponsors it, how states
- * vote on it and which of its resolutions split the Assembly most. Only the years filter applies.
+ * vote on it and which of its resolutions split the Assembly most. Only the years filter applies;
+ * states that no longer exist are left out of the per-country lists unless the viewer asks.
  */
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -9,20 +10,21 @@ import { useRouter } from 'vue-router'
 import {
   useCountryIndex,
   useDomains,
+  useHistoricalStates,
   useMultilateral,
   useResolutions,
   useSubjectSponsors,
 } from '@/api/queries'
 import AgreementBars from '@/components/AgreementBars.vue'
 import ChartFrame from '@/components/ChartFrame.vue'
-import FilterBar from '@/components/FilterBar.vue'
+import FacetLayout from '@/components/facets/FacetLayout.vue'
 import QueryState from '@/components/QueryState.vue'
 import ResolutionTable from '@/components/ResolutionTable.vue'
 import ScaleLegend from '@/components/ScaleLegend.vue'
 import WorldMap from '@/components/WorldMap.vue'
 import YearBars from '@/components/YearBars.vue'
 import { divergingScale } from '@/charts/scales'
-import { type Filters, serializeFilters, useFilters } from '@/composables/useFilters'
+import { type Filters, onlyFilters, serializeFilters, useFilters } from '@/composables/useFilters'
 import { useThemeColors } from '@/composables/useThemeColors'
 import { sentenceCase } from '@/format'
 
@@ -42,20 +44,16 @@ const { name } = useCountryIndex()
 const colors = useThemeColors()
 
 const range = computed(() => ({ from: filters.value.from, to: filters.value.to }))
-const yearsOnly = computed<Filters>(() => ({
-  ...filters.value,
-  subjects: [],
-  country: null,
-  mode: 'none',
-  keyword: '',
-  sponsor: null,
-  original: false,
-  adoption: [],
-  group: [],
-  together: null,
-  allVoted: false,
-}))
+const yearsOnly = computed<Filters>(() => onlyFilters(filters.value, ['from', 'to']))
 const yearsQuery = computed(() => serializeFilters(yearsOnly.value))
+// Back to the overview, keeping the historical-states choice as well
+const overviewQuery = computed(() => serializeFilters(onlyFilters(filters.value, ['from', 'to', 'historical'])))
+
+// States that no longer exist (the region tree's "historical" branch), left out unless asked for.
+// Dropping their rows is enough: every figure per state here (vote shares, sponsorships) is the
+// state's own, and the map's midpoint is the mean over the rows shown.
+const historical = useHistoricalStates()
+const shown = (iso3: string) => filters.value.historical || !historical.value.has(iso3)
 const selection = computed<Filters>(() => ({ ...yearsOnly.value, subjects: [props.id] }))
 const listLink = computed(() => ({ name: 'resolutions', query: serializeFilters(selection.value) }))
 
@@ -97,7 +95,7 @@ const percent = (value: number) => n(value, 'percent')
 
 // --- sponsors --------------------------------------------------------------------------------
 const countryLink = (iso3: string) => ({ name: 'country', params: { iso3 }, query: yearsQuery.value })
-const sponsorRows = computed(() => sponsors.data.value?.sponsors ?? [])
+const sponsorRows = computed(() => (sponsors.data.value?.sponsors ?? []).filter((s) => shown(s.country)))
 const mostActive = computed(() => {
   const rows = sponsorRows.value.slice(0, TOP)
   const max = Math.max(1, ...rows.map((s) => s.sponsored))
@@ -129,7 +127,7 @@ const focused = computed(() => {
 
 // --- votes -----------------------------------------------------------------------------------
 const votes = useMultilateral(selection, MIN_VOTES)
-const voters = computed(() => votes.data.value?.countries ?? [])
+const voters = computed(() => (votes.data.value?.countries ?? []).filter((c) => shown(c.country)))
 const byCountry = computed(() => new Map(voters.value.map((c) => [c.country, c])))
 const averageYes = computed(() => {
   const rates = voters.value.map((c) => c.yes_rate).filter((r): r is number => r != null)
@@ -178,14 +176,18 @@ const contestedLink = computed(() => ({ ...listLink.value, query: { ...listLink.
   <div class="page">
     <div class="page-head">
       <p class="crumb">
-        <RouterLink :to="{ name: 'subjects', query: yearsQuery }">{{ t('subject.all') }}</RouterLink>
+        <RouterLink :to="{ name: 'subjects', query: overviewQuery }">{{ t('subject.all') }}</RouterLink>
       </p>
       <h1>{{ label }}</h1>
       <p>{{ t('subject.detailLead') }}</p>
     </div>
 
-    <FilterBar :fields="['years']" />
-
+    <FacetLayout
+      :allowed="['years', 'historical']"
+      :defaults="['years', 'historical']"
+      storage-key="policy-pulse:facets:subject"
+      :applied="selection"
+    >
     <QueryState
       :loading="domains.isLoading.value || sponsors.isLoading.value"
       :fetching="domains.isFetching.value"
@@ -371,6 +373,7 @@ const contestedLink = computed(() => ({ ...listLink.value, query: { ...listLink.
         </section>
       </template>
     </section>
+    </FacetLayout>
   </div>
 </template>
 

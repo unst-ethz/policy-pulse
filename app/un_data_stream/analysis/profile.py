@@ -1,6 +1,7 @@
 """A country's voting profile over a period: what it voted, who it votes with, notable votes."""
 
 from dataclasses import dataclass
+from typing import Iterable
 
 import pandas as pd
 
@@ -63,12 +64,17 @@ def country_profile(
     comparison: list[str] | None = None,
     participation: tuple[int, int] | None = None,
     min_joint_votes: int = MIN_JOINT_VOTES,
+    subject_ids: list[str] | None = None,
+    exclude: Iterable[str] = (),
 ) -> CountryProfile | None:
     """Build the profile of `country` (an ISO3 in `engine.country_columns`).
 
     `participation` is the (first, last) year the country took part; the date range is clamped to
-    it. `comparison` falls back to the P5 when none of its codes is usable. Returns None when no
-    resolution falls in the (clamped) range.
+    it. `subject_ids` (descendants included) narrows every figure to those subjects. States in
+    `exclude` (other than `country`) are left out of the rank and the most/least aligned lists,
+    though agreement scores still count votes with them. `comparison`
+    falls back to the P5 when none of its codes is usable. Returns None when no resolution falls
+    in the (clamped) range.
     """
     start_date, end_date = clamp_to_participation(start_date, end_date, participation)
 
@@ -76,7 +82,12 @@ def country_profile(
     requested = [c for c in (comparison or []) if c in available and c != country]
     comparison = requested or P5
 
-    res_df = engine.query_resolutions(start_date=start_date, end_date=end_date)
+    res_df = engine.query_resolutions(
+        start_date=start_date,
+        end_date=end_date,
+        subject_ids=subject_ids or None,
+        include_descendants=True,
+    )
     if res_df.empty:
         return None
     res_ids = res_df["undl_id"].tolist()
@@ -96,7 +107,9 @@ def country_profile(
     ranked = 0
     ml_stats = engine.query_multilateral_stats(res_ids)
     if not ml_stats.empty:
-        ml_valid = ml_stats.dropna(subset=["multilateral_alignment"]).copy()
+        ml_valid = ml_stats.dropna(subset=["multilateral_alignment"])
+        others = set(exclude) - {country}
+        ml_valid = ml_valid[~ml_valid["country"].isin(others)].copy()
         ml_valid["_rank"] = (
             ml_valid["multilateral_alignment"].rank(ascending=False, method="min").astype(int)
         )
@@ -123,7 +136,9 @@ def country_profile(
     joint_counts = scores_df[score_cols].notna().sum()
     qualified = joint_counts[joint_counts >= min_joint_votes].index
     avg_by_country = scores_df[score_cols].mean().dropna().sort_values(ascending=False)
-    avg_qualified = avg_by_country[avg_by_country.index.isin(qualified)]
+    avg_qualified = avg_by_country[
+        avg_by_country.index.isin(qualified) & ~avg_by_country.index.isin(set(exclude))
+    ]
 
     valid_comp = [c for c in comparison if c in scores_df.columns]
     yearly = (

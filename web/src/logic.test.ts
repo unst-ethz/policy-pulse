@@ -4,6 +4,7 @@ import {
   countActive,
   exactTerms,
   hasTerm,
+  onlyFilters,
   parseFilters,
   serializeFilters,
   toApiParams,
@@ -26,6 +27,7 @@ describe('URL filters', () => {
       group: ['CHE', 'FRA'],
       together: 'yes' as const,
       allVoted: true,
+      historical: true,
     }
     expect(parseFilters(serializeFilters(filters))).toEqual(filters)
   })
@@ -55,6 +57,7 @@ describe('URL filters', () => {
       group: ['CHE'],
       together: null,
       allVoted: true,
+      historical: false,
     })
   })
 
@@ -83,6 +86,7 @@ describe('URL filters', () => {
         group: ['CHE', 'FRA'],
         together: 'split',
         allVoted: false,
+        historical: true,
       }),
     ).toEqual({
       start_date: '2000-01-01',
@@ -98,6 +102,11 @@ describe('URL filters', () => {
       group_vote: 'split',
       group_all_voted: undefined,
     })
+  })
+
+  it('keeps only the filters a page applies', () => {
+    const all = parseFilters({ from: '1990', subject: '07', country: 'CHE', adopted: 'recorded', historical: '1' })
+    expect(onlyFilters(all, ['from', 'historical'])).toEqual({ ...parseFilters({}), from: 1990, historical: true })
   })
 
   it('keeps a group without a way of voting in the URL but not in the API filter', () => {

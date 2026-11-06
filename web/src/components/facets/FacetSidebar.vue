@@ -1,57 +1,49 @@
 <script setup lang="ts">
 /**
- * The resolution list's filters as a column of facets. Each facet reads and writes the URL
- * filter on its own; this only decides which show. The viewer picks them (kept in this
- * browser), starting with years and subjects, and a facet whose filter is set always shows, so
- * a shared link never hides a filter that narrows the list.
+ * A page's filters as a column of facets. Each facet reads and writes the URL filter on its own;
+ * this only decides which show: of the facets the page allows, those the viewer chose (kept in
+ * this browser per page, starting with the page's defaults), and always those whose filter is
+ * set, so a shared link never hides a filter that changes the page.
  */
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
-import { type Component, computed, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { countActive, exactTerms, type Filters, useFilters } from '@/composables/useFilters'
-import AdoptionFacet from './AdoptionFacet.vue'
-import CountryFacet from './CountryFacet.vue'
-import GroupFacet from './GroupFacet.vue'
-import SponsorFacet from './SponsorFacet.vue'
-import SubjectsFacet from './SubjectsFacet.vue'
-import TermsFacet from './TermsFacet.vue'
-import YearsFacet from './YearsFacet.vue'
+import { useFilters } from '@/composables/useFilters'
+import { activeCount, FACETS, type FacetKey } from './registry'
 
-const STORAGE_KEY = 'policy-pulse:facets'
-const DEFAULT = ['years', 'subjects']
-
-const FACETS: { key: string; title: string; component: Component; active: (f: Filters) => boolean }[] = [
-  { key: 'years', title: 'filters.years', component: YearsFacet, active: (f) => !!(f.from || f.to) },
-  { key: 'adoption', title: 'facets.adoption', component: AdoptionFacet, active: (f) => f.adoption.length > 0 },
-  { key: 'subjects', title: 'filters.subjects', component: SubjectsFacet, active: (f) => f.subjects.length > 0 },
-  { key: 'terms', title: 'facets.terms', component: TermsFacet, active: (f) => exactTerms(f.keyword).length > 0 },
-  { key: 'group', title: 'facets.group', component: GroupFacet, active: (f) => f.group.length > 0 },
-  { key: 'country', title: 'filters.country', component: CountryFacet, active: (f) => !!f.country },
-  { key: 'sponsor', title: 'filters.sponsor', component: SponsorFacet, active: (f) => !!f.sponsor },
-]
+const props = defineProps<{
+  allowed: FacetKey[]
+  defaults: FacetKey[]
+  storageKey: string
+  /** How many filters are set, when the page has some outside the facets (default: the facets'). */
+  count?: number
+}>()
 
 const { t } = useI18n()
 const { filters, clear } = useFilters()
-const active = computed(() => countActive(filters.value))
+const facets = computed(() => FACETS.filter((f) => props.allowed.includes(f.key)))
+const active = computed(() => props.count ?? activeCount(props.allowed, filters.value))
 
 function load(): string[] {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null')
-    return Array.isArray(saved) ? saved : DEFAULT
+    const saved = JSON.parse(localStorage.getItem(props.storageKey) ?? 'null')
+    return Array.isArray(saved) ? saved : props.defaults
   } catch {
-    return DEFAULT
+    return props.defaults
   }
 }
 const chosen = ref<string[]>(load())
 watch(chosen, (value) => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
+    localStorage.setItem(props.storageKey, JSON.stringify(value))
   } catch {
     // Storage blocked (private mode): the choice lasts for this visit only
   }
 })
 
-const shown = computed(() => FACETS.filter((f) => chosen.value.includes(f.key) || f.active(filters.value)))
+const shown = computed(() => facets.value.filter((f) => chosen.value.includes(f.key) || f.active(filters.value)))
+// Nothing to choose when the page starts with every facet it has
+const choosable = computed(() => facets.value.some((f) => !props.defaults.includes(f.key)))
 
 function choose(key: string, on: boolean) {
   chosen.value = on ? [...chosen.value, key] : chosen.value.filter((k) => k !== key)
@@ -62,7 +54,7 @@ function choose(key: string, on: boolean) {
   <div class="facets" role="group" :aria-label="t('filters.label')">
     <div class="head">
       <h2>{{ t('facets.title') }}</h2>
-      <PopoverRoot>
+      <PopoverRoot v-if="choosable">
         <PopoverTrigger class="pick" :aria-label="t('facets.choose')" :title="t('facets.choose')">
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
             <path d="M2 4h7M13 4h1M2 12h1M7 12h7" stroke="currentColor" stroke-width="1.5" fill="none" />
@@ -73,7 +65,7 @@ function choose(key: string, on: boolean) {
         <PopoverPortal>
           <PopoverContent class="facet-chooser" side="bottom" align="start" :side-offset="6" :collision-padding="12">
             <p class="facet-chooser-title">{{ t('facets.choose') }}</p>
-            <label v-for="f in FACETS" :key="f.key" class="facet-chooser-option">
+            <label v-for="f in facets" :key="f.key" class="facet-chooser-option">
               <input
                 type="checkbox"
                 :checked="chosen.includes(f.key) || f.active(filters)"
@@ -82,7 +74,7 @@ function choose(key: string, on: boolean) {
               />
               {{ t(f.title) }}
             </label>
-            <p v-if="FACETS.some((f) => f.active(filters))" class="facet-chooser-note">{{ t('facets.chooseNote') }}</p>
+            <p v-if="facets.some((f) => f.active(filters))" class="facet-chooser-note">{{ t('facets.chooseNote') }}</p>
           </PopoverContent>
         </PopoverPortal>
       </PopoverRoot>

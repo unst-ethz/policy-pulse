@@ -3,10 +3,10 @@
  *
  * URL keys are short and human-readable (`from=1990&to=2020&subject=…&country=CHE&mode=voted&q=…`,
  * `sponsor=CHE&original=1`, `adopted=recorded&adopted=without_vote`,
- * `group=CHE&group=155&together=split&allvoted=1`);
+ * `group=CHE&group=FRA&together=split&allvoted=1`, `historical=1`);
  * `toApiParams` turns them into the API's filter parameters.
  */
-import { computed } from 'vue'
+import { type ComputedRef, computed, type InjectionKey, inject } from 'vue'
 import { type LocationQuery, useRoute, useRouter } from 'vue-router'
 
 export type CountryMode = 'voted' | 'member' | 'none'
@@ -34,6 +34,8 @@ export interface Filters {
   together: GroupVote | null
   /** With `together`: only where every state of the group voted. */
   allVoted: boolean
+  /** Show states that no longer exist (USSR, Yugoslavia…) in per-country views. Not an API filter. */
+  historical: boolean
 }
 
 const MODES: CountryMode[] = ['voted', 'member', 'none']
@@ -69,6 +71,7 @@ export function parseFilters(query: LocationQuery): Filters {
       .filter((code) => /^[A-Z]{3}$/.test(code)),
     together: GROUP_VOTES.find((v) => v === one(query.together)) ?? null,
     allVoted: one(query.allvoted) === '1',
+    historical: one(query.historical) === '1',
   }
 }
 
@@ -86,6 +89,7 @@ export function serializeFilters(filters: Filters): Record<string, string | stri
   if (filters.group.length) query.group = filters.group
   if (filters.group.length && filters.together) query.together = filters.together
   if (filters.group.length && filters.together && filters.allVoted) query.allvoted = '1'
+  if (filters.historical) query.historical = '1'
   return query
 }
 
@@ -158,6 +162,20 @@ export function countActive(filters: Filters): number {
   )
 }
 
+/** `filters` with only `keys` kept and every other filter at its default: what a page applies. */
+export function onlyFilters(filters: Filters, keys: (keyof Filters)[]): Filters {
+  return { ...parseFilters({}), ...Object.fromEntries(keys.map((key) => [key, filters[key]])) }
+}
+
+/**
+ * The filters a page applies, its own context included (e.g. the country it is about), provided
+ * for the facets beside it so their counts match the page. Without one, the plain URL filter.
+ */
+export const PAGE_FILTERS: InjectionKey<ComputedRef<Filters>> = Symbol('page filters')
+export function usePageFilters(): ComputedRef<Filters> {
+  return inject(PAGE_FILTERS, null) ?? useFilters().filters
+}
+
 export function useFilters() {
   const route = useRoute()
   const router = useRouter()
@@ -169,7 +187,7 @@ export function useFilters() {
     const next = { ...filters.value, ...patch }
     const kept = Object.fromEntries(
       Object.entries(route.query).filter(
-        ([key]) => !['from', 'to', 'subject', 'country', 'mode', 'q', 'sponsor', 'original', 'adopted', 'group', 'together', 'allvoted', 'page'].includes(key),
+        ([key]) => !['from', 'to', 'subject', 'country', 'mode', 'q', 'sponsor', 'original', 'adopted', 'group', 'together', 'allvoted', 'historical', 'page'].includes(key),
       ),
     )
     const query: Record<string, unknown> = { ...kept, ...serializeFilters(next) }
@@ -181,7 +199,7 @@ export function useFilters() {
   }
 
   function clear() {
-    update({ from: null, to: null, subjects: [], country: null, mode: 'none', keyword: '', sponsor: null, original: false, adoption: [], group: [], together: null, allVoted: false })
+    update({ from: null, to: null, subjects: [], country: null, mode: 'none', keyword: '', sponsor: null, original: false, adoption: [], group: [], together: null, allVoted: false, historical: false })
   }
 
   return { filters, update, clear }

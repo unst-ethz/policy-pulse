@@ -26,6 +26,7 @@ from ..params import (
     LangParam,
     country_list,
     day,
+    group_states,
     known_country,
     num,
     resolution_filter,
@@ -37,6 +38,11 @@ router = APIRouter(tags=["analysis"])
 
 CloudMode = Literal["default", "geopolitical", "thematic", "action", "category"]
 assert set(get_args(CloudMode)) == set(keywords.MODES), "keep CloudMode in sync with MODES"
+
+SubjectParam = Annotated[
+    list[str] | None,
+    Query(description="Thesaurus subject ids (repeatable); descendants are included"),
+]
 
 CompareParam = Annotated[
     list[str],
@@ -274,6 +280,11 @@ def country_profile(
         list[str] | None, Query(description="ISO3 codes for the alignment over time")
     ] = None,
     min_joint_votes: Annotated[int, Query(ge=1)] = profile.MIN_JOINT_VOTES,
+    subject: SubjectParam = None,
+    exclude_historical: Annotated[
+        bool,
+        Query(description="Leave states that no longer exist out of the rank and the rankings"),
+    ] = False,
     lang: LangParam = "en",
 ) -> schemas.CountryProfile:
     """A country's record over a period (clamped to its participation), as on the profile page.
@@ -289,6 +300,8 @@ def country_profile(
         comparison=country_list(compare, "compare"),
         participation=data.get_participation_year_range(country),
         min_joint_votes=min_joint_votes,
+        subject_ids=subject,
+        exclude=group_states(["historical"]) if exclude_historical else (),
     )
     if prof is None:
         raise HTTPException(404, "No resolutions in the selected period")
@@ -331,6 +344,7 @@ def country_sponsorship(
     iso3: str,
     start_date: dt.date | None = None,
     end_date: dt.date | None = None,
+    subject: SubjectParam = None,
     lang: LangParam = "en",
 ) -> schemas.CountrySponsorship:
     """What a state sponsored over a period, and how others voted on it.
@@ -339,8 +353,9 @@ def country_sponsorship(
     not with `resolutions`. The sponsored resolutions themselves: `/resolutions?sponsor=<iso3>`.
     """
     country = known_country(iso3, "iso3", status_code=404)
+    ids = _selection(ResolutionFilter(subject_ids=tuple(subject)))["undl_id"] if subject else None
     record = sponsorship.country_sponsorship(
-        data.query_engine, country, _iso(start_date), _iso(end_date), data.TOP_LEVEL_SUBJECTS
+        data.query_engine, country, _iso(start_date), _iso(end_date), data.TOP_LEVEL_SUBJECTS, ids
     )
     labels = subject_labels(lang)
     return schemas.CountrySponsorship(

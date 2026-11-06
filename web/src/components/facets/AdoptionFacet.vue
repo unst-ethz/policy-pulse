@@ -6,12 +6,12 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFacets } from '@/api/queries'
-import { ADOPTIONS, type Adoption, useFilters } from '@/composables/useFilters'
+import { ADOPTIONS, type Adoption, useFilters, usePageFilters } from '@/composables/useFilters'
 import FacetPanel from './FacetPanel.vue'
 
 const { t, n } = useI18n()
 const { filters, update } = useFilters()
-const facets = useFacets(filters)
+const facets = useFacets(usePageFilters())
 
 const counts = computed(
   () => new Map((facets.data.value?.adoption ?? []).map((a) => [a.adoption, a.resolutions])),

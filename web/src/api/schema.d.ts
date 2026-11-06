@@ -1927,6 +1927,10 @@ export interface operations {
                 /** @description ISO3 codes for the alignment over time */
                 compare?: string[] | null;
                 min_joint_votes?: number;
+                /** @description Thesaurus subject ids (repeatable); descendants are included */
+                subject?: string[] | null;
+                /** @description Leave states that no longer exist out of the rank and the rankings */
+                exclude_historical?: boolean;
                 /** @description Language for country and subject names */
                 lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
             };
@@ -1963,6 +1967,8 @@ export interface operations {
             query?: {
                 start_date?: string | null;
                 end_date?: string | null;
+                /** @description Thesaurus subject ids (repeatable); descendants are included */
+                subject?: string[] | null;
                 /** @description Language for country and subject names */
                 lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
             };

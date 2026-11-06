@@ -61,6 +61,14 @@ def test_country_sponsorship(engine):
     assert ids(record.not_yes) == ["104"]  # AAA sponsored it, then voted no
 
 
+def test_country_sponsorship_narrowed_to_resolutions(engine):
+    # AAA sponsored 101, 103 and 104, all under PEACE; none of ENVIRONMENT's 102
+    peace = sponsorship.country_sponsorship(engine, "AAA", None, None, [PEACE], ids=["101", "104"])
+    assert (peace.resolutions, peace.sponsored) == (2, 2)
+    none = sponsorship.country_sponsorship(engine, "AAA", None, None, [PEACE], ids=["102"])
+    assert (none.resolutions, none.sponsored) == (1, 0)
+
+
 def test_country_sponsorship_in_a_period(engine):
     record = sponsorship.country_sponsorship(engine, "AAA", "2001-01-01", "2001-12-31", [PEACE])
     assert (record.resolutions, record.with_data, record.sponsored, record.original) == (2, 2, 2, 1)

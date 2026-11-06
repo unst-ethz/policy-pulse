@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot, DialogTitle, DialogTrigger } from 'reka-ui'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { csvUrl, type Lang, type ListOptions, useCountryIndex, useResolutions } from '@/api/queries'
 import CountryList from '@/components/CountryList.vue'
 import QueryState from '@/components/QueryState.vue'
 import ResolutionTable from '@/components/ResolutionTable.vue'
-import FacetSidebar from '@/components/facets/FacetSidebar.vue'
+import FacetLayout from '@/components/facets/FacetLayout.vue'
 import InfoTip from '@/components/InfoTip.vue'
 import KeywordField from '@/components/KeywordField.vue'
 import { countActive, useFilters } from '@/composables/useFilters'
@@ -52,15 +51,6 @@ const pages = computed(() => Math.max(1, Math.ceil((result.data.value?.total ?? 
 const voteColumns = computed(() => votes.value.map((iso3) => ({ iso3, label: name(iso3) })))
 const download = computed(() => csvUrl(filters.value, votes.value, locale.value as Lang))
 
-// Facets beside the list on wide screens; behind a "Filters" button in a drawer otherwise.
-// Rendered in one place only, so each facet's queries and state exist once.
-const wideQuery = window.matchMedia('(min-width: 960px)')
-const wide = ref(wideQuery.matches)
-const onWide = (event: MediaQueryListEvent) => (wide.value = event.matches)
-onMounted(() => wideQuery.addEventListener('change', onWide))
-onUnmounted(() => wideQuery.removeEventListener('change', onWide))
-const drawer = ref(false)
-const active = computed(() => countActive(filters.value))
 </script>
 
 <template>
@@ -70,32 +60,16 @@ const active = computed(() => countActive(filters.value))
       <p>{{ t('resolutions.lead') }}</p>
     </div>
 
-    <div class="layout">
-      <aside v-if="wide" class="side">
-        <FacetSidebar />
-      </aside>
+    <FacetLayout
+      :allowed="['years', 'adoption', 'subjects', 'terms', 'group', 'country', 'sponsor']"
+      :defaults="['years', 'subjects']"
+      storage-key="policy-pulse:facets"
+      :count="countActive(filters)"
+      :done-label="t('facets.show', { n: n(result.data.value?.total ?? 0) })"
+    >
+      <template #toolbar><KeywordField /></template>
 
     <section class="section">
-      <div class="search">
-        <KeywordField />
-        <DialogRoot v-if="!wide" v-model:open="drawer">
-          <DialogTrigger class="button">
-            {{ active ? t('facets.openActive', { n: active }) : t('facets.open') }}
-          </DialogTrigger>
-          <DialogPortal>
-            <DialogOverlay class="overlay" />
-            <DialogContent class="drawer" :aria-describedby="undefined">
-              <DialogTitle class="visually-hidden">{{ t('facets.title') }}</DialogTitle>
-              <FacetSidebar />
-              <div class="drawer-foot">
-                <DialogClose class="button primary">
-                  {{ t('facets.show', { n: n(result.data.value?.total ?? 0) }) }}
-                </DialogClose>
-              </div>
-            </DialogContent>
-          </DialogPortal>
-        </DialogRoot>
-      </div>
       <div class="toolbar">
         <p class="summary" aria-live="polite">
           <template v-if="result.data.value">
@@ -154,77 +128,11 @@ const active = computed(() => countActive(filters.value))
         </button>
       </nav>
     </section>
-    </div>
+    </FacetLayout>
   </div>
 </template>
 
 <style scoped>
-.layout {
-  display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  gap: var(--space-6);
-  align-items: start;
-}
-
-@media (max-width: 959px) {
-  .layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-/* Sticks below the site header and scrolls on its own when taller than the screen */
-.side {
-  position: sticky;
-  top: 76px;
-  max-height: calc(100vh - 92px);
-  overflow-y: auto;
-  padding-inline-end: var(--space-2);
-}
-
-.search {
-  display: flex;
-  align-items: end;
-  gap: var(--space-3);
-}
-
-.search .keyword {
-  flex: 1;
-}
-
-.overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 200; /* above the sticky site header */
-  background: rgb(0 0 0 / 0.2);
-}
-
-.drawer {
-  position: fixed;
-  z-index: 201;
-  inset-block: 0;
-  inset-inline-start: 0;
-  width: min(92vw, 360px);
-  overflow-y: auto;
-  background: var(--page);
-  border-inline-end: 1px solid var(--rule-strong);
-  padding: var(--space-4) var(--space-4) 0;
-  display: grid;
-  align-content: start;
-}
-
-.drawer-foot {
-  position: sticky;
-  bottom: 0;
-  padding-block: var(--space-3);
-  background: var(--page);
-  border-top: 1px solid var(--rule);
-}
-
-.drawer-foot .button {
-  width: 100%;
-  justify-content: center;
-}
-
 .toolbar {
   display: flex;
   flex-wrap: wrap;
