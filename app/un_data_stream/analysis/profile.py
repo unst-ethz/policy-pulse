@@ -63,12 +63,14 @@ def country_profile(
     comparison: list[str] | None = None,
     participation: tuple[int, int] | None = None,
     min_joint_votes: int = MIN_JOINT_VOTES,
+    subject_ids: list[str] | None = None,
 ) -> CountryProfile | None:
     """Build the profile of `country` (an ISO3 in `engine.country_columns`).
 
     `participation` is the (first, last) year the country took part; the date range is clamped to
-    it. `comparison` falls back to the P5 when none of its codes is usable. Returns None when no
-    resolution falls in the (clamped) range.
+    it. `subject_ids` (descendants included) narrows every figure to those subjects. `comparison`
+    falls back to the P5 when none of its codes is usable. Returns None when no resolution falls
+    in the (clamped) range.
     """
     start_date, end_date = clamp_to_participation(start_date, end_date, participation)
 
@@ -76,7 +78,12 @@ def country_profile(
     requested = [c for c in (comparison or []) if c in available and c != country]
     comparison = requested or P5
 
-    res_df = engine.query_resolutions(start_date=start_date, end_date=end_date)
+    res_df = engine.query_resolutions(
+        start_date=start_date,
+        end_date=end_date,
+        subject_ids=subject_ids or None,
+        include_descendants=True,
+    )
     if res_df.empty:
         return None
     res_ids = res_df["undl_id"].tolist()

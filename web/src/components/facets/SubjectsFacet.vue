@@ -8,7 +8,7 @@ import { PopoverTrigger } from 'reka-ui'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFacets, useSubjectTree } from '@/api/queries'
-import { useFilters } from '@/composables/useFilters'
+import { useFilters, usePageFilters } from '@/composables/useFilters'
 import { flatSubjects } from '@/format'
 import SubjectPicker from '../SubjectPicker.vue'
 import FacetPanel from './FacetPanel.vue'
@@ -18,7 +18,7 @@ const SHOWN = 5
 
 const { t, n } = useI18n()
 const { filters, update } = useFilters()
-const facets = useFacets(filters)
+const facets = useFacets(usePageFilters())
 const tree = useSubjectTree()
 
 const subjects = computed({

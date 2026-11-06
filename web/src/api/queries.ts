@@ -250,14 +250,14 @@ export function useWordCloud(filters: MaybeRefOrGetter<Filters>, mode: MaybeRefO
 
 export function useProfile(
   country: MaybeRefOrGetter<string>,
-  range: MaybeRefOrGetter<{ from: number | null; to: number | null }>,
+  range: MaybeRefOrGetter<{ from: number | null; to: number | null; subjects?: string[] }>,
   compare: MaybeRefOrGetter<string[]>,
 ) {
   const lang = useLang()
   return useQuery({
     queryKey: ['profile', r(country), r(range), r(compare), lang],
     queryFn: () => {
-      const { from, to } = toValue(range)
+      const { from, to, subjects } = toValue(range)
       return unwrap(
         api.GET('/api/v1/countries/{iso3}/profile', {
           params: {
@@ -265,6 +265,7 @@ export function useProfile(
             query: {
               start_date: from ? `${from}-01-01` : undefined,
               end_date: to ? `${to}-12-31` : undefined,
+              subject: subjects?.length ? subjects : undefined,
               compare: toValue(compare).length ? toValue(compare) : undefined,
               lang: lang.value,
             },
@@ -278,13 +279,13 @@ export function useProfile(
 
 export function useSponsorship(
   country: MaybeRefOrGetter<string>,
-  range: MaybeRefOrGetter<{ from: number | null; to: number | null }>,
+  range: MaybeRefOrGetter<{ from: number | null; to: number | null; subjects?: string[] }>,
 ) {
   const lang = useLang()
   return useQuery({
     queryKey: ['sponsorship', r(country), r(range), lang],
     queryFn: () => {
-      const { from, to } = toValue(range)
+      const { from, to, subjects } = toValue(range)
       return unwrap(
         api.GET('/api/v1/countries/{iso3}/sponsorship', {
           params: {
@@ -292,6 +293,7 @@ export function useSponsorship(
             query: {
               start_date: from ? `${from}-01-01` : undefined,
               end_date: to ? `${to}-12-31` : undefined,
+              subject: subjects?.length ? subjects : undefined,
               lang: lang.value,
             },
           },

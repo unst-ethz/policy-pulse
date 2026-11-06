@@ -4,6 +4,8 @@ import pytest
 
 from app.un_data_stream.analysis import overview, profile
 
+from .conftest import ENVIRONMENT, PEACE
+
 
 def test_profile_counts_votes_in_range(engine):
     prof = profile.country_profile(engine, "AAA", participation=(2001, 2002))
@@ -13,6 +15,13 @@ def test_profile_counts_votes_in_range(engine):
     assert prof.recorded_votes == 3
     assert prof.votes == {"Y": 1, "N": 1, "A": 1, "absent": 0}
     assert (prof.adopted_without_vote, prof.non_recorded_votes) == (1, 0)
+
+
+def test_profile_narrowed_to_subjects(engine):
+    # PEACE takes in DISARMAMENT below it: 101, 103, 104, 105; ENVIRONMENT is 102 only
+    assert profile.country_profile(engine, "AAA", subject_ids=[PEACE]).total_resolutions == 4
+    prof = profile.country_profile(engine, "AAA", subject_ids=[ENVIRONMENT])
+    assert (prof.total_resolutions, prof.votes["Y"]) == (1, 1)
 
 
 def test_profile_comparison_falls_back_to_the_p5(engine):

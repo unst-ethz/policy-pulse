@@ -73,8 +73,12 @@ def country_sponsorship(
     start_date: str | None,
     end_date: str | None,
     domains: Iterable[str],
+    ids: Iterable[str] | None = None,
 ) -> CountrySponsorship:
-    """`country`'s sponsorship over [start_date, end_date] (inclusive, 'YYYY-MM-DD')."""
+    """`country`'s sponsorship over [start_date, end_date] (inclusive, 'YYYY-MM-DD').
+
+    `ids`, when given, narrows it further to those resolutions (e.g. a subject's).
+    """
     snapshot = engine.snapshot
     table = snapshot.resolution_table
     in_period = pd.Series(True, index=table.index)
@@ -82,6 +86,8 @@ def country_sponsorship(
         in_period &= table["date"] >= pd.Timestamp(start_date)
     if end_date:
         in_period &= table["date"] <= pd.Timestamp(end_date)
+    if ids is not None:
+        in_period &= table["undl_id"].isin(pd.Index(ids))
     period = table[in_period]
 
     sponsors = snapshot.sponsor_table

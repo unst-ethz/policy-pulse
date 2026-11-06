@@ -2,20 +2,23 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDomains } from '@/api/queries'
-import FilterBar from '@/components/FilterBar.vue'
+import FacetLayout from '@/components/facets/FacetLayout.vue'
 import QueryState from '@/components/QueryState.vue'
-import { serializeFilters, useFilters } from '@/composables/useFilters'
+import { onlyFilters, serializeFilters, useFilters } from '@/composables/useFilters'
 import { sentenceCase } from '@/format'
 
 const { t, n } = useI18n()
 const { filters } = useFilters()
 
+// Only the years apply here: the subjects are what the page lists
+const applied = computed(() => onlyFilters(filters.value, ['from', 'to']))
 const range = computed(() => ({ from: filters.value.from, to: filters.value.to }))
 const domains = useDomains(range)
 
 // Every card's sparkline spans the same years, so their shapes compare
 const years = computed(() => (domains.data.value?.per_year ?? []).map((y) => y.year))
-const yearsQuery = computed(() => serializeFilters({ ...filters.value, subjects: [], country: null, keyword: '', sponsor: null }))
+// The subject pages keep the years and the historical-states choice
+const yearsQuery = computed(() => serializeFilters(onlyFilters(filters.value, ['from', 'to', 'historical'])))
 
 const cards = computed(() =>
   (domains.data.value?.domains ?? []).map((d) => {
@@ -38,8 +41,7 @@ const cards = computed(() =>
       <p>{{ t('subject.lead') }}</p>
     </div>
 
-    <FilterBar :fields="['years']" />
-
+    <FacetLayout :allowed="['years']" :defaults="['years']" storage-key="policy-pulse:facets:subjects" :applied="applied">
     <QueryState
       :loading="domains.isLoading.value"
       :fetching="domains.isFetching.value"
@@ -77,6 +79,7 @@ const cards = computed(() =>
         </li>
       </ul>
     </QueryState>
+    </FacetLayout>
 
     <p class="hint">{{ t('subject.coverage') }}</p>
   </div>

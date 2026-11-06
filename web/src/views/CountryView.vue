@@ -14,7 +14,7 @@ import AgreementBars from '@/components/AgreementBars.vue'
 import ChartFrame from '@/components/ChartFrame.vue'
 import CountryList from '@/components/CountryList.vue'
 import CountryPicker from '@/components/CountryPicker.vue'
-import FilterBar from '@/components/FilterBar.vue'
+import FacetLayout from '@/components/facets/FacetLayout.vue'
 import QueryState from '@/components/QueryState.vue'
 import ScaleLegend from '@/components/ScaleLegend.vue'
 import TimelineChart from '@/components/TimelineChart.vue'
@@ -24,7 +24,7 @@ import VoteChip from '@/components/VoteChip.vue'
 import WorldMap from '@/components/WorldMap.vue'
 import YearBars from '@/components/YearBars.vue'
 import { divergingScale } from '@/charts/scales'
-import { useFilters } from '@/composables/useFilters'
+import { onlyFilters, useFilters } from '@/composables/useFilters'
 import { useThemeColors } from '@/composables/useThemeColors'
 import { cleanTitle, sentenceCase, SERIES_SLOTS, SERIES_SLOTS_DARK, yearSpan } from '@/format'
 
@@ -39,6 +39,12 @@ const colors = useThemeColors()
 
 const country = computed(() => index.value.get(props.iso3))
 const range = computed(() => ({ from: filters.value.from, to: filters.value.to }))
+// Years and subjects narrow the page, except the timeline (whole history by design) and the
+// agreement by topic, which compares the subjects themselves
+const scope = computed(() => ({ ...range.value, subjects: filters.value.subjects }))
+const pageFilters = computed(() => onlyFilters(filters.value, ['from', 'to', 'subjects']))
+// What the facets count: the same filters, over the resolutions adopted while it was a member
+const applied = computed(() => ({ ...pageFilters.value, country: props.iso3, mode: 'member' as const }))
 
 function listParam(key: string): string[] {
   const v = route.query[key]
@@ -54,7 +60,7 @@ const requested = computed({
   get: () => listParam('compare'),
   set: (value: string[]) => setParam('compare', value),
 })
-const profile = useProfile(() => props.iso3, range, requested)
+const profile = useProfile(() => props.iso3, scope, requested)
 const p = computed(() => profile.data.value)
 
 // What the comparison charts use: what was asked for, else the profile's default (the P5).
@@ -67,8 +73,7 @@ const compareModel = computed({
 })
 
 // --- agreement map -------------------------------------------------------------------------
-const mapFilters = computed(() => ({ ...filters.value, subjects: [], keyword: '', mode: 'none' as const, country: null, sponsor: null }))
-const map = useAgreementMap(mapFilters, () => props.iso3)
+const map = useAgreementMap(pageFilters, () => props.iso3)
 // Centred by default: most pairs agree 0.7-0.95, which on a fixed 0-1 scale is all one blue.
 const centred = ref(true)
 const scores = computed(() => new Map((map.data.value?.scores ?? []).map((s) => [s.country, s.score])))
@@ -148,13 +153,16 @@ const subjectRows = computed(() =>
 )
 
 // --- sponsorship ---------------------------------------------------------------------------
-const sponsorship = useSponsorship(() => props.iso3, range)
+const sponsorship = useSponsorship(() => props.iso3, scope)
 const sp = computed(() => sponsorship.data.value)
 const years = computed(() => ({
   from: filters.value.from ? String(filters.value.from) : undefined,
   to: filters.value.to ? String(filters.value.to) : undefined,
 }))
-const sponsoredLink = computed(() => ({ name: 'resolutions', query: { ...years.value, sponsor: props.iso3 } }))
+const sponsoredLink = computed(() => ({
+  name: 'resolutions',
+  query: { ...years.value, subject: filters.value.subjects, sponsor: props.iso3 },
+}))
 const domainRows = computed(() => {
   const rows = sp.value?.by_subject ?? []
   const max = Math.max(1, ...rows.map((s) => s.count))
@@ -192,7 +200,12 @@ const membershipText = computed(() => {
       </p>
     </div>
 
-    <FilterBar :fields="['years']" />
+    <FacetLayout
+      :allowed="['years', 'subjects']"
+      :defaults="['years']"
+      storage-key="policy-pulse:facets:country"
+      :applied="applied"
+    >
 
     <QueryState
       :loading="profile.isLoading.value"
@@ -524,6 +537,7 @@ const membershipText = computed(() => {
         </div>
       </div>
     </section>
+    </FacetLayout>
   </div>
 </template>
 

@@ -8,13 +8,13 @@ import { SliderRange, SliderRoot, SliderThumb, SliderTrack } from 'reka-ui'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFacets, useMeta } from '@/api/queries'
-import { useFilters } from '@/composables/useFilters'
+import { useFilters, usePageFilters } from '@/composables/useFilters'
 import FacetPanel from './FacetPanel.vue'
 
 const { t, n } = useI18n()
 const { filters, update } = useFilters()
 const meta = useMeta()
-const facets = useFacets(filters)
+const facets = useFacets(usePageFilters())
 
 const first = computed(() => Number(meta.data.value?.earliest_date?.slice(0, 4) ?? 1946))
 const last = computed(() => Number(meta.data.value?.latest_date?.slice(0, 4) ?? new Date().getFullYear()))

@@ -10,7 +10,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import type { TreeNode } from '@/api/client'
 import { useCountryIndex, useFacets, useRegionTree } from '@/api/queries'
-import { GROUP_VOTES, type GroupVote, useFilters } from '@/composables/useFilters'
+import { GROUP_VOTES, type GroupVote, useFilters, usePageFilters } from '@/composables/useFilters'
 import CountryList from '../CountryList.vue'
 import FacetPanel from './FacetPanel.vue'
 
@@ -21,7 +21,7 @@ const MAJORITIES: GroupVote[] = ['yes', 'no', 'abstain']
 const { t, n } = useI18n()
 const route = useRoute()
 const { filters, update } = useFilters()
-const facets = useFacets(filters)
+const facets = useFacets(usePageFilters())
 const tree = useRegionTree()
 const { index } = useCountryIndex()
 
