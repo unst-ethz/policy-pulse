@@ -23,7 +23,7 @@ describe('URL filters', () => {
       sponsor: 'USA',
       original: true,
       adoption: ['recorded' as const, 'without_vote' as const],
-      group: ['CHE', '155'],
+      group: ['CHE', 'FRA'],
       together: 'yes' as const,
       allVoted: true,
     }

@@ -29,7 +29,7 @@ export interface Filters {
   original: boolean
   /** Any of these ways of adoption; empty = all. */
   adoption: Adoption[]
-  /** ISO3 and M49 region codes, judged together by `together`. */
+  /** ISO3 codes, judged together by `together`. */
   group: string[]
   together: GroupVote | null
   /** With `together`: only where every state of the group voted. */
@@ -64,7 +64,9 @@ export function parseFilters(query: LocationQuery): Filters {
     sponsor: one(query.sponsor)?.toUpperCase() ?? null,
     original: one(query.original) === '1',
     adoption: many(query.adopted).filter((a): a is Adoption => ADOPTIONS.includes(a as Adoption)),
-    group: many(query.group).map((code) => code.toUpperCase()),
+    group: many(query.group)
+      .map((code) => code.toUpperCase())
+      .filter((code) => /^[A-Z]{3}$/.test(code)),
     together: GROUP_VOTES.find((v) => v === one(query.together)) ?? null,
     allVoted: one(query.allvoted) === '1',
   }

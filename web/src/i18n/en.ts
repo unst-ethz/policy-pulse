@@ -65,8 +65,7 @@ export default {
   facets: {
     group: 'Voted together',
     groupCountries: 'Countries in the group',
-    groupRegions: 'Regions in the group',
-    addRegion: 'Add a region',
+    addRegion: 'Add the countries of a region',
     wholeRegion: 'All of {name}',
     groupHint: 'Add at least two countries, or a region.',
     groupVotes: {
@@ -86,7 +85,7 @@ export default {
       without_vote: 'Without a vote',
     },
     info: {
-      group: 'Pick two or more countries, or a region, and how they voted: all the same way, split, or (with three or more states) a majority one way. With two countries this shows where they agreed or disagreed. Only recorded votes count, and states that did not vote are left out unless all of them must have voted. The numbers apply all your other filters.',
+      group: 'Pick two or more countries (choosing a region adds all of its countries) and how they voted: all the same way, split, or (with three or more states) a majority one way. With two countries this shows where they agreed or disagreed. Only recorded votes count, and states that did not vote are left out unless all of them must have voted. The numbers apply all your other filters.',
       years: 'The year the General Assembly adopted the resolution. The bars count resolutions per year under all your other filters, so they show what moving or widening the range would add.',
       adoption: "A recorded vote lists how every state voted; only these resolutions show individual votes. A vote that was not recorded gives only the totals. Most resolutions are adopted without a vote, by consensus. The numbers apply all your other filters.",
       subjects: 'The areas of the UNBIS Thesaurus that the UN Library files resolutions under; a subject includes everything below it. About a third of resolutions have no subject, and none adopted before 1980 has one. The numbers are what each subject would give with your other filters.',
