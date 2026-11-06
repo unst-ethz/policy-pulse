@@ -377,6 +377,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/subjects/domains": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Subject Domains
+         * @description Resolutions per thesaurus domain and year over a period.
+         *
+         *     A resolution counts towards every domain one of its subjects falls under, so the domains add
+         *     up to more than `resolutions`; about a third of resolutions have no subject at all.
+         */
+        get: operations["subject_domains_api_v1_subjects_domains_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/subjects/{subject_id}/sponsors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Subject Sponsors
+         * @description States sponsoring resolutions on a subject (descendants included) over a period.
+         *
+         *     `own_total` is everything a state sponsored in the period, so `sponsored / own_total` is how
+         *     much of its sponsorship goes to this subject. Coverage follows the UN catalogue (mostly since
+         *     2000): compare with `with_data`, not `resolutions`.
+         */
+        get: operations["subject_sponsors_api_v1_subjects__subject_id__sponsors_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -617,6 +664,52 @@ export interface components {
             /** Resolutions With Subjects */
             resolutions_with_subjects: number;
             votes: components["schemas"]["VoteTotals"];
+        };
+        /** Domain */
+        Domain: {
+            /** Subject Id */
+            subject_id: string;
+            /** Label */
+            label: string;
+            /** Resolutions */
+            resolutions: number;
+            /** Recorded */
+            recorded: number;
+            /**
+             * Per Year
+             * @description Years without a resolution are left out
+             */
+            per_year: components["schemas"]["DomainYear"][];
+        };
+        /** DomainYear */
+        DomainYear: {
+            /** Year */
+            year: number;
+            /** Resolutions */
+            resolutions: number;
+            /**
+             * Recorded
+             * @description Of those, adopted by a recorded vote
+             */
+            recorded: number;
+        };
+        /** Domains */
+        Domains: {
+            /**
+             * Resolutions
+             * @description All resolutions in the period, with or without subject
+             */
+            resolutions: number;
+            /**
+             * Per Year
+             * @description All resolutions per year, for shares
+             */
+            per_year: components["schemas"]["DomainYear"][];
+            /**
+             * Domains
+             * @description Most resolutions first
+             */
+            domains: components["schemas"]["Domain"][];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -928,6 +1021,45 @@ export interface components {
             label: string;
             /** Count */
             count: number;
+        };
+        /** SubjectSponsor */
+        SubjectSponsor: {
+            /** Country */
+            country: string;
+            /** Sponsored */
+            sponsored: number;
+            /**
+             * Original
+             * @description Of `sponsored`, as an original sponsor
+             */
+            original: number;
+            /**
+             * Own Total
+             * @description Everything the state sponsored in the period, any subject
+             */
+            own_total: number;
+        };
+        /** SubjectSponsors */
+        SubjectSponsors: {
+            /** Subject Id */
+            subject_id: string;
+            /** Label */
+            label: string;
+            /**
+             * Resolutions
+             * @description Resolutions in the subject and period
+             */
+            resolutions: number;
+            /**
+             * With Data
+             * @description Of those, with sponsorship data
+             */
+            with_data: number;
+            /**
+             * Sponsors
+             * @description States only, most sponsored first
+             */
+            sponsors: components["schemas"]["SubjectSponsor"][];
         };
         /** TimelineSession */
         TimelineSession: {
@@ -1669,6 +1801,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CountrySponsorship"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    subject_domains_api_v1_subjects_domains_get: {
+        parameters: {
+            query?: {
+                start_date?: string | null;
+                end_date?: string | null;
+                /** @description Language for country and subject names */
+                lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Domains"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    subject_sponsors_api_v1_subjects__subject_id__sponsors_get: {
+        parameters: {
+            query?: {
+                start_date?: string | null;
+                end_date?: string | null;
+                /** @description Language for country and subject names */
+                lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
+            };
+            header?: never;
+            path: {
+                subject_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectSponsors"];
                 };
             };
             /** @description Validation Error */

@@ -10,7 +10,7 @@ const meta = useMeta()
 const nav = computed(() => [
   { to: '/resolutions', label: t('nav.resolutions') },
   { to: '/countries', label: t('nav.countries') },
-  { to: '/topics', label: t('nav.topics') },
+  { to: '/subjects', label: t('nav.subjects') },
   { to: '/alignment', label: t('nav.alignment') },
   { to: '/about', label: t('nav.about') },
 ])

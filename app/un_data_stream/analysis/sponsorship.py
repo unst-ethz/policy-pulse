@@ -17,6 +17,7 @@ import pandas as pd
 from .profile import RECORDED_VOTE
 from .query_engine import ResolutionQueryEngine
 from .snapshot import DataSnapshot
+from .subjects import domain_pairs
 
 ORIGINAL = "original"
 
@@ -123,13 +124,7 @@ def country_sponsorship(
 
 
 def _by_domain(snapshot: DataSnapshot, ids: pd.Series, domains: Iterable[str]) -> pd.Series:
-    links = snapshot.resolution_subject_table
-    links = links[links["undl_id"].isin(ids)]
-    closure = snapshot.closure_table
-    closure = closure[closure["ancestor_id"].isin(list(domains))]
-    joined = links.merge(closure, left_on="subject_id", right_on="descendant_id")
-    # A resolution counts once per domain, however many of its subjects fall under it.
-    counts = joined.drop_duplicates(["undl_id", "ancestor_id"])["ancestor_id"].value_counts()
+    counts = domain_pairs(snapshot, ids, domains)["subject_id"].value_counts()
     return counts.rename_axis("subject_id").rename("count")
 
 
@@ -150,3 +145,39 @@ def _reception(snapshot: DataSnapshot, sponsored: pd.DataFrame, country: str) ->
     )
     out = out[(out["country"] != country) & (out[["yes", "no", "abstain"]].sum(axis=1) > 0)]
     return out.sort_values(["no", "abstain", "country"], ascending=[False, False, True])
+
+
+@dataclass(frozen=True)
+class SubjectSponsors:
+    resolutions: int  # in the subject and period
+    with_data: int  # of those, with sponsorship data
+    # country, sponsored, original, own_total (everything it sponsored in the period, any subject)
+    # — most sponsored first
+    sponsors: pd.DataFrame
+
+
+def subject_sponsors(
+    snapshot: DataSnapshot, selected: pd.DataFrame, period: pd.DataFrame
+) -> SubjectSponsors:
+    """States sponsoring the `selected` resolutions, out of all resolutions in `period`."""
+    states = snapshot.sponsor_table.dropna(subset=["country_code"])
+    in_period = states[states["undl_id"].isin(period["undl_id"])]
+    own_total = in_period.groupby("country_code")["undl_id"].nunique()
+
+    own = in_period[in_period["undl_id"].isin(selected["undl_id"])]
+    sponsored = own.groupby("country_code")["undl_id"].nunique()
+    original = own[own["sponsor_kind"] == ORIGINAL].groupby("country_code")["undl_id"].nunique()
+    sponsors = (
+        pd.DataFrame({"sponsored": sponsored, "original": original, "own_total": own_total})
+        .loc[sponsored.index]
+        .fillna(0)
+        .astype(int)
+        .rename_axis("country")
+        .reset_index()
+        .sort_values(["sponsored", "country"], ascending=[False, True])
+    )
+    return SubjectSponsors(
+        resolutions=len(selected),
+        with_data=int(selected["sponsor_count"].notna().sum()),
+        sponsors=sponsors,
+    )

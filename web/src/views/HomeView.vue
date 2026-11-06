@@ -102,9 +102,9 @@ function openCountry(iso3: string | null) {
         <RouterLink class="button" to="/resolutions">{{ t('home.browse') }}</RouterLink>
       </div>
       <div class="entry">
-        <h2>{{ t('home.byTopic') }}</h2>
-        <p>{{ t('home.byTopicText') }}</p>
-        <RouterLink class="button" to="/topics">{{ t('home.topics') }}</RouterLink>
+        <h2>{{ t('home.bySubject') }}</h2>
+        <p>{{ t('home.bySubjectText') }}</p>
+        <RouterLink class="button" to="/subjects">{{ t('home.subjects') }}</RouterLink>
       </div>
     </section>
 
