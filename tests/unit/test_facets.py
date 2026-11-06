@@ -42,10 +42,9 @@ def test_group_votes_judge_only_the_states_that_voted(engine):
     pair = ("AAA", "BBB")
     assert ids(engine, group=pair, group_vote="alike") == ["101", "102", "104"]
     assert ids(engine, group=pair, group_vote="split") == ["103", "106"]
-    assert ids(engine, group=pair, group_vote="yes_no") == ["103"]
     assert ids(engine, group=pair, group_vote="yes") == ["101", "102"]
     counts = facets.group_vote_counts(engine, ResolutionFilter(group=pair, group_vote="no"))
-    assert counts == {"alike": 3, "split": 2, "yes_no": 1, "yes": 2, "no": 1, "abstain": 0}
+    assert counts == {"alike": 3, "split": 2, "yes": 2, "no": 1, "abstain": 0}
 
 
 def test_group_votes_can_require_every_state_to_have_voted(engine):

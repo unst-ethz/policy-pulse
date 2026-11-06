@@ -70,8 +70,8 @@ def resolution_filter(
     group_vote: Annotated[
         GroupVote | None,
         Query(
-            description="With `group`: the states that voted all voted `alike`, `split`, some "
-            "`yes_no`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting"
+            description="With `group`: the states that voted all voted `alike`, `split`, or a "
+            "majority voted `yes`/`no`/`abstain`. Needs two of them voting"
         ),
     ] = None,
     group_all_voted: Annotated[

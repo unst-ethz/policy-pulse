@@ -759,7 +759,7 @@ export interface components {
              * Group Vote
              * @enum {string}
              */
-            group_vote: "alike" | "split" | "yes_no" | "yes" | "no" | "abstain";
+            group_vote: "alike" | "split" | "yes" | "no" | "abstain";
             /** Resolutions */
             resolutions: number;
         };
@@ -1455,8 +1455,8 @@ export interface operations {
                 sponsorship_known?: boolean;
                 /** @description ISO3 codes and/or M49 region codes (repeatable or comma-separated), judged together by `group_vote`; a region stands for its states */
                 group?: string[] | null;
-                /** @description With `group`: the states that voted all voted `alike`, `split`, some `yes_no`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
-                group_vote?: ("alike" | "split" | "yes_no" | "yes" | "no" | "abstain") | null;
+                /** @description With `group`: the states that voted all voted `alike`, `split`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
+                group_vote?: ("alike" | "split" | "yes" | "no" | "abstain") | null;
                 /** @description With `group_vote`: only where every state of `group` voted */
                 group_all_voted?: boolean;
                 /** @description How adopted (repeatable, any of them): `recorded` vote with each state's vote, `non_recorded` vote, or `without_vote` */
@@ -1515,8 +1515,8 @@ export interface operations {
                 sponsorship_known?: boolean;
                 /** @description ISO3 codes and/or M49 region codes (repeatable or comma-separated), judged together by `group_vote`; a region stands for its states */
                 group?: string[] | null;
-                /** @description With `group`: the states that voted all voted `alike`, `split`, some `yes_no`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
-                group_vote?: ("alike" | "split" | "yes_no" | "yes" | "no" | "abstain") | null;
+                /** @description With `group`: the states that voted all voted `alike`, `split`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
+                group_vote?: ("alike" | "split" | "yes" | "no" | "abstain") | null;
                 /** @description With `group_vote`: only where every state of `group` voted */
                 group_all_voted?: boolean;
                 /** @description How adopted (repeatable, any of them): `recorded` vote with each state's vote, `non_recorded` vote, or `without_vote` */
@@ -1573,8 +1573,8 @@ export interface operations {
                 sponsorship_known?: boolean;
                 /** @description ISO3 codes and/or M49 region codes (repeatable or comma-separated), judged together by `group_vote`; a region stands for its states */
                 group?: string[] | null;
-                /** @description With `group`: the states that voted all voted `alike`, `split`, some `yes_no`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
-                group_vote?: ("alike" | "split" | "yes_no" | "yes" | "no" | "abstain") | null;
+                /** @description With `group`: the states that voted all voted `alike`, `split`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
+                group_vote?: ("alike" | "split" | "yes" | "no" | "abstain") | null;
                 /** @description With `group_vote`: only where every state of `group` voted */
                 group_all_voted?: boolean;
                 /** @description How adopted (repeatable, any of them): `recorded` vote with each state's vote, `non_recorded` vote, or `without_vote` */
@@ -1695,8 +1695,8 @@ export interface operations {
                 sponsorship_known?: boolean;
                 /** @description ISO3 codes and/or M49 region codes (repeatable or comma-separated), judged together by `group_vote`; a region stands for its states */
                 group?: string[] | null;
-                /** @description With `group`: the states that voted all voted `alike`, `split`, some `yes_no`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
-                group_vote?: ("alike" | "split" | "yes_no" | "yes" | "no" | "abstain") | null;
+                /** @description With `group`: the states that voted all voted `alike`, `split`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
+                group_vote?: ("alike" | "split" | "yes" | "no" | "abstain") | null;
                 /** @description With `group_vote`: only where every state of `group` voted */
                 group_all_voted?: boolean;
                 /** @description How adopted (repeatable, any of them): `recorded` vote with each state's vote, `non_recorded` vote, or `without_vote` */
@@ -1827,8 +1827,8 @@ export interface operations {
                 sponsorship_known?: boolean;
                 /** @description ISO3 codes and/or M49 region codes (repeatable or comma-separated), judged together by `group_vote`; a region stands for its states */
                 group?: string[] | null;
-                /** @description With `group`: the states that voted all voted `alike`, `split`, some `yes_no`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
-                group_vote?: ("alike" | "split" | "yes_no" | "yes" | "no" | "abstain") | null;
+                /** @description With `group`: the states that voted all voted `alike`, `split`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
+                group_vote?: ("alike" | "split" | "yes" | "no" | "abstain") | null;
                 /** @description With `group_vote`: only where every state of `group` voted */
                 group_all_voted?: boolean;
                 /** @description How adopted (repeatable, any of them): `recorded` vote with each state's vote, `non_recorded` vote, or `without_vote` */
@@ -1886,8 +1886,8 @@ export interface operations {
                 sponsorship_known?: boolean;
                 /** @description ISO3 codes and/or M49 region codes (repeatable or comma-separated), judged together by `group_vote`; a region stands for its states */
                 group?: string[] | null;
-                /** @description With `group`: the states that voted all voted `alike`, `split`, some `yes_no`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
-                group_vote?: ("alike" | "split" | "yes_no" | "yes" | "no" | "abstain") | null;
+                /** @description With `group`: the states that voted all voted `alike`, `split`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
+                group_vote?: ("alike" | "split" | "yes" | "no" | "abstain") | null;
                 /** @description With `group_vote`: only where every state of `group` voted */
                 group_all_voted?: boolean;
                 /** @description How adopted (repeatable, any of them): `recorded` vote with each state's vote, `non_recorded` vote, or `without_vote` */

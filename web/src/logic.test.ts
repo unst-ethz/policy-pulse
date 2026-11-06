@@ -24,7 +24,7 @@ describe('URL filters', () => {
       original: true,
       adoption: ['recorded' as const, 'without_vote' as const],
       group: ['CHE', '155'],
-      together: 'yes_no' as const,
+      together: 'yes' as const,
       allVoted: true,
     }
     expect(parseFilters(serializeFilters(filters))).toEqual(filters)

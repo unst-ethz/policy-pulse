@@ -14,9 +14,8 @@ from .keywords import keyword_index, matched_ids
 from .query_engine import ResolutionQueryEngine
 
 CountryMode = Literal["voted", "member", "none"]
-# How a group of states voted: all alike, split, at least one Yes and one No, or a majority
-GroupVote = Literal["alike", "split", "yes_no", "yes", "no", "abstain"]
-GROUP_VOTES: tuple[GroupVote, ...] = ("alike", "split", "yes_no", "yes", "no", "abstain")
+# How a group of states voted: all alike, split, or a majority one way
+GroupVote = Literal["alike", "split", "yes", "no", "abstain"]
 
 # Votes a country can cast; the vote columns also hold "X" for "did not vote".
 CAST_VOTES = ("Y", "N", "A")
@@ -164,7 +163,6 @@ def group_vote_masks(
     return {
         "alike": judged & alike,
         "split": judged & ~alike,
-        "yes_no": judged & (yes > 0) & (no > 0),
         "yes": judged & (yes * 2 > cast),
         "no": judged & (no * 2 > cast),
         "abstain": judged & (abstain * 2 > cast),

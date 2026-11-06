@@ -13,9 +13,9 @@ export type CountryMode = 'voted' | 'member' | 'none'
 /** How a resolution was adopted, as the API names it. */
 export type Adoption = 'recorded' | 'non_recorded' | 'without_vote'
 export const ADOPTIONS: Adoption[] = ['recorded', 'non_recorded', 'without_vote']
-/** How a group of states voted: all alike, split, some yes and some no, or a majority. */
-export type GroupVote = 'alike' | 'split' | 'yes_no' | 'yes' | 'no' | 'abstain'
-export const GROUP_VOTES: GroupVote[] = ['alike', 'split', 'yes_no', 'yes', 'no', 'abstain']
+/** How a group of states voted: all alike, split, or a majority one way. */
+export type GroupVote = 'alike' | 'split' | 'yes' | 'no' | 'abstain'
+export const GROUP_VOTES: GroupVote[] = ['alike', 'split', 'yes', 'no', 'abstain']
 
 export interface Filters {
   from: number | null
