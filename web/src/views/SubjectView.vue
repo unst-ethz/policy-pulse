@@ -286,7 +286,7 @@ const contestedLink = computed(() => ({ ...listLink.value, query: { ...listLink.
       <p v-if="domains.data.value && !recorded" class="hint">{{ t('subject.noVotes') }}</p>
       <template v-else-if="recorded">
         <p v-if="votes.data.value && !voters.length" class="hint">{{ t('subject.minVotes', { n: MIN_VOTES }) }}</p>
-        <ChartFrame v-if="voters.length" :title="t('subject.mapTitle')" :description="t('subject.mapText')">
+        <ChartFrame v-if="voters.length || !votes.data.value" :title="t('subject.mapTitle')" :description="t('subject.mapText')">
           <QueryState
             :loading="votes.isLoading.value"
             :fetching="votes.isFetching.value"

@@ -94,7 +94,7 @@ def test_multilateral_overview_applies_the_vote_minimum(engine):
 
 def test_multilateral_overview_of_nothing_is_empty(engine):
     # Not the whole dataset: the engine itself reads an empty id list as "all resolutions"
-    assert agreement.multilateral_overview(engine, []).empty
+    assert agreement.multilateral_overview(engine, [], min_votes=1).empty
 
 
 def test_consensus_scale_anchors_on_the_mean():
