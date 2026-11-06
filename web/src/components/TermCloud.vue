@@ -11,7 +11,7 @@ import ChartFrame from './ChartFrame.vue'
 import QueryState from './QueryState.vue'
 import WordCloud from './WordCloud.vue'
 import type { CloudWord } from '@/charts/types'
-import { useFilters } from '@/composables/useFilters'
+import { hasTerm, toggleTerm, useFilters } from '@/composables/useFilters'
 
 const MODES: CloudMode[] = ['default', 'thematic', 'geopolitical', 'action', 'category']
 
@@ -32,13 +32,16 @@ const cloud = useWordCloud(filters, mode)
 function target(term: string, subjectIds: string[]) {
   const query = { ...route.query, page: undefined }
   if (mode.value === 'category' && subjectIds.length) return { query: { ...query, subject: subjectIds } }
-  const exact = `"${term}"`
-  const q = filters.value.keyword.trim() ? `${filters.value.keyword.trim()} & ${exact}` : exact
-  return { query: { ...query, q } }
+  return { query: { ...query, q: toggleTerm(filters.value.keyword, term) } }
 }
 
+// Terms already in the keyword filter match every listed resolution: they say nothing here
+const terms = computed(() =>
+  (cloud.data.value?.terms ?? []).filter((term) => !hasTerm(filters.value.keyword, term.term)),
+)
+
 const words = computed<CloudWord[]>(() =>
-  (cloud.data.value?.terms ?? []).map((term) => ({
+  terms.value.map((term) => ({
     term: term.term,
     count: term.count,
     to: target(term.term, term.subject_ids ?? []),
@@ -72,7 +75,7 @@ const words = computed<CloudWord[]>(() =>
       :loading="cloud.isLoading.value"
       :fetching="cloud.isFetching.value"
       :error="cloud.error.value"
-      :empty="cloud.data.value?.terms.length === 0"
+      :empty="cloud.data.value != null && terms.length === 0"
       :empty-text="t('cloud.empty')"
       min-height="380px"
       @retry="cloud.refetch()"
@@ -90,7 +93,7 @@ const words = computed<CloudWord[]>(() =>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="term in cloud.data.value?.terms ?? []" :key="term.term">
+          <tr v-for="term in terms" :key="term.term">
             <td>
               <RouterLink :to="target(term.term, term.subject_ids ?? [])">{{ term.term }}</RouterLink>
             </td>

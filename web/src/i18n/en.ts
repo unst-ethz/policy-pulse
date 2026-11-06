@@ -262,6 +262,10 @@ export default {
     emergencySession: 'Emergency special session {n} ({year})',
   },
   cloud: {
+    common: 'Common terms:',
+    more: 'More terms',
+    close: 'Close',
+    remove: 'Remove {term} from the filter',
     cloudTitle: 'Most frequent terms',
     cloudText: 'Across {n} resolutions.',
     mode: 'Kind of term',

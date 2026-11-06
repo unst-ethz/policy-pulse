@@ -78,6 +78,41 @@ export function toApiParams(filters: Filters) {
   }
 }
 
+// shortcut: splits on every "&" and ignores "," (OR): an exact term containing either, or a
+// term toggled into an OR expression, is handled wrongly. To fix with the backend's
+// searchable_count, which builds the same expression.
+const keywordParts = (keyword: string) =>
+  keyword
+    .split('&')
+    .map((part) => part.trim())
+    .filter(Boolean)
+
+const normal = (term: string) => term.trim().toLocaleLowerCase()
+
+/** The text of an exact ("quoted") part, or null; the search itself ignores case and spacing. */
+function exact(part: string): string | null {
+  return part.length > 1 && part.startsWith('"') && part.endsWith('"') ? part.slice(1, -1).trim() : null
+}
+
+/** The exact terms of a keyword expression, as typed. */
+export function exactTerms(keyword: string): string[] {
+  return keywordParts(keyword)
+    .map(exact)
+    .filter((term): term is string => !!term)
+}
+
+/** Whether the keyword expression holds `term` as an exact `&` term. */
+export function hasTerm(keyword: string, term: string): boolean {
+  return exactTerms(keyword).some((t) => normal(t) === normal(term))
+}
+
+/** The keyword expression with `term` added as an exact `&` term, or removed if already there. */
+export function toggleTerm(keyword: string, term: string): string {
+  const parts = keywordParts(keyword)
+  const kept = parts.filter((part) => normal(exact(part) ?? '\0') !== normal(term))
+  return (kept.length < parts.length ? kept : [...parts, `"${term}"`]).join(' & ')
+}
+
 export function countActive(filters: Filters): number {
   return (
     (filters.from || filters.to ? 1 : 0) +

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { divergingScale } from './charts/scales'
-import { countActive, parseFilters, serializeFilters, toApiParams } from './composables/useFilters'
+import {
+  countActive,
+  exactTerms,
+  hasTerm,
+  parseFilters,
+  serializeFilters,
+  toApiParams,
+  toggleTerm,
+} from './composables/useFilters'
 import { cleanTitle, sentenceCase } from './format'
 
 describe('URL filters', () => {
@@ -104,5 +112,28 @@ describe('formatting', () => {
     expect(sentenceCase('SOCIAL CONDITIONS AND EQUITY')).toBe('Social conditions and equity')
     expect(sentenceCase('Already fine')).toBe('Already fine')
     expect(sentenceCase('社会')).toBe('社会')
+  })
+})
+
+describe('keyword terms', () => {
+  it('adds a term as an exact & term and removes it again', () => {
+    expect(toggleTerm('', 'oil slick')).toBe('"oil slick"')
+    expect(toggleTerm('nuclear', 'oil slick')).toBe('nuclear & "oil slick"')
+    expect(toggleTerm('nuclear & "oil slick" & "peace"', 'oil slick')).toBe('nuclear & "peace"')
+  })
+
+  it('recognises only exact terms', () => {
+    expect(hasTerm('nuclear & "oil slick"', 'oil slick')).toBe(true)
+    expect(hasTerm('oil slick', 'oil slick')).toBe(false)
+    expect(hasTerm('"oil slick (2006)"', 'oil slick')).toBe(false)
+  })
+
+  it('ignores case and spacing, as the search does', () => {
+    expect(hasTerm('"Climate change "', 'climate change')).toBe(true)
+    expect(toggleTerm('peace & " Climate change"', 'climate change')).toBe('peace')
+  })
+
+  it('lists the exact terms as typed', () => {
+    expect(exactTerms('nuclear & "Oil slick" & "peace"')).toEqual(['Oil slick', 'peace'])
   })
 })
