@@ -4,8 +4,8 @@
  * filter, or takes it out again. "More terms" opens the full word cloud in a side drawer, beside
  * the list it narrows.
  */
-import { computed, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import {
   DialogClose,
   DialogContent,
@@ -14,57 +14,95 @@ import {
   DialogRoot,
   DialogTitle,
   DialogTrigger,
-} from 'reka-ui'
-import { useWordCloud } from '@/api/queries'
-import { hasTerm, toggleTerm, useFilters } from '@/composables/useFilters'
-import TermCloud from './TermCloud.vue'
+} from "reka-ui";
+import { useWordCloud } from "@/api/queries";
+import { useRoute, useRouter } from "vue-router";
+import {
+  exactTerms,
+  hasTerm,
+  toggleTerm,
+  useFilters,
+} from "@/composables/useFilters";
+import TermCloud from "./TermCloud.vue";
 
-const CHIPS = 8
+const CHIPS = 8;
 
-const { t, n } = useI18n()
-const { filters, update } = useFilters()
+const { t, n } = useI18n();
+const { filters, update } = useFilters();
 // Same request as the cloud's default mode, so opening the drawer reuses it
-const cloud = useWordCloud(filters, 'default')
-const open = ref(false)
+const cloud = useWordCloud(filters, "default");
+const open = ref(false);
 
-const chips = computed(() =>
-  (cloud.data.value?.terms ?? []).slice(0, CHIPS).map((term) => ({
-    term: term.term,
-    count: term.count,
-    active: hasTerm(filters.value.keyword, term.term),
-  })),
-)
+// The terms in the filter first, pressed, so each can be taken out again even when it is not
+// among the most common ones; then the most common others, up to CHIPS
+const chips = computed(() => {
+  const counts = new Map(
+    (cloud.data.value?.terms ?? []).map((term) => [
+      term.term.toLocaleLowerCase(),
+      term.count,
+    ]),
+  );
+  const active = exactTerms(filters.value.keyword).map((term) => ({
+    term,
+    count: counts.get(term.toLocaleLowerCase()) ?? null,
+    active: true,
+  }));
+  const others = (cloud.data.value?.terms ?? [])
+    .filter((term) => !hasTerm(filters.value.keyword, term.term))
+    .slice(0, Math.max(0, CHIPS - active.length))
+    .map((term) => ({ term: term.term, count: term.count, active: false }));
+  return [...active, ...others];
+});
+
+// The drawer's mode lives in the URL while it is open; closing it drops it again
+const route = useRoute();
+const router = useRouter();
+watch(open, (isOpen) => {
+  if (!isOpen && route.query.cloud)
+    router.replace({ query: { ...route.query, cloud: undefined } });
+});
 
 function toggle(term: string) {
-  update({ keyword: toggleTerm(filters.value.keyword, term) })
+  update({ keyword: toggleTerm(filters.value.keyword, term) });
 }
 </script>
 
 <template>
-  <div v-if="chips.length" class="terms" :class="{ fetching: cloud.isFetching.value }">
-    <span class="lead">{{ t('cloud.common') }}</span>
-    <button
-      v-for="chip in chips"
-      :key="chip.term"
-      type="button"
-      class="chip"
-      :aria-pressed="chip.active"
-      :title="chip.active ? t('cloud.remove', { term: chip.term }) : t('cloud.termTitle', { term: chip.term, n: chip.count })"
-      @click="toggle(chip.term)"
-    >
-      {{ chip.term }}
-      <span v-if="chip.active" aria-hidden="true">×</span>
-      <span v-else class="count">{{ n(chip.count) }}</span>
-    </button>
+  <div class="terms" :class="{ fetching: cloud.isFetching.value }">
+    <template v-if="chips.length">
+      <span class="lead">{{ t("cloud.common") }}</span>
+      <button
+        v-for="chip in chips"
+        :key="chip.term"
+        type="button"
+        class="chip"
+        :aria-pressed="chip.active"
+        :aria-label="chip.term"
+        :title="
+          chip.active
+            ? t('cloud.remove', { term: chip.term })
+            : t('cloud.termTitle', { term: chip.term, n: chip.count ?? 0 })
+        "
+        @click="toggle(chip.term)"
+      >
+        {{ chip.term }}
+        <span v-if="chip.active" aria-hidden="true">×</span>
+        <span v-else class="count" aria-hidden="true">{{
+          n(chip.count ?? 0)
+        }}</span>
+      </button>
+    </template>
 
     <DialogRoot v-model:open="open">
-      <DialogTrigger class="more">{{ t('cloud.more') }}</DialogTrigger>
+      <DialogTrigger class="more">{{ t("cloud.more") }}</DialogTrigger>
       <DialogPortal>
         <DialogOverlay class="overlay" />
         <DialogContent class="drawer" :aria-describedby="undefined">
           <div class="drawer-head">
-            <DialogTitle class="visually-hidden">{{ t('cloud.more') }}</DialogTitle>
-            <DialogClose class="button">{{ t('cloud.close') }}</DialogClose>
+            <DialogTitle class="visually-hidden">{{
+              t("cloud.more")
+            }}</DialogTitle>
+            <DialogClose class="button">{{ t("cloud.close") }}</DialogClose>
           </div>
           <TermCloud />
         </DialogContent>
@@ -108,7 +146,7 @@ function toggle(term: string) {
   border-color: var(--ink-2);
 }
 
-.chip[aria-pressed='true'] {
+.chip[aria-pressed="true"] {
   background: var(--ink);
   border-color: var(--ink);
   color: var(--surface);
@@ -128,10 +166,9 @@ function toggle(term: string) {
   text-decoration: underline;
   cursor: pointer;
 }
-</style>
 
-<!-- Not scoped: the drawer is teleported to <body>, outside this component's scope -->
-<style>
+/* The drawer is teleported to <body>; scoped styles still reach it (the scope attribute is on
+   the elements, not their position in the DOM). */
 .overlay {
   position: fixed;
   inset: 0;

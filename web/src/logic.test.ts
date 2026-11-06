@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { divergingScale } from './charts/scales'
 import {
   countActive,
+  exactTerms,
   hasTerm,
   parseFilters,
   serializeFilters,
@@ -125,5 +126,14 @@ describe('keyword terms', () => {
     expect(hasTerm('nuclear & "oil slick"', 'oil slick')).toBe(true)
     expect(hasTerm('oil slick', 'oil slick')).toBe(false)
     expect(hasTerm('"oil slick (2006)"', 'oil slick')).toBe(false)
+  })
+
+  it('ignores case and spacing, as the search does', () => {
+    expect(hasTerm('"Climate change "', 'climate change')).toBe(true)
+    expect(toggleTerm('peace & " Climate change"', 'climate change')).toBe('peace')
+  })
+
+  it('lists the exact terms as typed', () => {
+    expect(exactTerms('nuclear & "Oil slick" & "peace"')).toEqual(['Oil slick', 'peace'])
   })
 })
