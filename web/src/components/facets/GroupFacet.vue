@@ -3,7 +3,7 @@
  * How a group of states voted together: pick countries (a region adds all of its states), then
  * whether they all voted alike, split, or (from three states) mostly voted one way. With two
  * countries this is the bilateral case. States that did not vote are left out, unless all of them must have voted.
- * Picked countries also become the list's vote columns, unless the viewer chose other ones.
+ * Up to four picked countries also become the list's vote columns, unless the viewer chose others.
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -40,11 +40,12 @@ const members = (code: string) => {
 const countries = computed({
   get: () => filters.value.group,
   set: (value: string[]) => {
-    // The vote columns follow the group's countries until the viewer adds others of their own
+    // The vote columns follow the group's countries until the viewer adds others of their own;
+    // a group larger than the columns gets none, rather than a few of its states picked at random
     const v = route.query.votes
     const columns = (Array.isArray(v) ? v : v ? [v] : []).filter((c): c is string => !!c)
     const ours = columns.every((c) => countries.value.includes(c))
-    const votes = value.length ? value.slice(0, VOTE_COLUMNS) : undefined
+    const votes = value.length && value.length <= VOTE_COLUMNS ? value : undefined
     update({ group: value }, ours ? { votes } : {})
   },
 })
