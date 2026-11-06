@@ -1,4 +1,4 @@
-"""Agreement, alignment, word-cloud and country-profile analyses.
+"""Agreement, alignment, word-cloud, country-profile and subject-domain analyses.
 
 Endpoints taking the shared filter parameters run over exactly the resolutions the filter selects
 (the client decides which filters a view uses). Exceptions are noted per endpoint.
@@ -16,9 +16,11 @@ from ...un_data_stream.analysis import (
     keywords,
     profile,
     sponsorship,
+    subjects,
     word_cloud,
 )
 from ...un_data_stream.analysis.filtering import ResolutionFilter
+from ...un_data_stream.analysis.profile import RECORDED_VOTE
 from .. import schemas
 from ..params import (
     LangParam,
@@ -362,4 +364,82 @@ def country_sponsorship(
             for r in record.reception.to_dict("records")
         ],
         not_yes=_notable(record.not_yes, country),
+    )
+
+
+@router.get("/subjects/domains", response_model=schemas.Domains)
+def subject_domains(
+    start_date: dt.date | None = None,
+    end_date: dt.date | None = None,
+    lang: LangParam = "en",
+) -> schemas.Domains:
+    """Resolutions per thesaurus domain and year over a period.
+
+    A resolution counts towards every domain one of its subjects falls under, so the domains add
+    up to more than `resolutions`; about a third of resolutions have no subject at all.
+    """
+    period = _selection(ResolutionFilter(start_date=_iso(start_date), end_date=_iso(end_date)))
+    years = subjects.domain_years(period, data.query_engine.snapshot, data.TOP_LEVEL_SUBJECTS)
+    labels = subject_labels(lang)
+    totals = period.assign(
+        year=period["date"].dt.year, recorded=period["modality"] == RECORDED_VOTE
+    )
+
+    def per_year(rows) -> list[schemas.DomainYear]:
+        return [
+            schemas.DomainYear(
+                year=int(y), resolutions=int(r["resolutions"]), recorded=int(r["recorded"])
+            )
+            for y, r in rows.iterrows()
+        ]
+
+    domains = [
+        schemas.Domain(
+            subject_id=subject_id,
+            label=labels.get(subject_id, subject_id),
+            resolutions=int(rows["resolutions"].sum()),
+            recorded=int(rows["recorded"].sum()),
+            per_year=per_year(rows.set_index("year")),
+        )
+        for subject_id, rows in years.groupby("subject_id")
+    ]
+    return schemas.Domains(
+        resolutions=len(period),
+        per_year=per_year(
+            totals.groupby("year").agg(
+                resolutions=("undl_id", "size"), recorded=("recorded", "sum")
+            )
+        ),
+        domains=sorted(domains, key=lambda d: (-d.resolutions, d.label)),
+    )
+
+
+@router.get("/subjects/{subject_id}/sponsors", response_model=schemas.SubjectSponsors)
+def subject_sponsors(
+    subject_id: str,
+    start_date: dt.date | None = None,
+    end_date: dt.date | None = None,
+    lang: LangParam = "en",
+) -> schemas.SubjectSponsors:
+    """States sponsoring resolutions on a subject (descendants included) over a period.
+
+    `own_total` is everything a state sponsored in the period, so `sponsored / own_total` is how
+    much of its sponsorship goes to this subject. Coverage follows the UN catalogue (mostly since
+    2000): compare with `with_data`, not `resolutions`.
+    """
+    labels = subject_labels(lang)
+    if subject_id not in labels:
+        raise HTTPException(404, f"Unknown subject {subject_id!r}")
+    start, end = _iso(start_date), _iso(end_date)
+    period = _selection(ResolutionFilter(start_date=start, end_date=end))
+    selected = _selection(
+        ResolutionFilter(start_date=start, end_date=end, subject_ids=(subject_id,))
+    )
+    record = sponsorship.subject_sponsors(data.query_engine.snapshot, selected, period)
+    return schemas.SubjectSponsors(
+        subject_id=subject_id,
+        label=labels[subject_id],
+        resolutions=record.resolutions,
+        with_data=record.with_data,
+        sponsors=[schemas.SubjectSponsor(**r) for r in record.sponsors.to_dict("records")],
     )

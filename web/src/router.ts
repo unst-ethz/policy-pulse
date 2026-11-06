@@ -24,6 +24,13 @@ export const router = createRouter({
       component: () => import('./views/CountryView.vue'),
       props: (route) => ({ iso3: String(route.params.iso3).toUpperCase() }),
     },
+    { path: '/subjects', name: 'subjects', component: () => import('./views/SubjectsView.vue') },
+    {
+      path: '/subjects/:id',
+      name: 'subject',
+      component: () => import('./views/SubjectView.vue'),
+      props: true,
+    },
     // The old word-cloud page: the cloud now sits above the resolution list
     { path: '/topics', redirect: (to) => ({ name: 'resolutions', query: to.query }) },
     { path: '/alignment', name: 'alignment', component: () => import('./views/AlignmentView.vue') },

@@ -235,6 +235,8 @@ def multilateral_overview(
     Columns as `query_multilateral_stats`; countries without an alignment score or with fewer than
     `min_votes` votes cast are dropped. Empty if there is no vote data.
     """
+    if not resolution_ids:  # the engine reads an empty list as "all resolutions"
+        return pd.DataFrame()
     return qualified_multilateral(engine.query_multilateral_stats(resolution_ids), min_votes)
 
 

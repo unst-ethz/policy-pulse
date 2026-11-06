@@ -17,12 +17,12 @@ import CountryPicker from '@/components/CountryPicker.vue'
 import FilterBar from '@/components/FilterBar.vue'
 import QueryState from '@/components/QueryState.vue'
 import ScaleLegend from '@/components/ScaleLegend.vue'
-import SponsorshipChart from '@/components/SponsorshipChart.vue'
 import TimelineChart from '@/components/TimelineChart.vue'
 import type { TimelineSeries } from '@/charts/types'
 import VoteBar from '@/components/VoteBar.vue'
 import VoteChip from '@/components/VoteChip.vue'
 import WorldMap from '@/components/WorldMap.vue'
+import YearBars from '@/components/YearBars.vue'
 import { divergingScale } from '@/charts/scales'
 import { useFilters } from '@/composables/useFilters'
 import { useThemeColors } from '@/composables/useThemeColors'
@@ -404,7 +404,15 @@ const membershipText = computed(() => {
           </div>
 
           <ChartFrame :title="t('sponsorship.chartTitle')" :description="t('sponsorship.chartText', { name: name(iso3) })">
-            <SponsorshipChart :years="sp.per_year" />
+            <YearBars
+              :years="sp.per_year"
+              :label="t('sponsorship.chartTitle')"
+              :bars="[
+                { key: 'with_data', label: t('sponsorship.withData'), color: 'rule' },
+                { key: 'original', label: t('sponsorship.original'), color: 'ink', stack: 'sponsored' },
+                { key: 'additional', label: t('sponsorship.additional'), color: 'muted', stack: 'sponsored' },
+              ]"
+            />
             <template #table>
               <table class="data-table">
                 <thead>

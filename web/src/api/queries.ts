@@ -293,6 +293,40 @@ export function useSponsorship(
   })
 }
 
+type YearRange = { from: number | null; to: number | null }
+const period = ({ from, to }: YearRange) => ({
+  start_date: from ? `${from}-01-01` : undefined,
+  end_date: to ? `${to}-12-31` : undefined,
+})
+
+export function useDomains(range: MaybeRefOrGetter<YearRange>) {
+  const lang = useLang()
+  return useQuery({
+    queryKey: ['domains', r(range), lang],
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/v1/subjects/domains', {
+          params: { query: { ...period(toValue(range)), lang: lang.value } },
+        }),
+      ),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useSubjectSponsors(subject: MaybeRefOrGetter<string>, range: MaybeRefOrGetter<YearRange>) {
+  const lang = useLang()
+  return useQuery({
+    queryKey: ['subject-sponsors', r(subject), r(range), lang],
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/v1/subjects/{subject_id}/sponsors', {
+          params: { path: { subject_id: toValue(subject) }, query: { ...period(toValue(range)), lang: lang.value } },
+        }),
+      ),
+    placeholderData: keepPreviousData,
+  })
+}
+
 /** Build the CSV download URL for the current filters (a plain link: the browser downloads it). */
 export function csvUrl(filters: Filters, votes: string[], lang: Lang): string {
   const params = new URLSearchParams()

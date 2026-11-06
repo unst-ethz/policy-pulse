@@ -58,6 +58,8 @@ ENDPOINTS = [
     "/api/v1/countries/ZAF/profile?compare=NGA&compare=EGY",
     "/api/v1/resolutions?sponsor=CHE&original_sponsor=true&limit=20",
     "/api/v1/countries/CHE/sponsorship?start_date=2000-01-01",
+    "/api/v1/subjects/domains?start_date=2000-01-01&lang=fr",
+    "/api/v1/subjects/16/sponsors?start_date=2000-01-01",
 ]
 
 
@@ -171,6 +173,23 @@ def test_country_sponsorship(client):
     assert listed["total"] == record["sponsored"]
     assert sum(y["original"] + y["additional"] for y in record["per_year"]) == record["sponsored"]
     assert "CHE" not in {r["country"] for r in record["reception"]}
+
+
+def test_subject_domains_and_sponsors(client):
+    domains = get(client, "/api/v1/subjects/domains?start_date=2010-01-01")
+    counts = [d["resolutions"] for d in domains["domains"]]
+    assert counts == sorted(counts, reverse=True)
+    assert sum(y["resolutions"] for y in domains["per_year"]) == domains["resolutions"]
+    first = domains["domains"][0]
+    assert sum(y["resolutions"] for y in first["per_year"]) == first["resolutions"]
+    assert first["recorded"] <= first["resolutions"]
+
+    listed = get(client, f"/api/v1/resolutions?subject={first['subject_id']}&start_date=2010-01-01")
+    assert listed["total"] == first["resolutions"]
+    sponsors = get(client, f"/api/v1/subjects/{first['subject_id']}/sponsors?start_date=2010-01-01")
+    assert sponsors["resolutions"] == first["resolutions"]
+    assert all(s["original"] <= s["sponsored"] <= s["own_total"] for s in sponsors["sponsors"])
+    get(client, "/api/v1/subjects/nope/sponsors", status=404)
 
 
 def test_agreement_map(client):

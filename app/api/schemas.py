@@ -290,3 +290,38 @@ class CountrySponsorship(BaseModel):
     not_yes: list[NotableVote] = Field(
         description="Resolutions it sponsored but then abstained on or voted against"
     )
+
+
+class DomainYear(BaseModel):
+    year: int
+    resolutions: int
+    recorded: int = Field(description="Of those, adopted by a recorded vote")
+
+
+class Domain(BaseModel):
+    subject_id: str
+    label: str
+    resolutions: int
+    recorded: int
+    per_year: list[DomainYear] = Field(description="Years without a resolution are left out")
+
+
+class Domains(BaseModel):
+    resolutions: int = Field(description="All resolutions in the period, with or without subject")
+    per_year: list[DomainYear] = Field(description="All resolutions per year, for shares")
+    domains: list[Domain] = Field(description="Most resolutions first")
+
+
+class SubjectSponsor(BaseModel):
+    country: str
+    sponsored: int
+    original: int = Field(description="Of `sponsored`, as an original sponsor")
+    own_total: int = Field(description="Everything the state sponsored in the period, any subject")
+
+
+class SubjectSponsors(BaseModel):
+    subject_id: str
+    label: str
+    resolutions: int = Field(description="Resolutions in the subject and period")
+    with_data: int = Field(description="Of those, with sponsorship data")
+    sponsors: list[SubjectSponsor] = Field(description="States only, most sponsored first")

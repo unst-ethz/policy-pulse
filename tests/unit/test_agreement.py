@@ -92,6 +92,11 @@ def test_multilateral_overview_applies_the_vote_minimum(engine):
     assert set(out.columns) >= {"multilateral_alignment", "yes_rate", "participation_count"}
 
 
+def test_multilateral_overview_of_nothing_is_empty(engine):
+    # Not the whole dataset: the engine itself reads an empty id list as "all resolutions"
+    assert agreement.multilateral_overview(engine, []).empty
+
+
 def test_consensus_scale_anchors_on_the_mean():
     lo, avg, hi, midpoint = agreement.consensus_scale(pd.Series([0.2, 0.4, 0.9]), lo=0, hi=1)
     assert (lo, hi) == (0, 1)
