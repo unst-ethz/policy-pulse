@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 
 from ... import data
-from ...un_data_stream.analysis import filtering, overview, sponsorship
+from ...un_data_stream.analysis import facets, filtering, overview, sponsorship
 from ...un_data_stream.analysis.filtering import ResolutionFilter
 from .. import schemas
 from ..params import (
@@ -126,6 +126,32 @@ def export_resolutions(
         frame.to_csv(index=False),
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="resolutions.csv"'},
+    )
+
+
+@router.get("/resolutions/facets", response_model=schemas.ResolutionFacets)
+def resolution_facets(
+    criteria: Annotated[ResolutionFilter, Depends(resolution_filter)],
+    lang: LangParam = "en",
+) -> schemas.ResolutionFacets:
+    """Counts beside the list's filters: per year, and per thesaurus domain.
+
+    Each facet ignores its own filter, so its counts show what choosing differently would give.
+    A resolution counts towards every domain one of its subjects falls under.
+    """
+    engine, mask = data.query_engine, data.membership_mask
+    years = facets.year_counts(engine, criteria, mask)
+    domains = facets.domain_counts(engine, criteria, data.TOP_LEVEL_SUBJECTS, mask)
+    labels = subject_labels(lang)
+    return schemas.ResolutionFacets(
+        years=[schemas.YearCount(year=y, resolutions=c) for y, c in years.items()],
+        domains=sorted(
+            (
+                schemas.DomainCount(subject_id=s, label=labels.get(s, s), resolutions=c)
+                for s, c in domains.items()
+            ),
+            key=lambda d: (-d.resolutions, d.label),
+        ),
     )
 
 

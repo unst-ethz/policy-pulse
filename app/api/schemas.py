@@ -312,6 +312,26 @@ class Domains(BaseModel):
     domains: list[Domain] = Field(description="Most resolutions first")
 
 
+class YearCount(BaseModel):
+    year: int
+    resolutions: int
+
+
+class DomainCount(BaseModel):
+    subject_id: str
+    label: str
+    resolutions: int
+
+
+class ResolutionFacets(BaseModel):
+    years: list[YearCount] = Field(
+        description="Every filter but the period applied; years without a resolution left out"
+    )
+    domains: list[DomainCount] = Field(
+        description="Every filter but the subjects applied; most first, empty domains left out"
+    )
+
+
 class SubjectSponsor(BaseModel):
     country: str
     sponsored: int

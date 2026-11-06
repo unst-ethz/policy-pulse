@@ -179,6 +179,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/resolutions/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resolution Facets
+         * @description Counts beside the list's filters: per year, and per thesaurus domain.
+         *
+         *     Each facet ignores its own filter, so its counts show what choosing differently would give.
+         *     A resolution counts towards every domain one of its subjects falls under.
+         */
+        get: operations["resolution_facets_api_v1_resolutions_facets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/resolutions/recent": {
         parameters: {
             query?: never;
@@ -681,6 +704,15 @@ export interface components {
              */
             per_year: components["schemas"]["DomainYear"][];
         };
+        /** DomainCount */
+        DomainCount: {
+            /** Subject Id */
+            subject_id: string;
+            /** Label */
+            label: string;
+            /** Resolutions */
+            resolutions: number;
+        };
         /** DomainYear */
         DomainYear: {
             /** Year */
@@ -927,6 +959,19 @@ export interface components {
              */
             sponsorship_note: string | null;
         };
+        /** ResolutionFacets */
+        ResolutionFacets: {
+            /**
+             * Years
+             * @description Every filter but the period applied; years without a resolution left out
+             */
+            years: components["schemas"]["YearCount"][];
+            /**
+             * Domains
+             * @description Every filter but the subjects applied; most first, empty domains left out
+             */
+            domains: components["schemas"]["DomainCount"][];
+        };
         /** ResolutionPage */
         ResolutionPage: {
             /** Total */
@@ -1128,6 +1173,13 @@ export interface components {
             /** Terms */
             terms: components["schemas"]["CloudTerm"][];
             consensus: components["schemas"]["ConsensusScale"] | null;
+        };
+        /** YearCount */
+        YearCount: {
+            /** Year */
+            year: number;
+            /** Resolutions */
+            resolutions: number;
         };
         /** YearlyAlignment */
         YearlyAlignment: {
@@ -1437,6 +1489,56 @@ export interface operations {
                 };
                 content: {
                     "text/csv": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolution_facets_api_v1_resolutions_facets_get: {
+        parameters: {
+            query?: {
+                /** @description Language for country and subject names */
+                lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
+                /** @description Inclusive */
+                start_date?: string | null;
+                /** @description Inclusive */
+                end_date?: string | null;
+                /** @description Thesaurus subject ids (repeatable); descendants are included. `__no_subject__` selects resolutions without any subject. */
+                subject?: string[] | null;
+                /** @description ISO3 code, used by `country_mode` */
+                country?: string | null;
+                /** @description `voted`: only resolutions the country voted on; `member`: only while it was a UN member (or voted) */
+                country_mode?: "voted" | "member" | "none";
+                /** @description Title/keyword search: "," = OR, "&" = AND, "\"…\"" = exact term */
+                keyword?: string | null;
+                /** @description ISO3 code: only resolutions this state sponsored */
+                sponsor?: string | null;
+                /** @description With `sponsor`: only where it was an original sponsor */
+                original_sponsor?: boolean;
+                /** @description Only resolutions with sponsorship data (mostly since 2000) */
+                sponsorship_known?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolutionFacets"];
                 };
             };
             /** @description Validation Error */
