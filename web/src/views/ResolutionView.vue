@@ -206,7 +206,7 @@ const tableRows = computed(() =>
             </RouterLink>
           </div>
           <div v-for="[dimension, terms] in keywordGroups" :key="dimension" class="tags">
-            <span class="tag-label">{{ t(`topics.modes.${dimension === 'general' ? 'default' : dimension}`) }}</span>
+            <span class="tag-label">{{ t(`cloud.modes.${dimension === 'general' ? 'default' : dimension}`) }}</span>
             <RouterLink
               v-for="term in terms"
               :key="term"

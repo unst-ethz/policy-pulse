@@ -263,9 +263,7 @@ const fr: typeof en = {
     specialSession: 'Session extraordinaire {n} ({year})',
     emergencySession: "Session extraordinaire d'urgence {n} ({year})",
   },
-  topics: {
-    title: 'Thèmes',
-    lead: "Les termes qui décrivent les résolutions choisies. Plus un terme est grand, plus il en trouve ; suivez-en un pour lister ces résolutions.",
+  cloud: {
     cloudTitle: 'Termes les plus fréquents',
     cloudText: 'Sur {n} résolutions.',
     mode: 'Type de terme',

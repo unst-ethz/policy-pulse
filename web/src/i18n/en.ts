@@ -261,9 +261,7 @@ export default {
     specialSession: 'Special session {n} ({year})',
     emergencySession: 'Emergency special session {n} ({year})',
   },
-  topics: {
-    title: 'Topics',
-    lead: 'The terms that describe the selected resolutions. Larger terms find more of them; follow one to list those resolutions.',
+  cloud: {
     cloudTitle: 'Most frequent terms',
     cloudText: 'Across {n} resolutions.',
     mode: 'Kind of term',
