@@ -26,6 +26,7 @@ from ..params import (
     LangParam,
     country_list,
     day,
+    group_states,
     known_country,
     num,
     resolution_filter,
@@ -280,6 +281,10 @@ def country_profile(
     ] = None,
     min_joint_votes: Annotated[int, Query(ge=1)] = profile.MIN_JOINT_VOTES,
     subject: SubjectParam = None,
+    exclude_historical: Annotated[
+        bool,
+        Query(description="Leave states that no longer exist out of the rank and the rankings"),
+    ] = False,
     lang: LangParam = "en",
 ) -> schemas.CountryProfile:
     """A country's record over a period (clamped to its participation), as on the profile page.
@@ -296,6 +301,7 @@ def country_profile(
         participation=data.get_participation_year_range(country),
         min_joint_votes=min_joint_votes,
         subject_ids=subject,
+        exclude=group_states(["historical"]) if exclude_historical else (),
     )
     if prof is None:
         raise HTTPException(404, "No resolutions in the selected period")

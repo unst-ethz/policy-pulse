@@ -10,8 +10,8 @@ import { useRouter } from 'vue-router'
 import {
   useCountryIndex,
   useDomains,
+  useHistoricalStates,
   useMultilateral,
-  useRegionTree,
   useResolutions,
   useSubjectSponsors,
 } from '@/api/queries'
@@ -52,10 +52,7 @@ const overviewQuery = computed(() => serializeFilters(onlyFilters(filters.value,
 // States that no longer exist (the region tree's "historical" branch), left out unless asked for.
 // Dropping their rows is enough: every figure per state here (vote shares, sponsorships) is the
 // state's own, and the map's midpoint is the mean over the rows shown.
-const regions = useRegionTree()
-const historical = computed(
-  () => new Set(regions.data.value?.find((node) => node.id === 'historical')?.children?.map((c) => c.id) ?? []),
-)
+const historical = useHistoricalStates()
 const shown = (iso3: string) => filters.value.historical || !historical.value.has(iso3)
 const selection = computed<Filters>(() => ({ ...yearsOnly.value, subjects: [props.id] }))
 const listLink = computed(() => ({ name: 'resolutions', query: serializeFilters(selection.value) }))

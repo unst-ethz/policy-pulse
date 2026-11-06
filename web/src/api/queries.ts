@@ -77,6 +77,14 @@ export function useRegionTree() {
   })
 }
 
+/** ISO3 codes of states that no longer exist (USSR, Yugoslavia…): the region tree's "historical" branch. */
+export function useHistoricalStates() {
+  const tree = useRegionTree()
+  return computed(
+    () => new Set(tree.data.value?.find((node) => node.id === 'historical')?.children?.map((c) => c.id) ?? []),
+  )
+}
+
 export function useSubjectTree() {
   const lang = useLang()
   return useQuery({
@@ -250,14 +258,14 @@ export function useWordCloud(filters: MaybeRefOrGetter<Filters>, mode: MaybeRefO
 
 export function useProfile(
   country: MaybeRefOrGetter<string>,
-  range: MaybeRefOrGetter<{ from: number | null; to: number | null; subjects?: string[] }>,
+  range: MaybeRefOrGetter<{ from: number | null; to: number | null; subjects?: string[]; historical?: boolean }>,
   compare: MaybeRefOrGetter<string[]>,
 ) {
   const lang = useLang()
   return useQuery({
     queryKey: ['profile', r(country), r(range), r(compare), lang],
     queryFn: () => {
-      const { from, to, subjects } = toValue(range)
+      const { from, to, subjects, historical } = toValue(range)
       return unwrap(
         api.GET('/api/v1/countries/{iso3}/profile', {
           params: {
@@ -266,6 +274,7 @@ export function useProfile(
               start_date: from ? `${from}-01-01` : undefined,
               end_date: to ? `${to}-12-31` : undefined,
               subject: subjects?.length ? subjects : undefined,
+              exclude_historical: historical === false || undefined,
               compare: toValue(compare).length ? toValue(compare) : undefined,
               lang: lang.value,
             },

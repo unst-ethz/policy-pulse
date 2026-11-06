@@ -46,6 +46,13 @@ def test_profile_ranking_needs_enough_joint_votes(engine):
     assert list(prof.most_aligned.index) == ["BBB", "CCC"]  # DDD shares only 4 votes
 
 
+def test_profile_rankings_can_leave_states_out(engine):
+    prof = profile.country_profile(engine, "AAA", min_joint_votes=5, exclude=["BBB", "AAA"])
+    assert list(prof.most_aligned.index) == ["CCC"]
+    # Ranked among AAA, CCC and DDD; AAA itself is never left out
+    assert prof.multilateral_ranked == 3 and prof.multilateral_rank is not None
+
+
 def test_profile_notable_votes(engine):
     prof = profile.country_profile(engine, "AAA")
     # Opposed (N/A) highest consensus first; supported (Y) lowest consensus first.

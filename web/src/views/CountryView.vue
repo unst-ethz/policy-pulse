@@ -6,6 +6,7 @@ import {
   useAgreementBySubject,
   useAgreementMap,
   useCountryIndex,
+  useHistoricalStates,
   useProfile,
   useSponsorship,
   useTimeline,
@@ -41,7 +42,11 @@ const country = computed(() => index.value.get(props.iso3))
 const range = computed(() => ({ from: filters.value.from, to: filters.value.to }))
 // Years and subjects narrow the page, except the timeline (whole history by design) and the
 // agreement by topic, which compares the subjects themselves
-const scope = computed(() => ({ ...range.value, subjects: filters.value.subjects }))
+const scope = computed(() => ({ ...range.value, subjects: filters.value.subjects, historical: filters.value.historical }))
+// States that no longer exist stay out of the per-state lists unless asked for (never this one).
+// The profile's rankings leave them out on the server; the map and reception lists here.
+const historical = useHistoricalStates()
+const shown = (iso3: string) => filters.value.historical || iso3 === props.iso3 || !historical.value.has(iso3)
 const pageFilters = computed(() => onlyFilters(filters.value, ['from', 'to', 'subjects']))
 // What the facets count: the same filters, over the resolutions adopted while it was a member
 const applied = computed(() => ({ ...pageFilters.value, country: props.iso3, mode: 'member' as const }))
@@ -76,7 +81,8 @@ const compareModel = computed({
 const map = useAgreementMap(pageFilters, () => props.iso3)
 // Centred by default: most pairs agree 0.7-0.95, which on a fixed 0-1 scale is all one blue.
 const centred = ref(true)
-const scores = computed(() => new Map((map.data.value?.scores ?? []).map((s) => [s.country, s.score])))
+const mapScores = computed(() => (map.data.value?.scores ?? []).filter((s) => shown(s.country)))
+const scores = computed(() => new Map(mapScores.value.map((s) => [s.country, s.score])))
 // The midpoint when centred: this country's average agreement over the countries on the map, so
 // blue reads "votes more like it than most" and red "less". (Not the mean consensus the API also
 // returns: that compares with the world's agreement overall, and turns nearly every country red
@@ -99,7 +105,7 @@ const mapTooltip = (iso3: string) => {
   return `<b>${name(iso3)}</b><br>${score == null ? t('country.noSharedVote') : t('country.agreement', { value: n(score, 'score') })}`
 }
 const mapRows = computed(() =>
-  (map.data.value?.scores ?? [])
+  mapScores.value
     .filter((s) => s.score != null)
     .map((s) => ({ ...s, name: name(s.country) }))
     .sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
@@ -155,6 +161,7 @@ const subjectRows = computed(() =>
 // --- sponsorship ---------------------------------------------------------------------------
 const sponsorship = useSponsorship(() => props.iso3, scope)
 const sp = computed(() => sponsorship.data.value)
+const reception = computed(() => (sp.value?.reception ?? []).filter((r) => shown(r.country)))
 const years = computed(() => ({
   from: filters.value.from ? String(filters.value.from) : undefined,
   to: filters.value.to ? String(filters.value.to) : undefined,
@@ -201,8 +208,8 @@ const membershipText = computed(() => {
     </div>
 
     <FacetLayout
-      :allowed="['years', 'subjects']"
-      :defaults="['years']"
+      :allowed="['years', 'subjects', 'historical']"
+      :defaults="['years', 'historical']"
       storage-key="policy-pulse:facets:country"
       :applied="applied"
     >
@@ -461,7 +468,7 @@ const membershipText = computed(() => {
             <div class="panel notable">
               <h3>{{ t('sponsorship.reception') }}</h3>
               <p class="hint">{{ t('sponsorship.receptionText', { name: name(iso3) }) }}</p>
-              <div v-if="sp.reception.length" class="reception">
+              <div v-if="reception.length" class="reception">
                 <table class="data-table">
                   <thead>
                     <tr>
@@ -472,7 +479,7 @@ const membershipText = computed(() => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="row in sp.reception" :key="row.country">
+                    <tr v-for="row in reception" :key="row.country">
                       <td>
                         <RouterLink :to="{ name: 'country', params: { iso3: row.country }, query: route.query }">
                           {{ name(row.country) }}
