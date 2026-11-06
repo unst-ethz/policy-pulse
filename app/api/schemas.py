@@ -322,6 +322,11 @@ class AdoptionCount(BaseModel):
     resolutions: int
 
 
+class GroupVoteCount(BaseModel):
+    group_vote: Literal["alike", "split", "yes_no", "yes", "no", "abstain"]
+    resolutions: int
+
+
 class DomainCount(BaseModel):
     subject_id: str
     label: str
@@ -334,6 +339,9 @@ class ResolutionFacets(BaseModel):
     )
     adoption: list[AdoptionCount] = Field(
         description="Every filter but `adoption` applied; every kind, zero included"
+    )
+    group_votes: list[GroupVoteCount] = Field(
+        description="With `group`: every filter but `group_vote` applied; empty without a group"
     )
     domains: list[DomainCount] = Field(
         description="Every filter but the subjects applied; most first, empty domains left out"

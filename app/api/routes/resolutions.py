@@ -144,12 +144,16 @@ def resolution_facets(
     years = facets.year_counts(engine, criteria, mask)
     domains = facets.domain_counts(engine, criteria, data.TOP_LEVEL_SUBJECTS, mask)
     modalities = facets.modality_counts(engine, criteria, mask)
+    group_votes = facets.group_vote_counts(engine, criteria, mask)
     labels = subject_labels(lang)
     return schemas.ResolutionFacets(
         years=[schemas.YearCount(year=y, resolutions=c) for y, c in years.items()],
         adoption=[
             schemas.AdoptionCount(adoption=a, resolutions=int(modalities.get(m, 0)))
             for a, m in MODALITIES.items()
+        ],
+        group_votes=[
+            schemas.GroupVoteCount(group_vote=v, resolutions=c) for v, c in group_votes.items()
         ],
         domains=sorted(
             (

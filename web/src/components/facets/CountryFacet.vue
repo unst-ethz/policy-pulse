@@ -22,7 +22,6 @@ const modes: CountryMode[] = ['voted', 'member', 'none']
     :info="t('facets.info.country')"
     :title="t('filters.country')"
     :active="!!filters.country"
-    collapsed
     @clear="update({ country: null, mode: 'none' })"
   >
     <CountryPicker v-model="country" :label="t('filters.country')" :placeholder="t('filters.anyCountry')" hide-label />

@@ -68,6 +68,15 @@ export function useMembersOn() {
   }
 }
 
+export function useRegionTree() {
+  const lang = useLang()
+  return useQuery({
+    queryKey: ['regions', lang],
+    queryFn: () => unwrap(api.GET('/api/v1/regions/tree', { params: { query: { lang: lang.value } } })),
+    ...STATIC,
+  })
+}
+
 export function useSubjectTree() {
   const lang = useLang()
   return useQuery({
@@ -293,7 +302,10 @@ export function useSponsorship(
   })
 }
 
-/** Counts beside the list's filters; each facet ignores its own filter (see the endpoint). */
+/**
+ * Counts beside the list's filters; each facet ignores its own filter (see the endpoint). The
+ * group goes along even before a way of voting is picked, to count each way.
+ */
 export function useFacets(filters: MaybeRefOrGetter<Filters>) {
   const lang = useLang()
   return useQuery({
@@ -301,12 +313,15 @@ export function useFacets(filters: MaybeRefOrGetter<Filters>) {
     queryFn: () =>
       unwrap(
         api.GET('/api/v1/resolutions/facets', {
-          params: { query: { ...toApiParams(toValue(filters)), lang: lang.value } },
+          params: { query: { ...toApiParams(toValue(filters)), ...group(toValue(filters)), lang: lang.value } },
         }),
       ),
     placeholderData: keepPreviousData,
   })
 }
+
+const group = (f: Filters) =>
+  f.group.length ? { group: f.group, group_all_voted: f.allVoted || undefined } : {}
 
 type YearRange = { from: number | null; to: number | null }
 const period = ({ from, to }: YearRange) => ({

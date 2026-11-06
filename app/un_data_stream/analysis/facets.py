@@ -10,7 +10,7 @@ from typing import Iterable
 
 import pandas as pd
 
-from .filtering import MembershipMask, ResolutionFilter, filter_resolutions
+from .filtering import MembershipMask, ResolutionFilter, filter_resolutions, group_vote_masks
 from .query_engine import ResolutionQueryEngine
 from .subjects import domain_pairs
 
@@ -37,6 +37,21 @@ def modality_counts(
         engine, replace(criteria, modalities=None), membership_mask=membership_mask
     )
     return df["modality"].value_counts().astype(int)
+
+
+def group_vote_counts(
+    engine: ResolutionQueryEngine,
+    criteria: ResolutionFilter,
+    membership_mask: MembershipMask | None = None,
+) -> dict[str, int]:
+    """Resolutions per way the group voted (see `group_vote_masks`), under every other filter."""
+    if not criteria.group:
+        return {}
+    df = filter_resolutions(
+        engine, replace(criteria, group_vote=None), membership_mask=membership_mask, columns=None
+    )
+    masks = group_vote_masks(df, criteria.group, criteria.group_all_voted)
+    return {vote: int(mask.sum()) for vote, mask in masks.items()}
 
 
 def domain_counts(

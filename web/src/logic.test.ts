@@ -23,6 +23,9 @@ describe('URL filters', () => {
       sponsor: 'USA',
       original: true,
       adoption: ['recorded' as const, 'without_vote' as const],
+      group: ['CHE', '155'],
+      together: 'yes_no' as const,
+      allVoted: true,
     }
     expect(parseFilters(serializeFilters(filters))).toEqual(filters)
   })
@@ -35,6 +38,9 @@ describe('URL filters', () => {
       mode: 'sideways',
       subject: '07',
       adopted: ['recorded', 'maybe'],
+      group: 'che',
+      together: 'sideways',
+      allvoted: '1',
     })
     expect(parsed).toEqual({
       from: null,
@@ -46,6 +52,9 @@ describe('URL filters', () => {
       sponsor: null,
       original: false,
       adoption: ['recorded'],
+      group: ['CHE'],
+      together: null,
+      allVoted: true,
     })
   })
 
@@ -71,6 +80,9 @@ describe('URL filters', () => {
         sponsor: 'CHE',
         original: true,
         adoption: ['non_recorded'],
+        group: ['CHE', 'FRA'],
+        together: 'split',
+        allVoted: false,
       }),
     ).toEqual({
       start_date: '2000-01-01',
@@ -82,7 +94,16 @@ describe('URL filters', () => {
       sponsor: 'CHE',
       original_sponsor: true,
       adoption: ['non_recorded'],
+      group: ['CHE', 'FRA'],
+      group_vote: 'split',
+      group_all_voted: undefined,
     })
+  })
+
+  it('keeps a group without a way of voting in the URL but not in the API filter', () => {
+    const filters = { ...parseFilters({}), group: ['CHE', 'FRA'], allVoted: true }
+    expect(serializeFilters(filters)).toEqual({ group: ['CHE', 'FRA'] })
+    expect(toApiParams(filters).group).toBeUndefined()
   })
 
   it('counts active filters the way the clear button reports them', () => {

@@ -200,6 +200,22 @@ def test_facets_ignore_their_own_filter(client):
     get(client, f"{base}/facets?sponsor=XXX", status=422)
 
 
+def test_group_vote_filter_and_facet(client):
+    base = "/api/v1/resolutions"
+    query = "group=CHE,FRA&group=155&group_vote=split&start_date=2000-01-01"  # 155: Western Europe
+    counts = {
+        g["group_vote"]: g["resolutions"]
+        for g in get(client, f"{base}/facets?{query}")["group_votes"]
+    }
+    assert counts["split"] == get(client, f"{base}?{query}")["total"] > 0
+    alike = get(client, f"{base}?{query.replace('split', 'alike')}")["total"]
+    assert alike == counts["alike"]
+    strict = get(client, f"{base}?{query}&group_all_voted=true")["total"]
+    assert strict <= counts["split"]
+    assert get(client, f"{base}/facets?start_date=2000-01-01")["group_votes"] == []
+    get(client, f"{base}?group=XXX&group_vote=alike", status=422)
+
+
 def test_adoption_filter_and_facet(client):
     base = "/api/v1/resolutions"
     counts = {

@@ -63,6 +63,23 @@ export default {
     about: 'About {name}',
   },
   facets: {
+    group: 'Voted together',
+    groupCountries: 'Countries in the group',
+    groupRegions: 'Regions in the group',
+    addRegion: 'Add a region',
+    wholeRegion: 'All of {name}',
+    groupHint: 'Add at least two countries, or a region.',
+    groupVotes: {
+      alike: 'All voted alike',
+      split: 'They split',
+      yes_no: 'Some yes, some no',
+      yes: 'Most voted yes',
+      no: 'Most voted no',
+      abstain: 'Most abstained',
+    },
+    allVoted: 'Only where all of them voted',
+    choose: 'Choose filters',
+    chooseNote: 'Filters in use always show.',
     adoption: 'How adopted',
     adoptions: {
       recorded: 'Recorded vote',
@@ -70,6 +87,7 @@ export default {
       without_vote: 'Without a vote',
     },
     info: {
+      group: 'Pick two or more countries, or a region, and how they voted: all the same way, split, with at least one yes and one no, or a majority one way. With two countries this shows where they agreed or disagreed. Only recorded votes count, and states that did not vote are left out unless all of them must have voted. The numbers apply all your other filters.',
       years: 'The year the General Assembly adopted the resolution. The bars count resolutions per year under all your other filters, so they show what moving or widening the range would add.',
       adoption: "A recorded vote lists how every state voted; only these resolutions show individual votes. A vote that was not recorded gives only the totals. Most resolutions are adopted without a vote, by consensus. The numbers apply all your other filters.",
       subjects: 'The areas of the UNBIS Thesaurus that the UN Library files resolutions under; a subject includes everything below it. About a third of resolutions have no subject, and none adopted before 1980 has one. The numbers are what each subject would give with your other filters.',

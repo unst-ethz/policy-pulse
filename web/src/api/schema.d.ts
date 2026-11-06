@@ -753,6 +753,16 @@ export interface components {
              */
             domains: components["schemas"]["Domain"][];
         };
+        /** GroupVoteCount */
+        GroupVoteCount: {
+            /**
+             * Group Vote
+             * @enum {string}
+             */
+            group_vote: "alike" | "split" | "yes_no" | "yes" | "no" | "abstain";
+            /** Resolutions */
+            resolutions: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -981,6 +991,11 @@ export interface components {
              * @description Every filter but `adoption` applied; every kind, zero included
              */
             adoption: components["schemas"]["AdoptionCount"][];
+            /**
+             * Group Votes
+             * @description With `group`: every filter but `group_vote` applied; empty without a group
+             */
+            group_votes: components["schemas"]["GroupVoteCount"][];
             /**
              * Domains
              * @description Every filter but the subjects applied; most first, empty domains left out
@@ -1438,6 +1453,12 @@ export interface operations {
                 original_sponsor?: boolean;
                 /** @description Only resolutions with sponsorship data (mostly since 2000) */
                 sponsorship_known?: boolean;
+                /** @description ISO3 codes and/or M49 region codes (repeatable or comma-separated), judged together by `group_vote`; a region stands for its states */
+                group?: string[] | null;
+                /** @description With `group`: the states that voted all voted `alike`, `split`, some `yes_no`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
+                group_vote?: ("alike" | "split" | "yes_no" | "yes" | "no" | "abstain") | null;
+                /** @description With `group_vote`: only where every state of `group` voted */
+                group_all_voted?: boolean;
                 /** @description How adopted (repeatable, any of them): `recorded` vote with each state's vote, `non_recorded` vote, or `without_vote` */
                 adoption?: ("recorded" | "non_recorded" | "without_vote")[] | null;
             };
@@ -1492,6 +1513,12 @@ export interface operations {
                 original_sponsor?: boolean;
                 /** @description Only resolutions with sponsorship data (mostly since 2000) */
                 sponsorship_known?: boolean;
+                /** @description ISO3 codes and/or M49 region codes (repeatable or comma-separated), judged together by `group_vote`; a region stands for its states */
+                group?: string[] | null;
+                /** @description With `group`: the states that voted all voted `alike`, `split`, some `yes_no`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
+                group_vote?: ("alike" | "split" | "yes_no" | "yes" | "no" | "abstain") | null;
+                /** @description With `group_vote`: only where every state of `group` voted */
+                group_all_voted?: boolean;
                 /** @description How adopted (repeatable, any of them): `recorded` vote with each state's vote, `non_recorded` vote, or `without_vote` */
                 adoption?: ("recorded" | "non_recorded" | "without_vote")[] | null;
             };
@@ -1544,6 +1571,12 @@ export interface operations {
                 original_sponsor?: boolean;
                 /** @description Only resolutions with sponsorship data (mostly since 2000) */
                 sponsorship_known?: boolean;
+                /** @description ISO3 codes and/or M49 region codes (repeatable or comma-separated), judged together by `group_vote`; a region stands for its states */
+                group?: string[] | null;
+                /** @description With `group`: the states that voted all voted `alike`, `split`, some `yes_no`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
+                group_vote?: ("alike" | "split" | "yes_no" | "yes" | "no" | "abstain") | null;
+                /** @description With `group_vote`: only where every state of `group` voted */
+                group_all_voted?: boolean;
                 /** @description How adopted (repeatable, any of them): `recorded` vote with each state's vote, `non_recorded` vote, or `without_vote` */
                 adoption?: ("recorded" | "non_recorded" | "without_vote")[] | null;
             };
@@ -1660,6 +1693,12 @@ export interface operations {
                 original_sponsor?: boolean;
                 /** @description Only resolutions with sponsorship data (mostly since 2000) */
                 sponsorship_known?: boolean;
+                /** @description ISO3 codes and/or M49 region codes (repeatable or comma-separated), judged together by `group_vote`; a region stands for its states */
+                group?: string[] | null;
+                /** @description With `group`: the states that voted all voted `alike`, `split`, some `yes_no`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
+                group_vote?: ("alike" | "split" | "yes_no" | "yes" | "no" | "abstain") | null;
+                /** @description With `group_vote`: only where every state of `group` voted */
+                group_all_voted?: boolean;
                 /** @description How adopted (repeatable, any of them): `recorded` vote with each state's vote, `non_recorded` vote, or `without_vote` */
                 adoption?: ("recorded" | "non_recorded" | "without_vote")[] | null;
             };
@@ -1786,6 +1825,12 @@ export interface operations {
                 original_sponsor?: boolean;
                 /** @description Only resolutions with sponsorship data (mostly since 2000) */
                 sponsorship_known?: boolean;
+                /** @description ISO3 codes and/or M49 region codes (repeatable or comma-separated), judged together by `group_vote`; a region stands for its states */
+                group?: string[] | null;
+                /** @description With `group`: the states that voted all voted `alike`, `split`, some `yes_no`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
+                group_vote?: ("alike" | "split" | "yes_no" | "yes" | "no" | "abstain") | null;
+                /** @description With `group_vote`: only where every state of `group` voted */
+                group_all_voted?: boolean;
                 /** @description How adopted (repeatable, any of them): `recorded` vote with each state's vote, `non_recorded` vote, or `without_vote` */
                 adoption?: ("recorded" | "non_recorded" | "without_vote")[] | null;
             };
@@ -1839,6 +1884,12 @@ export interface operations {
                 original_sponsor?: boolean;
                 /** @description Only resolutions with sponsorship data (mostly since 2000) */
                 sponsorship_known?: boolean;
+                /** @description ISO3 codes and/or M49 region codes (repeatable or comma-separated), judged together by `group_vote`; a region stands for its states */
+                group?: string[] | null;
+                /** @description With `group`: the states that voted all voted `alike`, `split`, some `yes_no`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
+                group_vote?: ("alike" | "split" | "yes_no" | "yes" | "no" | "abstain") | null;
+                /** @description With `group_vote`: only where every state of `group` voted */
+                group_all_voted?: boolean;
                 /** @description How adopted (repeatable, any of them): `recorded` vote with each state's vote, `non_recorded` vote, or `without_vote` */
                 adoption?: ("recorded" | "non_recorded" | "without_vote")[] | null;
             };

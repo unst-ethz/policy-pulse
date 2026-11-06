@@ -30,3 +30,36 @@ def test_modalities_ignore_their_own_filter(engine):
     assert len(filtering.filter_resolutions(engine, criteria)) == 1
     counts = facets.modality_counts(engine, criteria)
     assert counts.to_dict() == {"Vote, recorded": 3, "Without a vote": 1}
+
+
+def ids(engine, **criteria):
+    df = filtering.filter_resolutions(engine, ResolutionFilter(**criteria))
+    return sorted(df["undl_id"])
+
+
+def test_group_votes_judge_only_the_states_that_voted(engine):
+    # AAA/BBB: 101 YY, 102 YY, 103 YN, 104 NN, 105 nobody voted, 106 AY
+    pair = ("AAA", "BBB")
+    assert ids(engine, group=pair, group_vote="alike") == ["101", "102", "104"]
+    assert ids(engine, group=pair, group_vote="split") == ["103", "106"]
+    assert ids(engine, group=pair, group_vote="yes_no") == ["103"]
+    assert ids(engine, group=pair, group_vote="yes") == ["101", "102"]
+    counts = facets.group_vote_counts(engine, ResolutionFilter(group=pair, group_vote="no"))
+    assert counts == {"alike": 3, "split": 2, "yes_no": 1, "yes": 2, "no": 1, "abstain": 0}
+
+
+def test_group_votes_can_require_every_state_to_have_voted(engine):
+    # DDD did not vote on 102, so AAA and BBB alone decide it, unless all must have voted
+    trio = ("AAA", "BBB", "DDD")
+    assert ids(engine, group=trio, group_vote="alike") == ["102"]
+    assert ids(engine, group=trio, group_vote="alike", group_all_voted=True) == []
+    assert ids(engine, group=trio, group_vote="split", group_all_voted=True) == [
+        "101",
+        "103",
+        "104",
+        "106",
+    ]
+
+
+def test_a_group_of_one_matches_nothing(engine):
+    assert ids(engine, group=("AAA",), group_vote="alike") == []

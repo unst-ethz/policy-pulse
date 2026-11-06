@@ -65,6 +65,23 @@ const fr: typeof en = {
     about: 'À propos : {name}',
   },
   facets: {
+    group: 'Votes communs',
+    groupCountries: 'Pays du groupe',
+    groupRegions: 'Régions du groupe',
+    addRegion: 'Ajouter une région',
+    wholeRegion: 'Toute la région : {name}',
+    groupHint: 'Ajoutez au moins deux pays, ou une région.',
+    groupVotes: {
+      alike: 'Tous ont voté pareil',
+      split: 'Ils se sont divisés',
+      yes_no: 'Des oui et des non',
+      yes: 'Majorité de oui',
+      no: 'Majorité de non',
+      abstain: 'Majorité d’abstentions',
+    },
+    allVoted: 'Seulement si tous ont voté',
+    choose: 'Choisir les filtres',
+    chooseNote: 'Les filtres utilisés restent toujours affichés.',
     adoption: 'Mode d’adoption',
     adoptions: {
       recorded: 'Vote enregistré',
@@ -72,6 +89,7 @@ const fr: typeof en = {
       without_vote: 'Sans vote',
     },
     info: {
+      group: 'Choisissez au moins deux pays, ou une région, et comment ils ont voté : tous de la même façon, divisés, avec au moins un oui et un non, ou une majorité dans un sens. Avec deux pays, cela montre où ils étaient d’accord ou non. Seuls les votes enregistrés comptent, et les États qui n’ont pas voté sont ignorés, sauf si tous doivent avoir voté. Les nombres tiennent compte de vos autres filtres.',
       years: 'L’année où l’Assemblée générale a adopté la résolution. Les barres comptent les résolutions par année avec tous vos autres filtres : elles montrent ce que déplacer ou élargir la période ajouterait.',
       adoption: 'Un vote enregistré indique le vote de chaque État ; seules ces résolutions montrent des votes individuels. Un vote non enregistré ne donne que les totaux. La plupart des résolutions sont adoptées sans vote, par consensus. Les nombres tiennent compte de vos autres filtres.',
       subjects: 'Les domaines du Thésaurus UNBIS sous lesquels la Bibliothèque de l’ONU classe les résolutions ; un sujet inclut tout ce qui se trouve en dessous. Environ un tiers des résolutions n’ont pas de sujet, et aucune adoptée avant 1980. Les nombres indiquent ce que chaque sujet donnerait avec vos autres filtres.',

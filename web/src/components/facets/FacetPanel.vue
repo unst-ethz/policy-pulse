@@ -2,17 +2,16 @@
 /**
  * The frame every facet shares: a title that collapses it, an "i" that explains it, and "Clear"
  * while its filter is set.
- * A facet is open by default; `collapsed` starts it closed unless its filter is active.
  */
 import { ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import InfoTip from '../InfoTip.vue'
 
-const props = defineProps<{ title: string; info: string; active?: boolean; collapsed?: boolean }>()
+defineProps<{ title: string; info: string; active?: boolean }>()
 defineEmits<{ clear: [] }>()
 
 const { t } = useI18n()
-const open = ref(!props.collapsed || props.active)
+const open = ref(true)
 const body = useId()
 </script>
 

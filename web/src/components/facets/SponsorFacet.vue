@@ -20,7 +20,6 @@ const sponsor = computed({
     :info="t('facets.info.sponsor')"
     :title="t('filters.sponsor')"
     :active="!!filters.sponsor"
-    collapsed
     @clear="update({ sponsor: null, original: false })"
   >
     <CountryPicker v-model="sponsor" :label="t('filters.sponsor')" :placeholder="t('filters.anyCountry')" hide-label />
