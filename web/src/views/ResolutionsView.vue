@@ -7,7 +7,7 @@ import CountryList from '@/components/CountryList.vue'
 import FilterBar from '@/components/FilterBar.vue'
 import QueryState from '@/components/QueryState.vue'
 import ResolutionTable from '@/components/ResolutionTable.vue'
-import TermCloud from '@/components/TermCloud.vue'
+import TermBar from '@/components/TermBar.vue'
 import { useFilters } from '@/composables/useFilters'
 
 const PAGE_SIZE = 50
@@ -60,8 +60,6 @@ const download = computed(() => csvUrl(filters.value, votes.value, locale.value 
 
     <FilterBar />
 
-    <TermCloud />
-
     <section class="section">
       <div class="toolbar">
         <p class="summary" aria-live="polite">
@@ -87,6 +85,7 @@ const download = computed(() => csvUrl(filters.value, votes.value, locale.value 
         </label>
         <a class="button" :href="download" download>{{ t('resolutions.download') }}</a>
       </div>
+      <TermBar />
       <div class="votes-of">
         <span>{{ t('resolutions.showVotes') }}</span>
         <CountryList v-model="votes" :label="t('resolutions.showVotes')" :max="4" />

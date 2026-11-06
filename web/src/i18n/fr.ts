@@ -264,6 +264,10 @@ const fr: typeof en = {
     emergencySession: "Session extraordinaire d'urgence {n} ({year})",
   },
   cloud: {
+    common: 'Termes fréquents :',
+    more: 'Plus de termes',
+    close: 'Fermer',
+    remove: 'Retirer {term} du filtre',
     cloudTitle: 'Termes les plus fréquents',
     cloudText: 'Sur {n} résolutions.',
     mode: 'Type de terme',

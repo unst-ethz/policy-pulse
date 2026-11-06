@@ -78,6 +78,26 @@ export function toApiParams(filters: Filters) {
   }
 }
 
+// shortcut: splits on every "&", so an exact term containing "&" is not recognised; fine for
+// extracted keywords, which carry none.
+const keywordParts = (keyword: string) =>
+  keyword
+    .split('&')
+    .map((part) => part.trim())
+    .filter(Boolean)
+
+/** Whether the keyword expression holds `term` as an exact `&` term. */
+export function hasTerm(keyword: string, term: string): boolean {
+  return keywordParts(keyword).includes(`"${term}"`)
+}
+
+/** The keyword expression with `term` added as an exact `&` term, or removed if already there. */
+export function toggleTerm(keyword: string, term: string): string {
+  const exact = `"${term}"`
+  const parts = keywordParts(keyword)
+  return (parts.includes(exact) ? parts.filter((p) => p !== exact) : [...parts, exact]).join(' & ')
+}
+
 export function countActive(filters: Filters): number {
   return (
     (filters.from || filters.to ? 1 : 0) +
