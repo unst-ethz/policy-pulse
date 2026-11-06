@@ -54,3 +54,4 @@ public/geo/         country shapes, built by scripts/build_world_geo.py from Nat
   visual style to fight. If the UN partners mandate a component library, it slots in here.
 - **Prototype scope.** No end-to-end tests yet, UI strings only in English and French, and no
   production deployment (the build is static files; nginx would serve `dist/` and proxy `/api`).
+- **AWS deploy.** On `feature/api-mongodb`, the `web-to-s3` job in `.github/workflows/deploy.yml` builds `dist/` for `/`, syncs it to S3 and invalidates `index.html` on CloudFront; it runs only once the repo variables `WEB_BUCKET` and `WEB_DISTRIBUTION_ID` are set.

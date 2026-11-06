@@ -95,3 +95,50 @@ jobs:
           labels: ${{ steps.web_meta.outputs.labels }}
           build-args: |
             WEB_BASE=/experimental/
+
+  # The Vue app as static files on S3 behind CloudFront (AWS move). Skipped until the infra repo has
+  # set the repo variables WEB_BUCKET and WEB_DISTRIBUTION_ID.
+  web-to-s3:
+    if: github.ref_name == 'feature/api-mongodb' && vars.WEB_BUCKET != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24 # same as web/Dockerfile
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # `npm run build` type-checks (vue-tsc) before the Vite build; no WEB_BASE, CloudFront serves at /.
+      - name: Build
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # Same cache rules as web/nginx.conf. Assets first and never deleted: a browser holding the old
+      # index.html still loads the old hashed chunks.
+      - name: Upload to S3
+        env:
+          WEB_BUCKET: ${{ vars.WEB_BUCKET }}
+        run: |
+          aws s3 sync dist/assets/ "s3://$WEB_BUCKET/assets/" --cache-control "public, max-age=31536000, immutable"
+          aws s3 sync dist/ "s3://$WEB_BUCKET/" --exclude "assets/*" --delete --cache-control "no-cache"
+
+      - name: Invalidate index.html on CloudFront
+        run: aws cloudfront create-invalidation --distribution-id ${{ vars.WEB_DISTRIBUTION_ID }} --paths /index.html
