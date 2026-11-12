@@ -14,7 +14,11 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   build-and-push:
+    needs: ci
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -100,6 +104,7 @@ jobs:
   # set the repo variables WEB_BUCKET and WEB_DISTRIBUTION_ID.
   web-to-s3:
     if: github.ref_name == 'feature/api-mongodb' && vars.WEB_BUCKET != ''
+    needs: ci
     runs-on: ubuntu-latest
     permissions:
       contents: read

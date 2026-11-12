@@ -1,0 +1,40 @@
+name: CI
+
+# Runs on every PR (required to merge) and is called by deploy.yml before anything is built, so a
+# direct push or an admin bypass can't deploy untested code either.
+on:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      # Unit tests only: the integration tests need a MongoDB with data and auto-skip without one.
+      - run: uv run pytest tests/unit
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # same as web/Dockerfile
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      # `build` type-checks (vue-tsc) before the Vite build.
+      - run: npm run build
+      - run: npm test
+      - run: npm run check:i18n
