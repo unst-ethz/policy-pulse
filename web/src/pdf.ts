@@ -110,7 +110,7 @@ export async function createPdf(running: { header: string; footer: string }) {
     },
 
     subheading(text: string) {
-      room(36) // with the text and first rows that follow
+      room(50) // with the text and first rows that follow
       y += 2
       write(text, 11, PDF_COLORS.ink, 'bold')
       y += 0.5
@@ -167,11 +167,13 @@ export async function createPdf(running: { header: string; footer: string }) {
     },
 
     /**
-     * A chart (PNG) under its heading and description, all on one page: as wide as the text
-     * unless that makes it taller than the page leaves.
+     * A chart (PNG) under its title and description, all on one page: as wide as the text
+     * unless that makes it taller than the page leaves. `section` puts a section heading on top,
+     * kept on the same page.
      */
-    chart(title: string, description: string | undefined, png: Uint8Array, widthPx: number, heightPx: number) {
-      const textHeight = 13 + (description ? lines(description, 9).length * lineHeight(9) + 1.5 : 0)
+    chart(title: string, description: string | undefined, png: Uint8Array, widthPx: number, heightPx: number, section?: string) {
+      const textHeight =
+        (section ? 14 : 0) + 13 + (description ? lines(description, 9).length * lineHeight(9) + 1.5 : 0)
       const maxHeight = PAGE.height - PAGE.top - PAGE.bottom - textHeight - 6
       let w = CONTENT
       let h = (heightPx / widthPx) * w
@@ -180,7 +182,8 @@ export async function createPdf(running: { header: string; footer: string }) {
         w = (widthPx / heightPx) * h
       }
       room(textHeight + h + 8)
-      this.heading(title)
+      if (section) this.heading(section)
+      this.subheading(title)
       if (description) this.paragraph(description)
       doc.addImage(png, 'PNG', PAGE.margin + (CONTENT - w) / 2, y, w, h)
       y += h + 3

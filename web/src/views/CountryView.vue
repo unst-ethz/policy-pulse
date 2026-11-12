@@ -191,7 +191,7 @@ const domainRows = computed(() => {
 })
 
 // --- sections and report ------------------------------------------------------------------
-const SECTIONS = ['overview', 'map', 'timeline', 'topics', 'sponsorship', 'notable'] as const
+const SECTIONS = ['overview', 'global', 'bilateral', 'notable', 'sponsorship'] as const
 type Section = (typeof SECTIONS)[number]
 // Hidden sections live in the URL like the filters, so a shared link shows (and exports) the same
 const hidden = computed(() => new Set(listParam('hide')))
@@ -273,12 +273,12 @@ const downloadPdf = () =>
         header: `${name(props.iso3)} · ${t('report.pdfSubtitle')} · ${yearsText}`,
         footer: t('report.footer', { date: dataDate, url: window.location.href }),
       })
-      const chart = async (id: string) => {
+      const chart = async (id: string, section?: string) => {
         const frame = report.charts.get(id)
         const image = await frame?.image({ bare: true })
-        if (!frame || !image) return
+        if (!frame || !image) return section && pdf.heading(section)
         const png = new Uint8Array(await (await svgToPng(image.svg, image.width, image.height, 3)).arrayBuffer())
-        pdf.chart(frame.title(), frame.description(), png, image.width, image.height)
+        pdf.chart(frame.title(), frame.description(), png, image.width, image.height, section)
       }
       const score = (v: number | null | undefined) => (v == null ? '' : n(v, 'score'))
       const ranking = (rows: { country: string; agreement: number | null }[]) =>
@@ -345,8 +345,8 @@ const downloadPdf = () =>
         }
       }
 
-      if (show('map')) {
-        await chart('map')
+      if (show('global')) {
+        await chart('map', t('report.global'))
         pdf.paragraph(`${t('country.mapNote')} ${t('map.disclaimer')}`, 7.5, PDF_COLORS.muted)
         if (p.value) {
           pdf.subheading(t('country.closest'))
@@ -357,25 +357,39 @@ const downloadPdf = () =>
         }
       }
 
-      if (show('timeline')) {
-        await chart('timeline')
+      if (show('bilateral')) {
+        await chart('timeline', t('report.bilateral'))
         pdf.paragraph(
           `${t('country.timelineNote', { n: timeline.data.value?.min_votes ?? 3 })} ${specialSessions.value ? '' : t('country.specialNote')}`,
           7.5,
           PDF_COLORS.muted,
         )
+        if (topicWith.value && bySubject.data.value?.subjects.length) {
+          const rows = bySubject.data.value.subjects
+          pdf.subheading(`${t('country.topicsTitle')}: ${name(props.iso3)} – ${name(topicWith.value)}`)
+          pdf.paragraph(t('country.topicsText'))
+          pdf.table({
+            head: [t('report.subjectCol'), '', t('country.agreementCol'), t('report.sharedVotesCol')],
+            rows: rows.map((s) => [sentenceCase(s.label), '', score(s.agreement), n(s.shared_votes)]),
+            numeric: [2, 3],
+            bar: { column: 1, values: rows.map((s) => s.agreement) },
+          })
+        }
       }
 
-      if (show('topics') && topicWith.value && bySubject.data.value?.subjects.length) {
-        const rows = bySubject.data.value.subjects
-        pdf.heading(`${t('country.topicsTitle')}: ${name(props.iso3)} – ${name(topicWith.value)}`)
-        pdf.paragraph(t('country.topicsText'))
-        pdf.table({
-          head: [t('report.subjectCol'), '', t('country.agreementCol'), t('report.sharedVotesCol')],
-          rows: rows.map((s) => [sentenceCase(s.label), '', score(s.agreement), n(s.shared_votes)]),
-          numeric: [2, 3],
-          bar: { column: 1, values: rows.map((s) => s.agreement) },
-        })
+      if (show('notable') && p.value) {
+        pdf.heading(t('country.notable'))
+        pdf.subheading(t('country.opposed'))
+        pdf.paragraph(t('country.opposedText'))
+        votes(p.value.opposed_high_consensus)
+        pdf.subheading(t('country.supported'))
+        pdf.paragraph(t('country.supportedText'))
+        votes(p.value.supported_low_consensus)
+        if (sp.value?.not_yes.length) {
+          pdf.subheading(t('sponsorship.notYes'))
+          pdf.paragraph(t('sponsorship.notYesText'))
+          votes(sp.value.not_yes)
+        }
       }
 
       if (show('sponsorship') && sp.value) {
@@ -410,21 +424,6 @@ const downloadPdf = () =>
           if (reception.value.length > rows.length) {
             pdf.paragraph(t('report.printedRows', { n: rows.length, total: reception.value.length }), 7.5, PDF_COLORS.muted)
           }
-        }
-      }
-
-      if (show('notable') && p.value) {
-        pdf.heading(t('country.notable'))
-        pdf.subheading(t('country.opposed'))
-        pdf.paragraph(t('country.opposedText'))
-        votes(p.value.opposed_high_consensus)
-        pdf.subheading(t('country.supported'))
-        pdf.paragraph(t('country.supportedText'))
-        votes(p.value.supported_low_consensus)
-        if (sp.value?.not_yes.length) {
-          pdf.subheading(t('sponsorship.notYes'))
-          pdf.paragraph(t('sponsorship.notYesText'))
-          votes(sp.value.not_yes)
         }
       }
 
@@ -558,52 +557,60 @@ const membershipText = computed(() => {
       :applied="applied"
     >
 
-    <QueryState
-      v-if="show('overview')"
-      :loading="profile.isLoading.value"
-      :fetching="profile.isFetching.value"
-      :error="profile.error.value"
-      min-height="200px"
-      @retry="profile.refetch()"
-    >
-      <section v-if="p" class="overview panel">
-        <div class="figures">
-          <div>
-            <span class="figure">{{ n(p.total_resolutions) }}</span>
-            <span class="caption">{{ t('country.resolutionsIn', { period }) }}</span>
+    <section v-if="show('overview')" class="section">
+      <h2>{{ t('report.overview') }}</h2>
+      <QueryState
+        :loading="profile.isLoading.value"
+        :fetching="profile.isFetching.value"
+        :error="profile.error.value"
+        min-height="200px"
+        @retry="profile.refetch()"
+      >
+        <div v-if="p" class="overview panel">
+          <div class="figures">
+            <div>
+              <span class="figure">{{ n(p.total_resolutions) }}</span>
+              <span class="caption">{{ t('country.resolutionsIn', { period }) }}</span>
+            </div>
+            <div v-if="p.multilateral_rank">
+              <span class="figure">{{ n(p.multilateral_alignment ?? 0, 'score') }}</span>
+              <span class="caption">
+                {{ t('country.alignmentRank', { rank: p.multilateral_rank, of: p.multilateral_ranked }) }}
+              </span>
+            </div>
           </div>
-          <div v-if="p.multilateral_rank">
-            <span class="figure">{{ n(p.multilateral_alignment ?? 0, 'score') }}</span>
-            <span class="caption">
-              {{ t('country.alignmentRank', { rank: p.multilateral_rank, of: p.multilateral_ranked }) }}
-            </span>
+          <div class="tally">
+            <template v-if="p.recorded_votes">
+              <p class="hint">{{ t('country.recordedVotes', { name: name(iso3), n: n(p.recorded_votes) }) }}</p>
+              <VoteBar
+                :yes="p.votes.Y ?? 0"
+                :no="p.votes.N ?? 0"
+                :abstain="p.votes.A ?? 0"
+                :absent="p.votes.absent ?? 0"
+              />
+            </template>
+            <p v-if="!p.recorded_votes" class="hint">{{ t('country.noRecordedVotes') }}</p>
+            <p v-else-if="p.total_resolutions > p.recorded_votes" class="hint">
+              {{
+                t('country.notRecorded', {
+                  n: n(p.total_resolutions - p.recorded_votes),
+                  without: n(p.adopted_without_vote),
+                  unrecorded: n(p.non_recorded_votes),
+                })
+              }}
+            </p>
           </div>
         </div>
-        <div class="tally">
-          <template v-if="p.recorded_votes">
-            <p class="hint">{{ t('country.recordedVotes', { name: name(iso3), n: n(p.recorded_votes) }) }}</p>
-            <VoteBar
-              :yes="p.votes.Y ?? 0"
-              :no="p.votes.N ?? 0"
-              :abstain="p.votes.A ?? 0"
-              :absent="p.votes.absent ?? 0"
-            />
-          </template>
-          <p v-if="!p.recorded_votes" class="hint">{{ t('country.noRecordedVotes') }}</p>
-          <p v-else-if="p.total_resolutions > p.recorded_votes" class="hint">
-            {{
-              t('country.notRecorded', {
-                n: n(p.total_resolutions - p.recorded_votes),
-                without: n(p.adopted_without_vote),
-                unrecorded: n(p.non_recorded_votes),
-              })
-            }}
-          </p>
-        </div>
-      </section>
-    </QueryState>
+      </QueryState>
+    </section>
 
-    <section v-if="show('map')" class="section">
+    <section v-if="show('global')" class="section">
+      <div class="section-head">
+        <div>
+          <h2>{{ t('report.global') }}</h2>
+          <p>{{ t('country.globalLead', { name: name(iso3) }) }}</p>
+        </div>
+      </div>
       <div class="grid-agreement">
         <ChartFrame id="map" :legend="mapLegend" :title="t('country.mapTitle', { name: name(iso3) })" :description="t('country.mapText')">
           <template #controls>
@@ -654,11 +661,11 @@ const membershipText = computed(() => {
         </ChartFrame>
 
         <section v-if="p" class="panel ranks">
-          <h2>{{ t('country.closest') }}</h2>
+          <h3>{{ t('country.closest') }}</h3>
           <AgreementBars
             :rows="p.most_aligned.map((r) => ({ key: r.country, label: name(r.country), value: r.agreement, to: { name: 'country', params: { iso3: r.country }, query: route.query } }))"
           />
-          <h2>{{ t('country.furthest') }}</h2>
+          <h3>{{ t('country.furthest') }}</h3>
           <AgreementBars
             :rows="p.least_aligned.map((r) => ({ key: r.country, label: name(r.country), value: r.agreement, to: { name: 'country', params: { iso3: r.country }, query: route.query } }))"
           />
@@ -667,103 +674,155 @@ const membershipText = computed(() => {
       </div>
     </section>
 
-    <ChartFrame
-      v-if="show('timeline')"
-      id="timeline"
-      :export-title="t('country.timelineExportTitle', { name: name(iso3) })"
-      :legend="timelineLegend"
-      :title="t('country.timelineTitle')"
-      :description="t('country.timelineText', { name: name(iso3) })"
-    >
-      <template #controls>
-        <label class="check">
-          <input v-model="specialSessions" type="checkbox" />
-          {{ t('country.specialSessions') }}
-        </label>
-      </template>
-      <CountryList v-model="compareModel" :label="t('country.compareWith')" :colors="seriesColors" :exclude="[iso3]" />
-      <QueryState
-        :loading="timeline.isLoading.value"
-        :fetching="timeline.isFetching.value"
-        :error="timeline.error.value"
-        :empty="!compare.length"
-        :empty-text="t('country.addCountry')"
-        min-height="360px"
-        @retry="timeline.refetch()"
+    <section v-if="show('bilateral')" class="section">
+      <div class="section-head">
+        <div>
+          <h2>{{ t('report.bilateral') }}</h2>
+          <p>{{ t('country.bilateralLead') }}</p>
+        </div>
+      </div>
+      <ChartFrame
+        id="timeline"
+        :export-title="t('country.timelineExportTitle', { name: name(iso3) })"
+        :legend="timelineLegend"
+        :title="t('country.timelineTitle')"
+        :description="t('country.timelineText', { name: name(iso3) })"
       >
-        <TimelineChart :series="series" />
-      </QueryState>
-      <template #table>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th scope="col">{{ t('country.sessionCol') }}</th>
-              <th scope="col">{{ t('country.yearCol') }}</th>
-              <th v-for="s in series" :key="s.country" scope="col" class="numeric">{{ s.label }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="session in timeline.data.value?.sessions ?? []" :key="session.session">
-              <td>{{ session.session }}</td>
-              <td>{{ session.year }}</td>
-              <td
-                v-for="s in series"
-                :key="s.country"
-                class="numeric"
-                :data-value="session.values[s.country]?.agreement ?? ''"
-              >
-                {{ session.values[s.country]?.agreement == null ? '' : n(session.values[s.country]!.agreement!, 'score') }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </template>
-      <template #note>
-        <p>
-          {{ t('country.timelineNote', { n: timeline.data.value?.min_votes ?? 3 }) }}
-          <template v-if="!specialSessions">{{ t('country.specialNote') }}</template>
-        </p>
-      </template>
-    </ChartFrame>
+        <template #controls>
+          <label class="check">
+            <input v-model="specialSessions" type="checkbox" />
+            {{ t('country.specialSessions') }}
+          </label>
+        </template>
+        <CountryList v-model="compareModel" :label="t('country.compareWith')" :colors="seriesColors" :exclude="[iso3]" />
+        <QueryState
+          :loading="timeline.isLoading.value"
+          :fetching="timeline.isFetching.value"
+          :error="timeline.error.value"
+          :empty="!compare.length"
+          :empty-text="t('country.addCountry')"
+          min-height="360px"
+          @retry="timeline.refetch()"
+        >
+          <TimelineChart :series="series" />
+        </QueryState>
+        <template #table>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th scope="col">{{ t('country.sessionCol') }}</th>
+                <th scope="col">{{ t('country.yearCol') }}</th>
+                <th v-for="s in series" :key="s.country" scope="col" class="numeric">{{ s.label }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="session in timeline.data.value?.sessions ?? []" :key="session.session">
+                <td>{{ session.session }}</td>
+                <td>{{ session.year }}</td>
+                <td
+                  v-for="s in series"
+                  :key="s.country"
+                  class="numeric"
+                  :data-value="session.values[s.country]?.agreement ?? ''"
+                >
+                  {{ session.values[s.country]?.agreement == null ? '' : n(session.values[s.country]!.agreement!, 'score') }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
+        <template #note>
+          <p>
+            {{ t('country.timelineNote', { n: timeline.data.value?.min_votes ?? 3 }) }}
+            <template v-if="!specialSessions">{{ t('country.specialNote') }}</template>
+          </p>
+        </template>
+      </ChartFrame>
 
-    <ChartFrame
-      v-if="show('topics')"
-      id="topics"
-      :title="t('country.topicsTitle')"
-      :description="t('country.topicsText')"
-    >
-      <template #controls>
-        <CountryPicker v-model="topicWith" :label="t('country.compareWith')" :exclude="[iso3]" class="with" />
-      </template>
-      <QueryState
-        :loading="bySubject.isLoading.value"
-        :fetching="bySubject.isFetching.value"
-        :error="bySubject.error.value"
-        :empty="!topicWith || subjectRows.length === 0"
-        :empty-text="topicWith ? t('country.topicsEmpty') : t('country.pickCountry')"
-        @retry="bySubject.refetch()"
+      <ChartFrame
+        id="topics"
+        :title="t('country.topicsTitle')"
+        :description="t('country.topicsText')"
       >
-        <AgreementBars :rows="subjectRows" />
-      </QueryState>
-      <template #table>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th scope="col">{{ t('report.subjectCol') }}</th>
-              <th scope="col" class="numeric">{{ t('country.agreementCol') }}</th>
-              <th scope="col" class="numeric">{{ t('report.sharedVotesCol') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="s in bySubject.data.value?.subjects ?? []" :key="s.subject_id">
-              <td>{{ sentenceCase(s.label) }}</td>
-              <td class="numeric" :data-value="s.agreement ?? ''">{{ s.agreement == null ? '' : n(s.agreement, 'score') }}</td>
-              <td class="numeric" :data-value="s.shared_votes">{{ n(s.shared_votes) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </template>
-    </ChartFrame>
+        <template #controls>
+          <CountryPicker v-model="topicWith" :label="t('country.compareWith')" :exclude="[iso3]" class="with" />
+        </template>
+        <QueryState
+          :loading="bySubject.isLoading.value"
+          :fetching="bySubject.isFetching.value"
+          :error="bySubject.error.value"
+          :empty="!topicWith || subjectRows.length === 0"
+          :empty-text="topicWith ? t('country.topicsEmpty') : t('country.pickCountry')"
+          @retry="bySubject.refetch()"
+        >
+          <AgreementBars :rows="subjectRows" />
+        </QueryState>
+        <template #table>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th scope="col">{{ t('report.subjectCol') }}</th>
+                <th scope="col" class="numeric">{{ t('country.agreementCol') }}</th>
+                <th scope="col" class="numeric">{{ t('report.sharedVotesCol') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="s in bySubject.data.value?.subjects ?? []" :key="s.subject_id">
+                <td>{{ sentenceCase(s.label) }}</td>
+                <td class="numeric" :data-value="s.agreement ?? ''">{{ s.agreement == null ? '' : n(s.agreement, 'score') }}</td>
+                <td class="numeric" :data-value="s.shared_votes">{{ n(s.shared_votes) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
+      </ChartFrame>
+    </section>
+
+    <section v-if="p && show('notable')" class="section">
+      <h2>{{ t('country.notable') }}</h2>
+      <div class="grid-2">
+        <div class="panel notable">
+          <h3>{{ t('country.opposed') }}</h3>
+          <p class="hint">{{ t('country.opposedText') }}</p>
+          <ol>
+            <li v-for="v in p.opposed_high_consensus" :key="v.undl_id">
+              <VoteChip :vote="v.vote" />
+              <span>
+                <RouterLink :to="{ name: 'resolution', params: { id: v.undl_id } }">{{ cleanTitle(v.title) }}</RouterLink>
+                <small>{{ v.symbol }}, {{ t('country.consensusOf', { value: n(v.consensus_score, 'score') }) }}</small>
+              </span>
+            </li>
+          </ol>
+        </div>
+        <div class="panel notable">
+          <h3>{{ t('country.supported') }}</h3>
+          <p class="hint">{{ t('country.supportedText') }}</p>
+          <ol>
+            <li v-for="v in p.supported_low_consensus" :key="v.undl_id">
+              <VoteChip :vote="v.vote" />
+              <span>
+                <RouterLink :to="{ name: 'resolution', params: { id: v.undl_id } }">{{ cleanTitle(v.title) }}</RouterLink>
+                <small>{{ v.symbol }}, {{ t('country.consensusOf', { value: n(v.consensus_score, 'score') }) }}</small>
+              </span>
+            </li>
+          </ol>
+        </div>
+        <div v-if="sp" class="panel notable">
+          <h3>{{ t('sponsorship.notYes') }}</h3>
+          <p class="hint">{{ t('sponsorship.notYesText') }}</p>
+          <ol v-if="sp.not_yes.length">
+            <li v-for="v in sp.not_yes" :key="v.undl_id">
+              <VoteChip :vote="v.vote" />
+              <span>
+                <RouterLink :to="{ name: 'resolution', params: { id: v.undl_id } }">{{ cleanTitle(v.title) }}</RouterLink>
+                <small>{{ v.symbol }}, {{ t('country.consensusOf', { value: n(v.consensus_score, 'score') }) }}</small>
+              </span>
+            </li>
+          </ol>
+          <p v-else class="hint">{{ t('sponsorship.notYesNone') }}</p>
+        </div>
+      </div>
+    </section>
 
     <section v-if="show('sponsorship')" class="section">
       <div class="section-head">
@@ -873,52 +932,6 @@ const membershipText = computed(() => {
         </div>
       </QueryState>
     </section>
-
-    <section v-if="p && show('notable')" class="section">
-      <h2>{{ t('country.notable') }}</h2>
-      <div class="grid-2">
-        <div class="panel notable">
-          <h3>{{ t('country.opposed') }}</h3>
-          <p class="hint">{{ t('country.opposedText') }}</p>
-          <ol>
-            <li v-for="v in p.opposed_high_consensus" :key="v.undl_id">
-              <VoteChip :vote="v.vote" />
-              <span>
-                <RouterLink :to="{ name: 'resolution', params: { id: v.undl_id } }">{{ cleanTitle(v.title) }}</RouterLink>
-                <small>{{ v.symbol }}, {{ t('country.consensusOf', { value: n(v.consensus_score, 'score') }) }}</small>
-              </span>
-            </li>
-          </ol>
-        </div>
-        <div class="panel notable">
-          <h3>{{ t('country.supported') }}</h3>
-          <p class="hint">{{ t('country.supportedText') }}</p>
-          <ol>
-            <li v-for="v in p.supported_low_consensus" :key="v.undl_id">
-              <VoteChip :vote="v.vote" />
-              <span>
-                <RouterLink :to="{ name: 'resolution', params: { id: v.undl_id } }">{{ cleanTitle(v.title) }}</RouterLink>
-                <small>{{ v.symbol }}, {{ t('country.consensusOf', { value: n(v.consensus_score, 'score') }) }}</small>
-              </span>
-            </li>
-          </ol>
-        </div>
-        <div v-if="sp" class="panel notable">
-          <h3>{{ t('sponsorship.notYes') }}</h3>
-          <p class="hint">{{ t('sponsorship.notYesText') }}</p>
-          <ol v-if="sp.not_yes.length">
-            <li v-for="v in sp.not_yes" :key="v.undl_id">
-              <VoteChip :vote="v.vote" />
-              <span>
-                <RouterLink :to="{ name: 'resolution', params: { id: v.undl_id } }">{{ cleanTitle(v.title) }}</RouterLink>
-                <small>{{ v.symbol }}, {{ t('country.consensusOf', { value: n(v.consensus_score, 'score') }) }}</small>
-              </span>
-            </li>
-          </ol>
-          <p v-else class="hint">{{ t('sponsorship.notYesNone') }}</p>
-        </div>
-      </div>
-    </section>
     </FacetLayout>
   </div>
 </template>
@@ -1007,11 +1020,11 @@ const membershipText = computed(() => {
   gap: var(--space-3);
 }
 
-.ranks h2 {
+.ranks h3 {
   font-size: var(--text-lg);
 }
 
-.ranks h2 + :deep(.bars) {
+.ranks h3 + :deep(.bars) {
   margin-bottom: var(--space-3);
 }
 
