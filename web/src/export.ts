@@ -111,7 +111,8 @@ export function download(data: Blob | string, filename: string, type = 'text/csv
   link.href = url
   link.download = filename
   link.click()
-  setTimeout(() => URL.revokeObjectURL(url), 0)
+  // Revoked a while later: some browsers drop the download if the URL goes right after the click
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
 
 /** A file-name-safe slug: "Agreement with France, 1990–2020" → "agreement-with-france-1990-2020". */
@@ -160,12 +161,23 @@ export interface ComposeOptions {
 const escapeXml = (text: string) =>
   text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 
+/** Lines of at most `max` px, broken between words (a word longer than that keeps its own line). */
+function wrapWords(text: string, size: number, font: string, max: number, weight = 400): string[] {
+  const lines: string[] = []
+  for (const word of text.split(' ')) {
+    const last = lines.length - 1
+    if (last >= 0 && textWidth(`${lines[last]} ${word}`, size, font, weight) <= max) lines[last] += ` ${word}`
+    else lines.push(word)
+  }
+  return lines
+}
+
 let measureContext: CanvasRenderingContext2D | null | undefined
-function textWidth(text: string, size: number, font: string): number {
+function textWidth(text: string, size: number, font: string, weight = 400): number {
   // jsdom has no canvas: fall back to an average glyph width
   measureContext ??= typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d')
   if (!measureContext) return text.length * size * 0.55
-  measureContext.font = `${size}px ${font}`
+  measureContext.font = `${weight} ${size}px ${font}`
   return measureContext.measureText(text).width
 }
 
@@ -185,8 +197,10 @@ export function composeChart(chart: { svg: string; width: number; height: number
 
   let y = pad
   if (options.title) {
-    y += 18
-    text(pad, y, options.title, 18, colors.ink, ' font-weight="600"')
+    wrapWords(options.title, 18, font, width - 2 * pad, 600).forEach((line, i) => {
+      y += i === 0 ? 18 : 23
+      text(pad, y, line, 18, colors.ink, ' font-weight="600"')
+    })
     y += 14
   }
 
@@ -222,13 +236,15 @@ export function composeChart(chart: { svg: string; width: number; height: number
       `<defs><linearGradient id="legend-scale">${stops}</linearGradient></defs>`,
       `<rect x="${pad}" y="${y}" width="${barWidth}" height="10" fill="url(#legend-scale)"/>`,
     )
-    if (scale.noData) {
-      const x = pad + barWidth + 24
+    const noData = (x: number, top: number) => {
       parts.push(
-        `<rect x="${x}" y="${y - 1}" width="12" height="12" rx="2" fill="${scale.noData.color}" stroke="${colors.rule}"/>`,
+        `<rect x="${x}" y="${top - 1}" width="12" height="12" rx="2" fill="${scale.noData!.color}" stroke="${colors.rule}"/>`,
       )
-      text(x + 18, y + 10, scale.noData.label, 13, colors.ink)
+      text(x + 18, top + 10, scale.noData!.label, 13, colors.ink)
     }
+    // Beside the scale when there is room, else under it (narrow charts)
+    const beside = !!scale.noData && pad + barWidth + 42 + textWidth(scale.noData.label, 13, font) <= width - pad
+    if (beside) noData(pad + barWidth + 24, y)
     y += 26
     text(pad, y, scale.low, 12, colors.muted)
     text(pad + barWidth, y, scale.high, 12, colors.muted, ' text-anchor="end"')
@@ -238,6 +254,11 @@ export function composeChart(chart: { svg: string; width: number; height: number
       y += 18
       parts.push(`<line x1="${pad + 1}" y1="${y - 10}" x2="${pad + 1}" y2="${y + 2}" stroke="${colors.ink}" stroke-width="2"/>`)
       text(pad + 8, y, scale.mark.label, 12, colors.muted)
+    }
+    if (scale.noData && !beside) {
+      y += 10
+      noData(pad, y)
+      y += 12
     }
     y += 4
   }
@@ -277,9 +298,9 @@ export async function withLightTheme<T>(task: () => Promise<T>): Promise<T> {
   if (!dark) return task()
   root.setAttribute('data-theme', 'light')
   try {
-    // shortcut: a fixed wait covers ECharts' 300 ms colour transition; wait on its 'finished'
-    // events instead if charts ever come out half-recoloured
-    await new Promise((resolve) => setTimeout(resolve, 600))
+    // The colours refresh on the attribute (useThemeColors) and Vue re-renders in microtasks; the
+    // charts (animation off) have repainted by the second frame
+    for (let i = 0; i < 2; i++) await new Promise((resolve) => requestAnimationFrame(resolve))
     return await task()
   } finally {
     if (theme == null) root.removeAttribute('data-theme')

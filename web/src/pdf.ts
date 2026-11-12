@@ -170,7 +170,7 @@ export async function createPdf(running: { header: string; footer: string }) {
      * A chart (PNG) under its heading and description, all on one page: as wide as the text
      * unless that makes it taller than the page leaves.
      */
-    chart(title: string, description: string | undefined, png: string, widthPx: number, heightPx: number) {
+    chart(title: string, description: string | undefined, png: Uint8Array, widthPx: number, heightPx: number) {
       const textHeight = 13 + (description ? lines(description, 9).length * lineHeight(9) + 1.5 : 0)
       const maxHeight = PAGE.height - PAGE.top - PAGE.bottom - textHeight - 6
       let w = CONTENT

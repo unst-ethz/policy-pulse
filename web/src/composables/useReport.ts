@@ -41,7 +41,8 @@ export function useReportChart(id: string | undefined, chart: ReportChart): Repo
   const report = inject(REPORT, null)
   if (report && id) {
     onMounted(() => report.charts.set(id, chart))
-    onBeforeUnmount(() => report.charts.delete(id))
+    // Only its own entry: a frame with the same id may already have replaced it
+    onBeforeUnmount(() => report.charts.get(id) === chart && report.charts.delete(id))
   }
   return report
 }

@@ -43,7 +43,8 @@ async function chartImage({ bare = false } = {}): Promise<ChartImage | null> {
   if (!el) return null
   const { echarts } = await import('@/charts/echarts')
   const chart = echarts.getInstanceByDom(el)
-  if (!chart) return null
+  // 0×0 when first drawn while hidden (table view): no image rather than an empty one
+  if (!chart || !chart.getWidth()) return null
   const style = getComputedStyle(frame.value!)
   const token = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback
   return composeChart(

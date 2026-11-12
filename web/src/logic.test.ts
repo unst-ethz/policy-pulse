@@ -230,6 +230,22 @@ describe('export files', () => {
     expect(height).toBeGreaterThanOrEqual(top + 200)
   })
 
+  it('wraps a long title and moves the no-data label under a narrow scale', () => {
+    const { svg } = composeChart(
+      { svg: '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="100"></svg>', width: 300, height: 100 },
+      {
+        title: 'Resolutions on Political and legal questions: share of all resolutions per year',
+        legend: { scale: { colors: ['#f00', '#00f'], low: 'never', high: 'always', noData: { color: '#fff', label: 'Fewer than 10 votes cast' } } },
+        colors: { background: '#fff', ink: '#000', muted: '#666', rule: '#ccc' },
+        font: 'sans-serif',
+      },
+    )
+    // no canvas in jsdom: widths are estimated, which is enough to force the wrap
+    expect(svg.match(/font-weight="600"/g)!.length).toBeGreaterThan(1)
+    const noData = /<rect x="(\d+(?:\.\d+)?)" y="[\d.]+" width="12" height="12" rx="2" fill="#fff"/.exec(svg)
+    expect(Number(noData![1])).toBe(16) // at the left margin, not beside the scale
+  })
+
   it('slugs titles into file names', () => {
     expect(slug('Agreement with Côte d’Ivoire, 1990–2020')).toBe('agreement-with-cote-d-ivoire-1990-2020')
     expect(slug('…')).toBe('chart')

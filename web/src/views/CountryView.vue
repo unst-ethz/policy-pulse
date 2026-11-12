@@ -242,6 +242,10 @@ const subjectLabels = computed(() => {
 })
 
 const exporting = ref<'pdf' | 'zip' | null>(null)
+// Not while the page's data loads: a chart still loading would be missing, or show the old filters
+const loadingData = computed(() =>
+  [profile, map, timeline, bySubject, sponsorship].some((query) => query.isFetching.value),
+)
 const exportError = ref<string | null>(null)
 async function runExport(kind: 'pdf' | 'zip', task: () => Promise<void>) {
   exporting.value = kind
@@ -273,13 +277,8 @@ const downloadPdf = () =>
         const frame = report.charts.get(id)
         const image = await frame?.image({ bare: true })
         if (!frame || !image) return
-        const png = await svgToPng(image.svg, image.width, image.height, 3)
-        const url = await new Promise<string>((resolve) => {
-          const reader = new FileReader()
-          reader.onload = () => resolve(reader.result as string)
-          reader.readAsDataURL(png)
-        })
-        pdf.chart(frame.title(), frame.description(), url, image.width, image.height)
+        const png = new Uint8Array(await (await svgToPng(image.svg, image.width, image.height, 3)).arrayBuffer())
+        pdf.chart(frame.title(), frame.description(), png, image.width, image.height)
       }
       const score = (v: number | null | undefined) => (v == null ? '' : n(v, 'score'))
       const ranking = (rows: { country: string; agreement: number | null }[]) =>
@@ -480,7 +479,7 @@ const downloadReport = () =>
       resolutions: {
         file: 'resolutions.csv',
         description:
-          'Resolutions in the selected years and subjects adopted while the country was a UN member, with its vote and those of the compared countries. The timeline covers the whole history and the topic chart every subject, whatever the filters.',
+          'Resolutions in the selected years and subjects adopted while the country was a UN member, with its vote and those of the compared countries. The timeline covers the whole history and the topic chart every subject, whatever the filters. Membership is applied by date here, while the page counts whole years from the year the country joined, so its totals can be slightly higher.',
         api: new URL(resolutionsUrl.value, window.location.href).href,
       },
     }
@@ -528,13 +527,13 @@ const membershipText = computed(() => {
             </PopoverContent>
           </PopoverPortal>
         </PopoverRoot>
-        <button type="button" class="button" :disabled="!!exporting" :title="t('report.pdfHint')" @click="downloadPdf">
+        <button type="button" class="button" :disabled="!!exporting || loadingData" :title="t('report.pdfHint')" @click="downloadPdf">
           {{ exporting === 'pdf' ? t('report.preparing') : t('report.pdf') }}
         </button>
         <button
           type="button"
           class="button primary"
-          :disabled="!!exporting"
+          :disabled="!!exporting || loadingData"
           :title="t('report.contents')"
           @click="downloadReport"
         >
