@@ -1,7 +1,7 @@
 /**
  * The design tokens as values, for chart code that can't use CSS variables directly (ECharts
  * draws on its own surface). Re-read whenever the colour scheme changes, so charts follow dark
- * mode without a reload.
+ * mode without a reload, and when the page forces a theme (`data-theme`, e.g. light for printing).
  */
 import { onBeforeUnmount, onMounted, reactive } from 'vue'
 
@@ -34,7 +34,14 @@ export function useThemeColors() {
   const colors = reactive(read())
   const media = window.matchMedia('(prefers-color-scheme: dark)')
   const refresh = () => Object.assign(colors, read())
-  onMounted(() => media.addEventListener('change', refresh))
-  onBeforeUnmount(() => media.removeEventListener('change', refresh))
+  const observer = new MutationObserver(refresh)
+  onMounted(() => {
+    media.addEventListener('change', refresh)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+  })
+  onBeforeUnmount(() => {
+    media.removeEventListener('change', refresh)
+    observer.disconnect()
+  })
   return colors
 }

@@ -247,13 +247,23 @@ def export_frame(
     criteria: ResolutionFilter,
     vote_countries: list[str],
     country_name: Callable[[str], str],
+    *,
+    membership_mask: MembershipMask | None = None,
+    apply_country: bool = False,
 ) -> pd.DataFrame:
     """The table behind the CSV download: filtered resolutions plus named vote columns.
 
-    Applies dates, subjects and keyword — not the country participation filter, which narrows
-    *views* to one country's record while an export is about the resolutions themselves.
+    Applies dates, subjects and keyword. The country participation filter only with
+    `apply_country` (a country report's resolutions): by default an export is about the
+    resolutions themselves, not one country's record.
     """
-    df = filter_resolutions(engine, criteria, apply_country=False, columns=None)
+    df = filter_resolutions(
+        engine,
+        criteria,
+        membership_mask=membership_mask,
+        apply_country=apply_country,
+        columns=None,
+    )
 
     vote_cols: list[str] = []
     for country in vote_countries:

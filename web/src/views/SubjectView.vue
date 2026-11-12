@@ -25,7 +25,9 @@ import WorldMap from '@/components/WorldMap.vue'
 import YearBars from '@/components/YearBars.vue'
 import { divergingScale } from '@/charts/scales'
 import { type Filters, onlyFilters, serializeFilters, useFilters } from '@/composables/useFilters'
+import { provideReport } from '@/composables/useReport'
 import { useThemeColors } from '@/composables/useThemeColors'
+import { slug } from '@/export'
 import { sentenceCase } from '@/format'
 
 // A state's vote shares count only above this many votes cast (as on the Alignment page)
@@ -166,6 +168,28 @@ const mostNo = computed(() => ranked('no_rate'))
 const mostAbstain = computed(() => ranked('abstention_rate'))
 const tableRows = computed(() => [...voters.value].sort((a, b) => (a.yes_rate ?? 0) - (b.yes_rate ?? 0)))
 
+// --- exports ------------------------------------------------------------------------------
+// File names and export titles name the subject: an exported chart has no page around it
+const years = computed(() =>
+  filters.value.from || filters.value.to ? `${filters.value.from ?? ''}-${filters.value.to ?? ''}` : '',
+)
+provideReport(() => [slug(label.value), years.value].filter(Boolean).join('_'))
+const volumeLegend = computed(() => ({
+  items: volumeBars.value.map((b) => ({ label: b.label, color: colors[b.color] })),
+}))
+const mapLegend = computed(() => ({
+  scale: {
+    colors: Array.from({ length: 11 }, (_, i) => scale.value(i / 10)),
+    low: t('subject.neverYes'),
+    high: t('subject.alwaysYes'),
+    mark:
+      averageYes.value != null
+        ? { at: averageYes.value, label: t('subject.average', { value: n(averageYes.value, 'percentShort') }) }
+        : undefined,
+    noData: { color: colors.surface, label: t('subject.fewVotes', { n: MIN_VOTES }) },
+  },
+}))
+
 // --- contested -------------------------------------------------------------------------------
 const contested = useResolutions(selection, () => ({ sort: 'consensus_asc', offset: 0, limit: TOP, votes: [] }))
 const contestedItems = computed(() => (contested.data.value?.items ?? []).filter((r) => r.consensus_score != null))
@@ -216,6 +240,9 @@ const contestedLink = computed(() => ({ ...listLink.value, query: { ...listLink.
 
     <ChartFrame
       v-if="volume.length"
+      id="volume"
+      :export-title="t(showShare ? 'subject.volumeShareExportTitle' : 'subject.volumeExportTitle', { subject: label })"
+      :legend="volumeLegend"
       :title="t('subject.volumeTitle')"
       :description="showShare ? t('subject.volumeShareText') : t('subject.volumeText')"
     >
@@ -244,9 +271,9 @@ const contestedLink = computed(() => ({ ...listLink.value, query: { ...listLink.
           <tbody>
             <tr v-for="y in volume" :key="y.year">
               <td>{{ y.year }}</td>
-              <td class="numeric">{{ n(y.recorded) }}</td>
-              <td class="numeric">{{ n(y.other) }}</td>
-              <td class="numeric">{{ n(y.share, 'percent') }}</td>
+              <td class="numeric" :data-value="y.recorded">{{ n(y.recorded) }}</td>
+              <td class="numeric" :data-value="y.other">{{ n(y.other) }}</td>
+              <td class="numeric" :data-value="y.share">{{ n(y.share, 'percent') }}</td>
             </tr>
           </tbody>
         </table>
@@ -292,7 +319,12 @@ const contestedLink = computed(() => ({ ...listLink.value, query: { ...listLink.
       <p v-if="domains.data.value && !recorded" class="hint">{{ t('subject.noVotes') }}</p>
       <template v-else-if="recorded">
         <p v-if="votes.data.value && !voters.length" class="hint">{{ t('subject.minVotes', { n: MIN_VOTES }) }}</p>
-        <ChartFrame v-if="voters.length || !votes.data.value" :title="t('subject.mapTitle')" :description="t('subject.mapText')">
+        <ChartFrame
+          v-if="voters.length || !votes.data.value"
+          id="map"
+          :export-title="t('subject.mapExportTitle', { subject: label })"
+          :legend="mapLegend"
+          :title="t('subject.mapTitle')" :description="t('subject.mapText')">
           <QueryState
             :loading="votes.isLoading.value"
             :fetching="votes.isFetching.value"
@@ -326,10 +358,10 @@ const contestedLink = computed(() => ({ ...listLink.value, query: { ...listLink.
               <tbody>
                 <tr v-for="c in tableRows" :key="c.country">
                   <td><RouterLink :to="countryLink(c.country)">{{ name(c.country) }}</RouterLink></td>
-                  <td class="numeric">{{ n(c.yes_rate ?? 0, 'percentShort') }}</td>
-                  <td class="numeric">{{ n(c.no_rate ?? 0, 'percentShort') }}</td>
-                  <td class="numeric">{{ n(c.abstention_rate ?? 0, 'percentShort') }}</td>
-                  <td class="numeric">{{ n(c.votes_cast) }}</td>
+                  <td class="numeric" :data-value="c.yes_rate ?? ''">{{ n(c.yes_rate ?? 0, 'percentShort') }}</td>
+                  <td class="numeric" :data-value="c.no_rate ?? ''">{{ n(c.no_rate ?? 0, 'percentShort') }}</td>
+                  <td class="numeric" :data-value="c.abstention_rate ?? ''">{{ n(c.abstention_rate ?? 0, 'percentShort') }}</td>
+                  <td class="numeric" :data-value="c.votes_cast">{{ n(c.votes_cast) }}</td>
                 </tr>
               </tbody>
             </table>

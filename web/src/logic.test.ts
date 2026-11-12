@@ -10,7 +10,9 @@ import {
   toApiParams,
   toggleTerm,
 } from './composables/useFilters'
+import { composeChart, crc32, slug, toCsv, zip } from './export'
 import { cleanTitle, sentenceCase } from './format'
+import { pdfText } from './pdf'
 
 describe('URL filters', () => {
   it('round-trips through the query string', () => {
@@ -176,5 +178,83 @@ describe('keyword terms', () => {
 
   it('lists the exact terms as typed', () => {
     expect(exactTerms('nuclear & "Oil slick" & "peace"')).toEqual(['Oil slick', 'peace'])
+  })
+})
+
+describe('export files', () => {
+  it('computes the standard CRC-32', () => {
+    expect(crc32(new TextEncoder().encode('123456789'))).toBe(0xcbf43926)
+  })
+
+  it('quotes every CSV field and escapes quotes', () => {
+    expect(toCsv([['a', 'say "hi"'], ['0,85', '']])).toBe('"a","say ""hi"""\r\n"0,85",""\r\n')
+  })
+
+  it('writes a stored ZIP with every entry in its directory', async () => {
+    const bytes = new Uint8Array(
+      await zip([
+        { name: 'a.txt', data: 'hello' },
+        { name: 'dir/é.csv', data: new Uint8Array([1, 2, 3]) },
+      ]).arrayBuffer(),
+    )
+    const view = new DataView(bytes.buffer)
+    const end = bytes.length - 22
+    expect(view.getUint32(0, true)).toBe(0x04034b50)
+    expect(view.getUint32(end, true)).toBe(0x06054b50)
+    expect(view.getUint16(end + 10, true)).toBe(2)
+    // the directory starts where the end record says, with the first entry's CRC
+    const directory = view.getUint32(end + 16, true)
+    expect(view.getUint32(directory, true)).toBe(0x02014b50)
+    expect(view.getUint32(directory + 16, true)).toBe(crc32(new TextEncoder().encode('hello')))
+  })
+
+  it('puts title, legend and source line around the chart', () => {
+    const { svg, height } = composeChart(
+      { svg: '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200"><path/></svg>', width: 400, height: 200 },
+      {
+        title: 'Votes & more',
+        legend: {
+          items: [{ label: 'France', color: '#f00', shape: 'line' }],
+          scale: { colors: ['#f00', '#00f'], low: 'opposed', high: 'agreed', mark: { at: 0.5, label: 'average' } },
+        },
+        footer: 'Source: <here>',
+        colors: { background: '#fff', ink: '#000', muted: '#666', rule: '#ccc' },
+        font: 'sans-serif',
+      },
+    )
+    for (const part of ['Votes &amp; more', '>France<', '>opposed<', '>agreed<', 'average', 'Source: &lt;here&gt;']) {
+      expect(svg).toContain(part)
+    }
+    const top = Number(/<svg x="0" y="(\d+)"/.exec(svg)?.[1])
+    expect(top).toBeGreaterThan(60) // below the title and legend
+    expect(height).toBeGreaterThanOrEqual(top + 200)
+  })
+
+  it('wraps a long title and moves the no-data label under a narrow scale', () => {
+    const { svg } = composeChart(
+      { svg: '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="100"></svg>', width: 300, height: 100 },
+      {
+        title: 'Resolutions on Political and legal questions: share of all resolutions per year',
+        legend: { scale: { colors: ['#f00', '#00f'], low: 'never', high: 'always', noData: { color: '#fff', label: 'Fewer than 10 votes cast' } } },
+        colors: { background: '#fff', ink: '#000', muted: '#666', rule: '#ccc' },
+        font: 'sans-serif',
+      },
+    )
+    // no canvas in jsdom: widths are estimated, which is enough to force the wrap
+    expect(svg.match(/font-weight="600"/g)!.length).toBeGreaterThan(1)
+    const noData = /<rect x="(\d+(?:\.\d+)?)" y="[\d.]+" width="12" height="12" rx="2" fill="#fff"/.exec(svg)
+    expect(Number(noData![1])).toBe(16) // at the left margin, not beside the scale
+  })
+
+  it('slugs titles into file names', () => {
+    expect(slug('Agreement with Côte d’Ivoire, 1990–2020')).toBe('agreement-with-cote-d-ivoire-1990-2020')
+    expect(slug('…')).toBe('chart')
+  })
+})
+
+describe('PDF text', () => {
+  it('keeps Latin-1 and swaps typographic marks the PDF font lacks', () => {
+    expect(pdfText('Côte d’Ivoire – Türkiye… «Réunion»')).toBe("Côte d'Ivoire - Türkiye... «Réunion»")
+    expect(pdfText('Viet Nam: Việt')).toBe('Viet Nam: Viet')
   })
 })
