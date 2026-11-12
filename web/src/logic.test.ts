@@ -12,6 +12,7 @@ import {
 } from './composables/useFilters'
 import { composeChart, crc32, slug, toCsv, zip } from './export'
 import { cleanTitle, sentenceCase } from './format'
+import { pdfText } from './pdf'
 
 describe('URL filters', () => {
   it('round-trips through the query string', () => {
@@ -232,5 +233,12 @@ describe('export files', () => {
   it('slugs titles into file names', () => {
     expect(slug('Agreement with Côte d’Ivoire, 1990–2020')).toBe('agreement-with-cote-d-ivoire-1990-2020')
     expect(slug('…')).toBe('chart')
+  })
+})
+
+describe('PDF text', () => {
+  it('keeps Latin-1 and swaps typographic marks the PDF font lacks', () => {
+    expect(pdfText('Côte d’Ivoire – Türkiye… «Réunion»')).toBe("Côte d'Ivoire - Türkiye... «Réunion»")
+    expect(pdfText('Viet Nam: Việt')).toBe('Viet Nam: Viet')
   })
 })

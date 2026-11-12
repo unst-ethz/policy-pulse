@@ -12,8 +12,12 @@ export interface ChartImage {
 
 export interface ReportChart {
   title: () => string
-  /** The chart as SVG with title and legend, or null when it has none (an HTML chart) or nothing drawn yet. */
-  image: () => Promise<ChartImage | null>
+  description: () => string | undefined
+  /**
+   * The chart as SVG with title, legend and source line (`bare`: the legend only, for a PDF that
+   * sets its own), or null when it has none (an HTML chart) or nothing drawn yet.
+   */
+  image: (options?: { bare?: boolean }) => Promise<ChartImage | null>
   /** The table twin as CSV, or null when there is none. */
   csv: () => string | null
 }

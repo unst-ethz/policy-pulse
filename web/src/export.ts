@@ -149,6 +149,7 @@ export interface ChartLegend {
 }
 
 export interface ComposeOptions {
+  /** Empty for none, e.g. in a PDF that sets its own headings. */
   title: string
   legend?: ChartLegend
   footer?: string
@@ -182,9 +183,12 @@ export function composeChart(chart: { svg: string; width: number; height: number
       `<text x="${x}" y="${y}" font-size="${size}" fill="${fill}"${extra}>${escapeXml(content)}</text>`,
     )
 
-  let y = pad + 18
-  text(pad, y, options.title, 18, colors.ink, ' font-weight="600"')
-  y += 14
+  let y = pad
+  if (options.title) {
+    y += 18
+    text(pad, y, options.title, 18, colors.ink, ' font-weight="600"')
+    y += 14
+  }
 
   // Items flow left to right and wrap, like the chips and swatches on the page
   if (legend?.items?.length) {
@@ -263,24 +267,22 @@ export function composeChart(chart: { svg: string; width: number; height: number
 }
 
 /**
- * Print the page (the browser's "Save as PDF" makes the PDF). The page is first laid out for
- * print on screen, in the light theme and at A4 width (`html.printing`, see base.css), and the
- * charts get time to redraw at that size: they resize on a ResizeObserver, which a print
- * snapshot alone wouldn't wait for. Everything is put back once the print dialog closes.
+ * Run `task` with the page in its light theme, so the charts it draws from are light, then put the
+ * theme back. A PDF is for paper, whatever the screen's theme.
  */
-export async function printPage(): Promise<void> {
+export async function withLightTheme<T>(task: () => Promise<T>): Promise<T> {
   const root = document.documentElement
   const theme = root.getAttribute('data-theme')
+  const dark = theme === 'dark' || (theme == null && window.matchMedia('(prefers-color-scheme: dark)').matches)
+  if (!dark) return task()
   root.setAttribute('data-theme', 'light')
-  root.classList.add('printing')
-  // shortcut: a fixed wait covers ECharts' resize and its 300 ms colour transition; wait on its
-  // 'finished' events instead if charts ever print half-drawn
-  await new Promise((resolve) => setTimeout(resolve, 600))
-  const restore = () => {
-    root.classList.remove('printing')
+  try {
+    // shortcut: a fixed wait covers ECharts' 300 ms colour transition; wait on its 'finished'
+    // events instead if charts ever come out half-recoloured
+    await new Promise((resolve) => setTimeout(resolve, 600))
+    return await task()
+  } finally {
     if (theme == null) root.removeAttribute('data-theme')
     else root.setAttribute('data-theme', theme)
   }
-  window.addEventListener('afterprint', restore, { once: true })
-  window.print()
 }

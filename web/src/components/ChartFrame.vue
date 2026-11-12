@@ -38,7 +38,7 @@ const tableBody = ref<HTMLElement>()
 const chartElement = () => chartBody.value?.querySelector<HTMLElement>('[_echarts_instance_]') ?? null
 const exportTitle = () => props.exportTitle ?? props.title
 
-async function chartImage(): Promise<ChartImage | null> {
+async function chartImage({ bare = false } = {}): Promise<ChartImage | null> {
   const el = chartElement()
   if (!el) return null
   const { echarts } = await import('@/charts/echarts')
@@ -49,13 +49,12 @@ async function chartImage(): Promise<ChartImage | null> {
   return composeChart(
     { svg: chart.renderToSVGString(), width: chart.getWidth(), height: chart.getHeight() },
     {
-      title: exportTitle(),
+      title: bare ? '' : exportTitle(),
       legend: props.legend,
       // Where the figure comes from: the data's date, and the link that reproduces it
-      footer: t('report.footer', {
-        date: meta.data.value?.data_version.slice(0, 10) ?? '?',
-        url: window.location.href,
-      }),
+      footer: bare
+        ? undefined
+        : t('report.footer', { date: meta.data.value?.data_version.slice(0, 10) ?? '?', url: window.location.href }),
       // The page's theme; the background matters, as ECharts draws on a transparent canvas
       colors: {
         background: token('--surface', '#ffffff'),
@@ -73,7 +72,12 @@ function csv(): string | null {
   return table ? tableCsv(table) : null
 }
 
-const report = useReportChart(props.id, { title: exportTitle, image: chartImage, csv })
+const report = useReportChart(props.id, {
+  title: exportTitle,
+  description: () => props.description,
+  image: chartImage,
+  csv,
+})
 const filename = (ext: string) =>
   `${[report?.prefix(), props.id ?? slug(props.title)].filter(Boolean).join('_')}.${ext}`
 
@@ -106,7 +110,7 @@ async function save(kind: 'svg' | 'png' | 'csv') {
         </div>
         <div class="controls">
           <slot name="controls" />
-          <div class="toggle no-print" role="group" :aria-label="t('chart.view')">
+          <div class="toggle" role="group" :aria-label="t('chart.view')">
             <button
               type="button"
               :aria-pressed="view === 'chart'"
@@ -125,7 +129,7 @@ async function save(kind: 'svg' | 'png' | 'csv') {
         </div>
       </div>
       <PopoverRoot v-model:open="exportOpen">
-        <PopoverTrigger class="export no-print" :aria-label="t('chart.download')" :title="t('chart.download')">
+        <PopoverTrigger class="export" :aria-label="t('chart.download')" :title="t('chart.download')">
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
             <path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M2.5 13.5h11" stroke="currentColor" stroke-width="1.5" fill="none" />
           </svg>
