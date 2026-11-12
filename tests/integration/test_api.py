@@ -320,6 +320,14 @@ def test_csv_export(client):
     assert header[-2:] == ["Switzerland", "France"]
 
 
+def test_csv_export_applies_country_on_request(client):
+    url = "/api/v1/resolutions.csv?country=CHE&country_mode=voted&start_date=1990-01-01"
+    everything = get(client, url).text.splitlines()
+    voted = get(client, url + "&apply_country=true").text.splitlines()
+    assert voted[0] == everything[0]
+    assert 1 < len(voted) < len(everything)
+
+
 @pytest.mark.parametrize(
     "url, status",
     [

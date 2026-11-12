@@ -1,12 +1,16 @@
 <script setup lang="ts">
+import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  csvUrl,
+  type Lang,
   useAgreementBySubject,
   useAgreementMap,
   useCountryIndex,
   useHistoricalStates,
+  useMeta,
   useProfile,
   useSponsorship,
   useTimeline,
@@ -26,12 +30,14 @@ import WorldMap from '@/components/WorldMap.vue'
 import YearBars from '@/components/YearBars.vue'
 import { divergingScale } from '@/charts/scales'
 import { onlyFilters, useFilters } from '@/composables/useFilters'
+import { provideReport } from '@/composables/useReport'
 import { useThemeColors } from '@/composables/useThemeColors'
+import { download, svgToPng, zip, type ZipEntry } from '@/export'
 import { cleanTitle, sentenceCase, SERIES_SLOTS, SERIES_SLOTS_DARK, yearSpan } from '@/format'
 
 const props = defineProps<{ iso3: string }>()
 
-const { t, n, d } = useI18n()
+const { t, n, d, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { filters } = useFilters()
@@ -182,6 +188,120 @@ const domainRows = computed(() => {
   }))
 })
 
+// --- sections and report ------------------------------------------------------------------
+const SECTIONS = ['overview', 'map', 'timeline', 'topics', 'sponsorship', 'notable'] as const
+type Section = (typeof SECTIONS)[number]
+// Hidden sections live in the URL like the filters, so a shared link shows (and exports) the same
+const hidden = computed(() => new Set(listParam('hide')))
+const show = (section: Section) => !hidden.value.has(section)
+function toggleSection(section: Section, visible: boolean) {
+  setParam('hide', SECTIONS.filter((s) => (s === section ? !visible : hidden.value.has(s))))
+}
+
+const meta = useMeta()
+const prefix = () => [props.iso3, filters.value.from || filters.value.to ? `${filters.value.from ?? ''}-${filters.value.to ?? ''}` : ''].filter(Boolean).join('_')
+const report = provideReport(prefix, () =>
+  t('report.footer', {
+    date: meta.data.value ? meta.data.value.data_version.slice(0, 10) : '?',
+    url: window.location.href,
+  }),
+)
+
+// --- legends of the exported charts (the page's own are HTML, outside the chart) -----------
+const mapLegend = computed(() => ({
+  items: [{ label: name(props.iso3), color: colors.accent }],
+  scale: {
+    colors: Array.from({ length: 11 }, (_, i) => scale.value(i / 10)),
+    low: t('country.alwaysOpposed'),
+    high: t('country.alwaysAgreed'),
+    mark:
+      centred.value && average.value != null
+        ? { at: average.value, label: t('country.average', { name: name(props.iso3), value: n(average.value, 'score') }) }
+        : undefined,
+    noData: { color: colors.surface, label: t('country.noSharedVote') },
+  },
+}))
+const timelineLegend = computed(() => ({
+  items: series.value.map((s) => ({ label: s.label, color: s.color, shape: 'line' as const })),
+}))
+const sponsorBars = computed(() => [
+  { key: 'with_data', label: t('sponsorship.withData'), color: 'rule' as const },
+  { key: 'original', label: t('sponsorship.original'), color: 'ink' as const, stack: 'sponsored' },
+  { key: 'additional', label: t('sponsorship.additional'), color: 'muted' as const, stack: 'sponsored' },
+])
+const sponsorLegend = computed(() => ({
+  items: sponsorBars.value.map((b) => ({ label: b.label, color: colors[b.color] })),
+}))
+// The resolutions behind the page: in its years and subjects, adopted while it was a member,
+// with its vote and those of the countries it is compared with
+const resolutionsUrl = computed(
+  () => `${csvUrl(applied.value, compare.value, locale.value as Lang)}&apply_country=true`,
+)
+const exporting = ref(false)
+const exportError = ref<string | null>(null)
+
+async function downloadReport() {
+  exporting.value = true
+  exportError.value = null
+  try {
+    const files: ZipEntry[] = []
+    const charts = []
+    for (const [id, chart] of report.charts) {
+      const written: string[] = []
+      const image = await chart.image()
+      if (image) {
+        const png = new Uint8Array(await (await svgToPng(image.svg, image.width, image.height)).arrayBuffer())
+        files.push({ name: `charts/${id}.svg`, data: image.svg }, { name: `charts/${id}.png`, data: png })
+        written.push(`charts/${id}.svg`, `charts/${id}.png`)
+      }
+      const table = chart.csv()
+      if (table) {
+        files.push({ name: `tables/${id}.csv`, data: table })
+        written.push(`tables/${id}.csv`)
+      }
+      charts.push({ id, title: chart.title(), files: written })
+    }
+    const response = await fetch(resolutionsUrl.value)
+    if (!response.ok) throw new Error(`resolutions.csv: HTTP ${response.status}`)
+    files.push({ name: 'resolutions.csv', data: new Uint8Array(await response.arrayBuffer()) })
+
+    const metadata = {
+      page: 'country',
+      country: { iso3: props.iso3, name: name(props.iso3) },
+      url: window.location.href,
+      exported_at: new Date().toISOString(),
+      data_version: meta.data.value?.data_version ?? null,
+      language: locale.value,
+      filters: {
+        from: filters.value.from,
+        to: filters.value.to,
+        subjects: filters.value.subjects,
+        historical_states: filters.value.historical,
+      },
+      settings: {
+        compare_with: compare.value,
+        topics_compared_with: topicWith.value,
+        special_sessions: specialSessions.value,
+        map_centred_on_average: centred.value,
+      },
+      sections: SECTIONS.filter(show),
+      charts,
+      resolutions: {
+        file: 'resolutions.csv',
+        description:
+          'Resolutions in the selected years and subjects adopted while the country was a UN member, with its vote and those of the compared countries. The timeline covers the whole history and the topic chart every subject, whatever the filters.',
+        api: new URL(resolutionsUrl.value, window.location.href).href,
+      },
+    }
+    files.push({ name: 'metadata.json', data: JSON.stringify(metadata, null, 2) })
+    download(zip(files), `policy-pulse_${prefix() || props.iso3}.zip`)
+  } catch (error) {
+    exportError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    exporting.value = false
+  }
+}
+
 const period = computed(() => (p.value ? yearSpan(p.value.start_date, p.value.end_date) : ''))
 const membershipText = computed(() => {
   const m = country.value?.membership ?? []
@@ -197,6 +317,42 @@ const membershipText = computed(() => {
 <template>
   <div class="page">
     <div class="page-head">
+      <div class="page-actions">
+        <PopoverRoot>
+          <PopoverTrigger class="button" :title="t('report.sectionsHint')">
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+              <path d="M2 4h7M13 4h1M2 12h1M7 12h7" stroke="currentColor" stroke-width="1.5" fill="none" />
+              <circle cx="11" cy="4" r="2" stroke="currentColor" stroke-width="1.5" fill="none" />
+              <circle cx="5" cy="12" r="2" stroke="currentColor" stroke-width="1.5" fill="none" />
+            </svg>
+            {{ t('report.customize') }}
+          </PopoverTrigger>
+          <PopoverPortal>
+            <PopoverContent class="facet-chooser" side="bottom" align="end" :side-offset="6" :collision-padding="12">
+              <p class="facet-chooser-title">{{ t('report.sections') }}</p>
+              <label v-for="section in SECTIONS" :key="section" class="facet-chooser-option">
+                <input
+                  type="checkbox"
+                  :checked="show(section)"
+                  @change="toggleSection(section, ($event.target as HTMLInputElement).checked)"
+                />
+                {{ t(`report.${section}`) }}
+              </label>
+              <p class="facet-chooser-note">{{ t('report.sectionsHint') }}</p>
+            </PopoverContent>
+          </PopoverPortal>
+        </PopoverRoot>
+        <button
+          type="button"
+          class="button primary"
+          :disabled="exporting"
+          :title="t('report.contents')"
+          @click="downloadReport"
+        >
+          {{ exporting ? t('report.preparing') : t('report.download') }}
+        </button>
+        <p v-if="exportError" class="error" role="alert">{{ t('report.failed', { error: exportError }) }}</p>
+      </div>
       <h1>{{ country?.name ?? iso3 }}</h1>
       <p class="sub">
         <span v-if="country?.subregion">{{ country.subregion }}</span>
@@ -215,6 +371,7 @@ const membershipText = computed(() => {
     >
 
     <QueryState
+      v-if="show('overview')"
       :loading="profile.isLoading.value"
       :fetching="profile.isFetching.value"
       :error="profile.error.value"
@@ -258,9 +415,9 @@ const membershipText = computed(() => {
       </section>
     </QueryState>
 
-    <section class="section">
+    <section v-if="show('map')" class="section">
       <div class="grid-agreement">
-        <ChartFrame :title="t('country.mapTitle', { name: name(iso3) })" :description="t('country.mapText')">
+        <ChartFrame id="map" :legend="mapLegend" :title="t('country.mapTitle', { name: name(iso3) })" :description="t('country.mapText')">
           <template #controls>
             <label class="check">
               <input v-model="centred" type="checkbox" :disabled="average == null" />
@@ -298,7 +455,7 @@ const membershipText = computed(() => {
               <tbody>
                 <tr v-for="row in mapRows" :key="row.country">
                   <td>{{ row.name }}</td>
-                  <td class="numeric">{{ n(row.score ?? 0, 'score') }}</td>
+                  <td class="numeric" :data-value="row.score ?? ''">{{ n(row.score ?? 0, 'score') }}</td>
                 </tr>
               </tbody>
             </table>
@@ -322,7 +479,14 @@ const membershipText = computed(() => {
       </div>
     </section>
 
-    <ChartFrame :title="t('country.timelineTitle')" :description="t('country.timelineText', { name: name(iso3) })">
+    <ChartFrame
+      v-if="show('timeline')"
+      id="timeline"
+      :export-title="t('country.timelineExportTitle', { name: name(iso3) })"
+      :legend="timelineLegend"
+      :title="t('country.timelineTitle')"
+      :description="t('country.timelineText', { name: name(iso3) })"
+    >
       <template #controls>
         <label class="check">
           <input v-model="specialSessions" type="checkbox" />
@@ -354,7 +518,12 @@ const membershipText = computed(() => {
             <tr v-for="session in timeline.data.value?.sessions ?? []" :key="session.session">
               <td>{{ session.session }}</td>
               <td>{{ session.year }}</td>
-              <td v-for="s in series" :key="s.country" class="numeric">
+              <td
+                v-for="s in series"
+                :key="s.country"
+                class="numeric"
+                :data-value="session.values[s.country]?.agreement ?? ''"
+              >
                 {{ session.values[s.country]?.agreement == null ? '' : n(session.values[s.country]!.agreement!, 'score') }}
               </td>
             </tr>
@@ -369,14 +538,15 @@ const membershipText = computed(() => {
       </template>
     </ChartFrame>
 
-    <section class="panel section">
-      <div class="section-head">
-        <div>
-          <h2>{{ t('country.topicsTitle') }}</h2>
-          <p>{{ t('country.topicsText') }}</p>
-        </div>
+    <ChartFrame
+      v-if="show('topics')"
+      id="topics"
+      :title="t('country.topicsTitle')"
+      :description="t('country.topicsText')"
+    >
+      <template #controls>
         <CountryPicker v-model="topicWith" :label="t('country.compareWith')" :exclude="[iso3]" class="with" />
-      </div>
+      </template>
       <QueryState
         :loading="bySubject.isLoading.value"
         :fetching="bySubject.isFetching.value"
@@ -387,9 +557,27 @@ const membershipText = computed(() => {
       >
         <AgreementBars :rows="subjectRows" />
       </QueryState>
-    </section>
+      <template #table>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th scope="col">{{ t('report.subjectCol') }}</th>
+              <th scope="col" class="numeric">{{ t('country.agreementCol') }}</th>
+              <th scope="col" class="numeric">{{ t('report.sharedVotesCol') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="s in bySubject.data.value?.subjects ?? []" :key="s.subject_id">
+              <td>{{ sentenceCase(s.label) }}</td>
+              <td class="numeric" :data-value="s.agreement ?? ''">{{ s.agreement == null ? '' : n(s.agreement, 'score') }}</td>
+              <td class="numeric" :data-value="s.shared_votes">{{ n(s.shared_votes) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </template>
+    </ChartFrame>
 
-    <section class="section">
+    <section v-if="show('sponsorship')" class="section">
       <div class="section-head">
         <div>
           <h2>{{ t('sponsorship.title') }}</h2>
@@ -423,15 +611,14 @@ const membershipText = computed(() => {
             </p>
           </div>
 
-          <ChartFrame :title="t('sponsorship.chartTitle')" :description="t('sponsorship.chartText', { name: name(iso3) })">
+          <ChartFrame
+            id="sponsorship"
+            :export-title="t('sponsorship.chartExportTitle', { name: name(iso3) })"
+            :legend="sponsorLegend" :title="t('sponsorship.chartTitle')" :description="t('sponsorship.chartText', { name: name(iso3) })">
             <YearBars
               :years="sp.per_year"
               :label="t('sponsorship.chartTitle')"
-              :bars="[
-                { key: 'with_data', label: t('sponsorship.withData'), color: 'rule' },
-                { key: 'original', label: t('sponsorship.original'), color: 'ink', stack: 'sponsored' },
-                { key: 'additional', label: t('sponsorship.additional'), color: 'muted', stack: 'sponsored' },
-              ]"
+              :bars="sponsorBars"
             />
             <template #table>
               <table class="data-table">
@@ -446,9 +633,9 @@ const membershipText = computed(() => {
                 <tbody>
                   <tr v-for="y in sp.per_year" :key="y.year">
                     <td>{{ y.year }}</td>
-                    <td class="numeric">{{ n(y.original) }}</td>
-                    <td class="numeric">{{ n(y.additional) }}</td>
-                    <td class="numeric">{{ n(y.with_data) }}</td>
+                    <td class="numeric" :data-value="y.original">{{ n(y.original) }}</td>
+                    <td class="numeric" :data-value="y.additional">{{ n(y.additional) }}</td>
+                    <td class="numeric" :data-value="y.with_data">{{ n(y.with_data) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -499,7 +686,7 @@ const membershipText = computed(() => {
       </QueryState>
     </section>
 
-    <section v-if="p" class="section">
+    <section v-if="p && show('notable')" class="section">
       <h2>{{ t('country.notable') }}</h2>
       <div class="grid-2">
         <div class="panel notable">
@@ -549,6 +736,30 @@ const membershipText = computed(() => {
 </template>
 
 <style scoped>
+.page-head {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.page-head > :not(.page-actions) {
+  grid-column: 1;
+}
+
+.page-actions {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.page-actions .error {
+  flex-basis: 100%;
+  text-align: end;
+  color: var(--danger-ink);
+  font-size: var(--text-sm);
+}
 .sub {
   display: flex;
   flex-wrap: wrap;

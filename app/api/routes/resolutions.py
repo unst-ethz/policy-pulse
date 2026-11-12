@@ -109,10 +109,14 @@ def export_resolutions(
     criteria: Annotated[ResolutionFilter, Depends(resolution_filter)],
     votes: VotesParam = None,
     lang: LangParam = "en",
+    apply_country: Annotated[
+        bool, Query(description="Also apply `country`/`country_mode` (e.g. a country report)")
+    ] = False,
 ) -> Response:
     """The filtered resolutions as CSV, with a named vote column per requested country.
 
-    Applies dates, subjects and keyword; `country_mode` is ignored, as in the Dash download.
+    Applies dates, subjects and keyword; `country_mode` only with `apply_country`, as by default
+    in the Dash download.
     """
     vote_countries = country_list(votes, "votes")
     if criteria.country and criteria.country not in vote_countries:
@@ -122,6 +126,8 @@ def export_resolutions(
         criteria,
         vote_countries,
         country_name=lambda iso3: data.get_country_name(iso3, lang),
+        membership_mask=data.membership_mask,
+        apply_country=apply_country,
     )
     return Response(
         frame.to_csv(index=False),

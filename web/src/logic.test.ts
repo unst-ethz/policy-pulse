@@ -10,6 +10,7 @@ import {
   toApiParams,
   toggleTerm,
 } from './composables/useFilters'
+import { composeChart, crc32, slug, toCsv, zip } from './export'
 import { cleanTitle, sentenceCase } from './format'
 
 describe('URL filters', () => {
@@ -176,5 +177,60 @@ describe('keyword terms', () => {
 
   it('lists the exact terms as typed', () => {
     expect(exactTerms('nuclear & "Oil slick" & "peace"')).toEqual(['Oil slick', 'peace'])
+  })
+})
+
+describe('export files', () => {
+  it('computes the standard CRC-32', () => {
+    expect(crc32(new TextEncoder().encode('123456789'))).toBe(0xcbf43926)
+  })
+
+  it('quotes every CSV field and escapes quotes', () => {
+    expect(toCsv([['a', 'say "hi"'], ['0,85', '']])).toBe('"a","say ""hi"""\r\n"0,85",""\r\n')
+  })
+
+  it('writes a stored ZIP with every entry in its directory', async () => {
+    const bytes = new Uint8Array(
+      await zip([
+        { name: 'a.txt', data: 'hello' },
+        { name: 'dir/é.csv', data: new Uint8Array([1, 2, 3]) },
+      ]).arrayBuffer(),
+    )
+    const view = new DataView(bytes.buffer)
+    const end = bytes.length - 22
+    expect(view.getUint32(0, true)).toBe(0x04034b50)
+    expect(view.getUint32(end, true)).toBe(0x06054b50)
+    expect(view.getUint16(end + 10, true)).toBe(2)
+    // the directory starts where the end record says, with the first entry's CRC
+    const directory = view.getUint32(end + 16, true)
+    expect(view.getUint32(directory, true)).toBe(0x02014b50)
+    expect(view.getUint32(directory + 16, true)).toBe(crc32(new TextEncoder().encode('hello')))
+  })
+
+  it('puts title, legend and source line around the chart', () => {
+    const { svg, height } = composeChart(
+      { svg: '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200"><path/></svg>', width: 400, height: 200 },
+      {
+        title: 'Votes & more',
+        legend: {
+          items: [{ label: 'France', color: '#f00', shape: 'line' }],
+          scale: { colors: ['#f00', '#00f'], low: 'opposed', high: 'agreed', mark: { at: 0.5, label: 'average' } },
+        },
+        footer: 'Source: <here>',
+        colors: { background: '#fff', ink: '#000', muted: '#666', rule: '#ccc' },
+        font: 'sans-serif',
+      },
+    )
+    for (const part of ['Votes &amp; more', '>France<', '>opposed<', '>agreed<', 'average', 'Source: &lt;here&gt;']) {
+      expect(svg).toContain(part)
+    }
+    const top = Number(/<svg x="0" y="(\d+)"/.exec(svg)?.[1])
+    expect(top).toBeGreaterThan(60) // below the title and legend
+    expect(height).toBeGreaterThanOrEqual(top + 200)
+  })
+
+  it('slugs titles into file names', () => {
+    expect(slug('Agreement with Côte d’Ivoire, 1990–2020')).toBe('agreement-with-cote-d-ivoire-1990-2020')
+    expect(slug('…')).toBe('chart')
   })
 })
