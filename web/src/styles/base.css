@@ -217,3 +217,65 @@ table {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* --- Print -------------------------------------------------------------------------------
+ * "Export PDF" sets html.printing before opening the print dialog (printPage in export.ts), so
+ * the page takes its print layout on screen first and the charts redraw at A4 width. The
+ * @media print rules cover what only matters on paper. */
+@page {
+  size: A4;
+  margin: 14mm 12mm;
+}
+
+.print-only {
+  display: none;
+}
+
+html.printing body {
+  width: 186mm; /* A4 less the page margins */
+  background: var(--surface);
+}
+
+html.printing .print-only {
+  display: block;
+}
+
+html.printing .top,
+html.printing .foot,
+html.printing .skip,
+html.printing .no-print,
+html.printing .layout > .side,
+html.printing .layout > .main > .bar {
+  display: none !important;
+}
+
+html.printing .page {
+  max-width: none;
+  padding: 0;
+  gap: var(--space-5);
+}
+
+/* Single column: two columns don't fit A4 portrait */
+html.printing .layout,
+html.printing .grid-2,
+html.printing .grid-agreement {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+@media print {
+  /* Charts and the short list panels stay whole; the long rankings may run on to the next page */
+  html.printing .frame,
+  html.printing .notable {
+    break-inside: avoid;
+  }
+
+  html.printing h2,
+  html.printing h3 {
+    break-after: avoid;
+  }
+
+  html.printing a {
+    color: inherit;
+    text-decoration: none;
+  }
+}

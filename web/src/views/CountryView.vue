@@ -13,6 +13,7 @@ import {
   useMeta,
   useProfile,
   useSponsorship,
+  useSubjectTree,
   useTimeline,
 } from '@/api/queries'
 import AgreementBars from '@/components/AgreementBars.vue'
@@ -32,8 +33,8 @@ import { divergingScale } from '@/charts/scales'
 import { onlyFilters, useFilters } from '@/composables/useFilters'
 import { provideReport } from '@/composables/useReport'
 import { useThemeColors } from '@/composables/useThemeColors'
-import { download, svgToPng, zip, type ZipEntry } from '@/export'
-import { cleanTitle, sentenceCase, SERIES_SLOTS, SERIES_SLOTS_DARK, yearSpan } from '@/format'
+import { download, printPage, svgToPng, zip, type ZipEntry } from '@/export'
+import { cleanTitle, flatSubjects, sentenceCase, SERIES_SLOTS, SERIES_SLOTS_DARK, yearSpan } from '@/format'
 
 const props = defineProps<{ iso3: string }>()
 
@@ -167,6 +168,8 @@ const subjectRows = computed(() =>
 // --- sponsorship ---------------------------------------------------------------------------
 const sponsorship = useSponsorship(() => props.iso3, scope)
 const sp = computed(() => sponsorship.data.value)
+// Printed, the reception table keeps its first rows (the CSS cut-off below matches): in full it runs over pages
+const PRINTED_ROWS = 15
 const reception = computed(() => (sp.value?.reception ?? []).filter((r) => shown(r.country)))
 const years = computed(() => ({
   from: filters.value.from ? String(filters.value.from) : undefined,
@@ -200,12 +203,7 @@ function toggleSection(section: Section, visible: boolean) {
 
 const meta = useMeta()
 const prefix = () => [props.iso3, filters.value.from || filters.value.to ? `${filters.value.from ?? ''}-${filters.value.to ?? ''}` : ''].filter(Boolean).join('_')
-const report = provideReport(prefix, () =>
-  t('report.footer', {
-    date: meta.data.value ? meta.data.value.data_version.slice(0, 10) : '?',
-    url: window.location.href,
-  }),
-)
+const report = provideReport(prefix)
 
 // --- legends of the exported charts (the page's own are HTML, outside the chart) -----------
 const mapLegend = computed(() => ({
@@ -237,6 +235,24 @@ const sponsorLegend = computed(() => ({
 const resolutionsUrl = computed(
   () => `${csvUrl(applied.value, compare.value, locale.value as Lang)}&apply_country=true`,
 )
+// For the printed cover: what the PDF shows, and the link back to it
+const tree = useSubjectTree()
+const subjectLabels = computed(() => {
+  const labels = new Map(flatSubjects(tree.data.value ?? []).map((s) => [s.id, s.label]))
+  return filters.value.subjects.map((id) => sentenceCase(labels.get(id) ?? id))
+})
+const pageUrl = ref('')
+const printing = ref(false)
+async function exportPdf() {
+  printing.value = true
+  pageUrl.value = window.location.href
+  try {
+    await printPage()
+  } finally {
+    printing.value = false
+  }
+}
+
 const exporting = ref(false)
 const exportError = ref<string | null>(null)
 
@@ -317,7 +333,7 @@ const membershipText = computed(() => {
 <template>
   <div class="page">
     <div class="page-head">
-      <div class="page-actions">
+      <div class="page-actions no-print">
         <PopoverRoot>
           <PopoverTrigger class="button" :title="t('report.sectionsHint')">
             <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
@@ -342,6 +358,9 @@ const membershipText = computed(() => {
             </PopoverContent>
           </PopoverPortal>
         </PopoverRoot>
+        <button type="button" class="button" :disabled="printing" :title="t('report.pdfHint')" @click="exportPdf">
+          {{ printing ? t('report.preparing') : t('report.pdf') }}
+        </button>
         <button
           type="button"
           class="button primary"
@@ -361,6 +380,20 @@ const membershipText = computed(() => {
           {{ t('countries.formerly', { names: country.historical_names.join(', ') }) }}
         </span>
       </p>
+      <dl class="print-only cover">
+        <dt>{{ t('report.years') }}</dt>
+        <dd>{{ filters.from || filters.to ? `${filters.from ?? '…'}–${filters.to ?? '…'}` : t('report.allYears') }}</dd>
+        <dt>{{ t('report.subjects') }}</dt>
+        <dd>{{ subjectLabels.length ? subjectLabels.join('; ') : t('report.allSubjects') }}</dd>
+        <dt>{{ t('report.comparedWith') }}</dt>
+        <dd>{{ compare.map(name).join(', ') || '–' }}</dd>
+        <dt>{{ t('report.topicsWith') }}</dt>
+        <dd>{{ topicWith ? name(topicWith) : '–' }}</dd>
+        <dt>{{ t('report.dataAsOf') }}</dt>
+        <dd>{{ meta.data.value?.data_version.slice(0, 10) ?? '?' }}</dd>
+        <dt>{{ t('report.link') }}</dt>
+        <dd class="link">{{ pageUrl }}</dd>
+      </dl>
     </div>
 
     <FacetLayout
@@ -678,6 +711,9 @@ const membershipText = computed(() => {
                     </tr>
                   </tbody>
                 </table>
+                <p v-if="reception.length > PRINTED_ROWS" class="print-only hint">
+                  {{ t('report.printedRows', { n: PRINTED_ROWS, total: reception.length }) }}
+                </p>
               </div>
               <p v-else class="hint">{{ t('sponsorship.none') }}</p>
             </div>
@@ -752,6 +788,32 @@ const membershipText = computed(() => {
   justify-content: flex-end;
   align-items: center;
   gap: var(--space-2);
+}
+
+/* Shown only when printing (.print-only); laid out as a grid then */
+.cover {
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-3) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--rule);
+  font-size: var(--text-sm);
+}
+
+html.printing .cover {
+  display: grid;
+}
+
+.cover dt {
+  color: var(--muted);
+}
+
+.cover dd {
+  margin: 0;
+}
+
+.cover .link {
+  overflow-wrap: anywhere;
 }
 
 .page-actions .error {
@@ -846,6 +908,16 @@ const membershipText = computed(() => {
 .reception {
   max-height: 360px;
   overflow: auto;
+}
+
+html.printing .reception {
+  max-height: none;
+  overflow: visible;
+}
+
+/* After PRINTED_ROWS */
+html.printing .reception tbody tr:nth-child(n + 16) {
+  display: none;
 }
 
 .reception thead th {

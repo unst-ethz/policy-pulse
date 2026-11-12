@@ -21,15 +21,13 @@ export interface ReportChart {
 export interface Report {
   /** File-name prefix for single downloads, e.g. "CHE_1990-2020". */
   prefix: () => string
-  /** The source line under exported charts: where the figure comes from, and with which filters. */
-  footer: () => string
   charts: Map<string, ReportChart>
 }
 
 const REPORT: InjectionKey<Report> = Symbol('report')
 
-export function provideReport(prefix: () => string, footer: () => string): Report {
-  const report: Report = { prefix, footer, charts: new Map() }
+export function provideReport(prefix: () => string): Report {
+  const report: Report = { prefix, charts: new Map() }
   provide(REPORT, report)
   return report
 }

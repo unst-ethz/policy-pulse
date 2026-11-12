@@ -261,3 +261,26 @@ export function composeChart(chart: { svg: string; width: number; height: number
     '</svg>'
   return { svg, width, height }
 }
+
+/**
+ * Print the page (the browser's "Save as PDF" makes the PDF). The page is first laid out for
+ * print on screen, in the light theme and at A4 width (`html.printing`, see base.css), and the
+ * charts get time to redraw at that size: they resize on a ResizeObserver, which a print
+ * snapshot alone wouldn't wait for. Everything is put back once the print dialog closes.
+ */
+export async function printPage(): Promise<void> {
+  const root = document.documentElement
+  const theme = root.getAttribute('data-theme')
+  root.setAttribute('data-theme', 'light')
+  root.classList.add('printing')
+  // shortcut: a fixed wait covers ECharts' resize and its 300 ms colour transition; wait on its
+  // 'finished' events instead if charts ever print half-drawn
+  await new Promise((resolve) => setTimeout(resolve, 600))
+  const restore = () => {
+    root.classList.remove('printing')
+    if (theme == null) root.removeAttribute('data-theme')
+    else root.setAttribute('data-theme', theme)
+  }
+  window.addEventListener('afterprint', restore, { once: true })
+  window.print()
+}
