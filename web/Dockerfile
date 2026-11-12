@@ -8,7 +8,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
 ARG WEB_BASE=/
-RUN WEB_BASE=$WEB_BASE npx vite build
+RUN WEB_BASE=$WEB_BASE npm run build
 
 FROM nginx:1.29-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
