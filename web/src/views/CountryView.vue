@@ -611,67 +611,69 @@ const membershipText = computed(() => {
           <p>{{ t('country.globalLead', { name: name(iso3) }) }}</p>
         </div>
       </div>
-      <div class="grid-agreement">
-        <ChartFrame id="map" :legend="mapLegend" :title="t('country.mapTitle', { name: name(iso3) })" :description="t('country.mapText')">
-          <template #controls>
-            <label class="check">
-              <input v-model="centred" type="checkbox" :disabled="average == null" />
-              {{ t('country.centre') }}
-            </label>
-          </template>
-          <QueryState
-            :loading="map.isLoading.value"
-            :fetching="map.isFetching.value"
-            :error="map.error.value"
-            @retry="map.refetch()"
-          >
-            <WorldMap
-              :fill="fill"
-              :tooltip="mapTooltip"
-              :highlight="iso3"
-              @select="(c) => router.push({ name: 'country', params: { iso3: c }, query: route.query })"
-            />
-          </QueryState>
-          <ScaleLegend
-            :color="scale"
-            :low="t('country.alwaysOpposed')"
-            :high="t('country.alwaysAgreed')"
-            :center="centred && average != null ? { value: average, label: t('country.average', { name: name(iso3), value: n(average, 'score') }) } : null"
-            :no-data="t('country.noSharedVote')"
+      <ChartFrame id="map" :legend="mapLegend" :title="t('country.mapTitle', { name: name(iso3) })" :description="t('country.mapText')">
+        <template #controls>
+          <label class="check">
+            <input v-model="centred" type="checkbox" :disabled="average == null" />
+            {{ t('country.centre') }}
+          </label>
+        </template>
+        <QueryState
+          :loading="map.isLoading.value"
+          :fetching="map.isFetching.value"
+          :error="map.error.value"
+          @retry="map.refetch()"
+        >
+          <WorldMap
+            :fill="fill"
+            :tooltip="mapTooltip"
+            :highlight="iso3"
+            @select="(c) => router.push({ name: 'country', params: { iso3: c }, query: route.query })"
           />
-          <template #table>
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th scope="col">{{ t('country.country') }}</th>
-                  <th scope="col" class="numeric">{{ t('country.agreementCol') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="row in mapRows" :key="row.country">
-                  <td>{{ row.name }}</td>
-                  <td class="numeric" :data-value="row.score ?? ''">{{ n(row.score ?? 0, 'score') }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </template>
-          <template #note>
-            <p>{{ t('country.mapNote') }} {{ t('map.disclaimer') }}</p>
-          </template>
-        </ChartFrame>
+        </QueryState>
+        <ScaleLegend
+          :color="scale"
+          :low="t('country.alwaysOpposed')"
+          :high="t('country.alwaysAgreed')"
+          :center="centred && average != null ? { value: average, label: t('country.average', { name: name(iso3), value: n(average, 'score') }) } : null"
+          :no-data="t('country.noSharedVote')"
+        />
+        <template #table>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th scope="col">{{ t('country.country') }}</th>
+                <th scope="col" class="numeric">{{ t('country.agreementCol') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in mapRows" :key="row.country">
+                <td>{{ row.name }}</td>
+                <td class="numeric" :data-value="row.score ?? ''">{{ n(row.score ?? 0, 'score') }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
+        <template #note>
+          <p>{{ t('country.mapNote') }} {{ t('map.disclaimer') }}</p>
+        </template>
+      </ChartFrame>
 
-        <section v-if="p" class="panel ranks">
+      <section v-if="p" class="panel ranks">
+        <div>
           <h3>{{ t('country.closest') }}</h3>
           <AgreementBars
             :rows="p.most_aligned.map((r) => ({ key: r.country, label: name(r.country), value: r.agreement, to: { name: 'country', params: { iso3: r.country }, query: route.query } }))"
           />
+        </div>
+        <div>
           <h3>{{ t('country.furthest') }}</h3>
           <AgreementBars
             :rows="p.least_aligned.map((r) => ({ key: r.country, label: name(r.country), value: r.agreement, to: { name: 'country', params: { iso3: r.country }, query: route.query } }))"
           />
-          <p class="hint">{{ t('country.ranksNote', { n: p.min_joint_votes }) }}</p>
-        </section>
-      </div>
+        </div>
+        <p class="hint">{{ t('country.ranksNote', { n: p.min_joint_votes }) }}</p>
+      </section>
     </section>
 
     <section v-if="show('bilateral')" class="section">
@@ -1008,25 +1010,26 @@ const membershipText = computed(() => {
   font-size: var(--text-xs);
 }
 
-.grid-agreement {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
-  gap: var(--space-5);
-  align-items: start;
-}
-
 .ranks {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-7);
+}
+
+.ranks > div {
+  display: grid;
   gap: var(--space-3);
+  align-content: start;
+}
+
+.ranks .hint {
+  grid-column: 1 / -1;
 }
 
 .ranks h3 {
   font-size: var(--text-lg);
 }
 
-.ranks h3 + :deep(.bars) {
-  margin-bottom: var(--space-3);
-}
 
 .check {
   display: inline-flex;
@@ -1085,8 +1088,8 @@ const membershipText = computed(() => {
   color: var(--muted);
 }
 
-@media (max-width: 960px) {
-  .grid-agreement {
+@media (max-width: 720px) {
+  .ranks {
     grid-template-columns: 1fr;
   }
 }
