@@ -1026,6 +1026,17 @@ const membershipText = computed(() => {
   grid-column: 1 / -1;
 }
 
+/* One line per name, so both lists keep the same row height; the full name is in the tooltip */
+.ranks :deep(.label) {
+  min-width: 0;
+}
+
+.ranks :deep(.label a) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .ranks h3 {
   font-size: var(--text-lg);
 }
