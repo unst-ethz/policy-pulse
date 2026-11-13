@@ -198,7 +198,7 @@ export function useTimeline(
 
 export function useAgreementBySubject(
   country: MaybeRefOrGetter<string>,
-  compare: MaybeRefOrGetter<string | null>,
+  compare: MaybeRefOrGetter<string[]>,
   range: MaybeRefOrGetter<{ from: number | null; to: number | null }>,
 ) {
   const lang = useLang()
@@ -211,7 +211,7 @@ export function useAgreementBySubject(
           params: {
             query: {
               country: toValue(country),
-              compare: toValue(compare)!,
+              compare: toValue(compare),
               start_date: from ? `${from}-01-01` : undefined,
               end_date: to ? `${to}-12-31` : undefined,
               lang: lang.value,
@@ -220,7 +220,7 @@ export function useAgreementBySubject(
         }),
       )
     },
-    enabled: computed(() => !!toValue(compare)),
+    enabled: computed(() => toValue(compare).length > 0),
     placeholderData: keepPreviousData,
   })
 }

@@ -146,46 +146,50 @@ def agreement_timeline(
 @router.get("/agreement/by-subject", response_model=schemas.AgreementBySubject)
 def agreement_by_subject(
     country: str,
-    compare: str,
+    compare: CompareParam,
     start_date: dt.date | None = None,
     end_date: dt.date | None = None,
     min_votes: Annotated[int, Query(ge=1)] = agreement.SUBJECT_MIN_VOTES,
     lang: LangParam = "en",
 ) -> schemas.AgreementBySubject:
-    """Agreement between two countries per thesaurus domain, best agreement first.
+    """Agreement with each compared country per thesaurus domain.
 
-    Uses the date range only: subjects are the dimension being compared.
+    Subjects come by mean agreement over the compared countries, best first. Uses the date
+    range only: subjects are the dimension being compared.
     """
     iso3 = known_country(country, "country")
-    other = known_country(compare, "compare")
-    if iso3 == other:
-        raise HTTPException(422, "`country` and `compare` must differ")
+    others = [c for c in country_list(compare, "compare") if c != iso3]
+    if not others:
+        raise HTTPException(422, "`compare` needs at least one other country")
     out = agreement.agreement_by_subject(
         data.query_engine,
         iso3,
-        other,
+        others,
         _iso(start_date),
         _iso(end_date),
         data.TOP_LEVEL_SUBJECTS,
         subject_labels(lang),
         min_votes=min_votes,
     )
+    subjects = []
     if len(out):
-        out = out.sort_values("agreement_score", ascending=False)
-    rows = out.to_dict("records")
-    return schemas.AgreementBySubject(
-        country=iso3,
-        compare=other,
-        min_votes=min_votes,
-        subjects=[
-            schemas.SubjectAgreement(
-                subject_id=r["subject_id"],
-                label=r["subject_label"],
-                agreement=r["agreement_score"],
-                shared_votes=r["total_votes"],
+        order = out.groupby("subject_id")["agreement_score"].mean().sort_values(ascending=False)
+        for subject_id in order.index:
+            rows = out[out["subject_id"] == subject_id]
+            subjects.append(
+                schemas.SubjectAgreement(
+                    subject_id=subject_id,
+                    label=rows["subject_label"].iloc[0],
+                    values={
+                        r["country"]: schemas.SessionValue(
+                            agreement=num(r["agreement_score"]), shared_votes=r["total_votes"]
+                        )
+                        for r in rows.to_dict("records")
+                    },
+                )
             )
-            for r in rows
-        ],
+    return schemas.AgreementBySubject(
+        country=iso3, compare=others, min_votes=min_votes, subjects=subjects
     )
 
 

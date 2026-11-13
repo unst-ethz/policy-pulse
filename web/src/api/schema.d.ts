@@ -168,7 +168,8 @@ export interface paths {
          * Export Resolutions
          * @description The filtered resolutions as CSV, with a named vote column per requested country.
          *
-         *     Applies dates, subjects and keyword; `country_mode` is ignored, as in the Dash download.
+         *     Applies dates, subjects and keyword; `country_mode` only with `apply_country`, as by default
+         *     in the Dash download.
          */
         get: operations["export_resolutions_api_v1_resolutions_csv_get"];
         put?: never;
@@ -297,9 +298,10 @@ export interface paths {
         };
         /**
          * Agreement By Subject
-         * @description Agreement between two countries per thesaurus domain, best agreement first.
+         * @description Agreement with each compared country per thesaurus domain.
          *
-         *     Uses the date range only: subjects are the dimension being compared.
+         *     Subjects come by mean agreement over the compared countries, best first. Uses the date
+         *     range only: subjects are the dimension being compared.
          */
         get: operations["agreement_by_subject_api_v1_agreement_by_subject_get"];
         put?: never;
@@ -466,7 +468,7 @@ export interface components {
             /** Country */
             country: string;
             /** Compare */
-            compare: string;
+            compare: string[];
             /** Min Votes */
             min_votes: number;
             /** Subjects */
@@ -1083,10 +1085,13 @@ export interface components {
             subject_id: string;
             /** Label */
             label: string;
-            /** Agreement */
-            agreement: number;
-            /** Shared Votes */
-            shared_votes: number;
+            /**
+             * Values
+             * @description Per compared country; a country with fewer than `min_votes` shared votes on the subject is left out
+             */
+            values: {
+                [key: string]: components["schemas"]["SessionValue"];
+            };
         };
         /** SubjectCount */
         SubjectCount: {
@@ -1495,6 +1500,8 @@ export interface operations {
                 votes?: string[] | null;
                 /** @description Language for country and subject names */
                 lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
+                /** @description Also apply `country`/`country_mode` (e.g. a country report) */
+                apply_country?: boolean;
                 /** @description Inclusive */
                 start_date?: string | null;
                 /** @description Inclusive */
@@ -1768,7 +1775,8 @@ export interface operations {
         parameters: {
             query: {
                 country: string;
-                compare: string;
+                /** @description ISO3 codes to compare with (repeatable or comma-separated) */
+                compare: string[];
                 start_date?: string | null;
                 end_date?: string | null;
                 min_votes?: number;

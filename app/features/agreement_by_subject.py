@@ -26,9 +26,10 @@ def calculate_agreement(query_engine, c1, c2, start_date, end_date, subject_list
 
     Returns a DataFrame with columns: subject_id, subject_label, agreement_score, total_votes
     """
-    return agreement.agreement_by_subject(
-        query_engine, c1, c2, start_date, end_date, subject_list, subject_map, MIN_VOTES_THRESHOLD
+    out = agreement.agreement_by_subject(
+        query_engine, c1, [c2], start_date, end_date, subject_list, subject_map, MIN_VOTES_THRESHOLD
     )
+    return out.drop(columns="country", errors="ignore")
 
 
 def register_callbacks(query_engine):

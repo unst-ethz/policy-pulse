@@ -6,7 +6,7 @@ Yes-vs-No, 0.5 per step of difference in between) and `query_multilateral_stats`
 """
 
 import logging
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -168,17 +168,18 @@ def session_agreement(
 def agreement_by_subject(
     engine: ResolutionQueryEngine,
     country: str,
-    other: str,
+    others: Sequence[str],
     start_date: str | None,
     end_date: str | None,
     subject_ids: Iterable[str],
     subject_labels: Mapping[str, str],
     min_votes: int = SUBJECT_MIN_VOTES,
 ) -> pd.DataFrame:
-    """Mean agreement between two countries per subject (descendants included), in a date range.
+    """Mean agreement of a country with each of `others` per subject (descendants included).
 
-    Returns columns `subject_id`, `subject_label`, `agreement_score` (0..1), `total_votes` — only
-    subjects with at least `min_votes` shared votes, ordered by subject id. Empty if none qualify.
+    Returns columns `subject_id`, `subject_label`, `country` (the other country),
+    `agreement_score` (0..1), `total_votes` — only pairs with at least `min_votes` shared votes,
+    ordered by subject id, then in the order of `others`. Empty if none qualify.
     """
     all_resolutions = engine.query_resolutions(start_date=start_date, end_date=end_date)
     if all_resolutions.empty:
@@ -189,10 +190,11 @@ def agreement_by_subject(
         resolution_ids=all_resolutions["undl_id"].tolist(),
         average=False,
     )
-    if agreement_df.empty or other not in agreement_df.columns:
+    columns = [c for c in others if c != country and c in agreement_df.columns]
+    if agreement_df.empty or not columns:
         return pd.DataFrame()
 
-    agreement_df = agreement_df[["undl_id", other]].rename(columns={other: "agreement_score"})
+    agreement_df = agreement_df.set_index("undl_id")[columns]
     resolution_subject_df = engine.resolution_subject_table
     closure = engine.closure_table
 
@@ -205,22 +207,22 @@ def agreement_by_subject(
             resolution_subject_df["subject_id"].isin(subject_filter)
         ]["undl_id"].unique()
 
-        subject_agreements = agreement_df[
-            agreement_df["undl_id"].isin(subject_resolution_ids)
-        ].dropna(subset=["agreement_score"])
-
-        total_votes = len(subject_agreements)
-        if total_votes < min_votes or total_votes == 0:
-            continue
-
-        results.append(
-            {
-                "subject_id": subject_id,
-                "subject_label": subject_labels.get(subject_id, f"ID: {subject_id}"),
-                "agreement_score": subject_agreements["agreement_score"].mean(),
-                "total_votes": total_votes,
-            }
-        )
+        subject_agreements = agreement_df[agreement_df.index.isin(subject_resolution_ids)]
+        counts = subject_agreements.count()
+        means = subject_agreements.mean()
+        for other in columns:
+            total_votes = int(counts[other])
+            if total_votes < min_votes or total_votes == 0:
+                continue
+            results.append(
+                {
+                    "subject_id": subject_id,
+                    "subject_label": subject_labels.get(subject_id, f"ID: {subject_id}"),
+                    "country": other,
+                    "agreement_score": means[other],
+                    "total_votes": total_votes,
+                }
+            )
 
     return pd.DataFrame(results)
 

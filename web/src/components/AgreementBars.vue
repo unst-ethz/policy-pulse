@@ -15,7 +15,7 @@ const { n } = useI18n()
 <template>
   <ol class="bars">
     <li v-for="row in rows" :key="row.key" class="row">
-      <span class="label">
+      <span class="label" :title="row.label">
         <RouterLink v-if="row.to" :to="row.to">{{ row.label }}</RouterLink>
         <template v-else>{{ row.label }}</template>
         <small v-if="row.detail">{{ row.detail }}</small>
