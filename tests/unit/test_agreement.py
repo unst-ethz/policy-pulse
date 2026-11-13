@@ -63,7 +63,7 @@ def test_session_agreement_needs_another_country(engine):
 def test_agreement_by_subject_includes_descendants(engine):
     labels = {PEACE: "PEACE", DISARMAMENT: "DISARMAMENT"}
     out = agreement.agreement_by_subject(
-        engine, "AAA", "BBB", None, None, [PEACE, ENVIRONMENT, DISARMAMENT], labels, min_votes=1
+        engine, "AAA", ["BBB"], None, None, [PEACE, ENVIRONMENT, DISARMAMENT], labels, min_votes=1
     )
     assert out["subject_id"].tolist() == [DISARMAMENT, ENVIRONMENT, PEACE]
     assert out["subject_label"].tolist() == ["DISARMAMENT", f"ID: {ENVIRONMENT}", "PEACE"]
@@ -73,15 +73,25 @@ def test_agreement_by_subject_includes_descendants(engine):
 
 def test_agreement_by_subject_drops_thin_subjects(engine):
     out = agreement.agreement_by_subject(
-        engine, "AAA", "BBB", None, None, [PEACE, ENVIRONMENT], {}, min_votes=2
+        engine, "AAA", ["BBB"], None, None, [PEACE, ENVIRONMENT], {}, min_votes=2
     )
     assert out["subject_id"].tolist() == [PEACE]
-    assert agreement.agreement_by_subject(engine, "AAA", "BBB", None, None, [PEACE], {}).empty
+    assert agreement.agreement_by_subject(engine, "AAA", ["BBB"], None, None, [PEACE], {}).empty
+
+
+def test_agreement_by_subject_with_several_countries(engine):
+    out = agreement.agreement_by_subject(
+        engine, "AAA", ["BBB", "AAA", "DDD", "ZZZ"], None, None, [PEACE], {}, min_votes=1
+    )
+    # Itself and unknown countries are skipped; one row per qualifying (subject, country) pair
+    assert out["country"].tolist() == ["BBB", "DDD"]
+    bbb = out[out["country"] == "BBB"].iloc[0]
+    assert (bbb["agreement_score"], bbb["total_votes"]) == (pytest.approx(2 / 3), 3)
 
 
 def test_agreement_by_subject_respects_dates(engine):
     out = agreement.agreement_by_subject(
-        engine, "AAA", "BBB", "2001-01-01", None, [PEACE], {}, min_votes=1
+        engine, "AAA", ["BBB"], "2001-01-01", None, [PEACE], {}, min_votes=1
     )
     assert out["total_votes"].tolist() == [2]  # 103 and 104; 105 has no votes
 

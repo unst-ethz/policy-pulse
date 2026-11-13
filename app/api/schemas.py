@@ -162,13 +162,15 @@ class AgreementTimeline(BaseModel):
 class SubjectAgreement(BaseModel):
     subject_id: str
     label: str
-    agreement: float
-    shared_votes: int
+    values: dict[str, SessionValue] = Field(
+        description="Per compared country; a country with fewer than `min_votes` shared votes "
+        "on the subject is left out"
+    )
 
 
 class AgreementBySubject(BaseModel):
     country: str
-    compare: str
+    compare: list[str]
     min_votes: int
     subjects: list[SubjectAgreement]
 

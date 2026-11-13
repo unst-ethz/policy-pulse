@@ -290,9 +290,19 @@ def test_timeline(client):
 
 def test_by_subject_is_sorted_and_thresholded(client):
     result = get(client, "/api/v1/agreement/by-subject?country=USA&compare=GBR&min_votes=50")
-    agreements = [s["agreement"] for s in result["subjects"]]
+    agreements = [s["values"]["GBR"]["agreement"] for s in result["subjects"]]
     assert agreements == sorted(agreements, reverse=True)
-    assert all(s["shared_votes"] >= 50 for s in result["subjects"])
+    assert all(s["values"]["GBR"]["shared_votes"] >= 50 for s in result["subjects"])
+
+
+def test_by_subject_compares_several_countries(client):
+    result = get(
+        client, "/api/v1/agreement/by-subject?country=USA&compare=GBR,CHN,USA&min_votes=50"
+    )
+    assert result["compare"] == ["GBR", "CHN"]
+    values = [v for s in result["subjects"] for v in s["values"].values()]
+    assert {c for s in result["subjects"] for c in s["values"]} == {"GBR", "CHN"}
+    assert all(0 <= v["agreement"] <= 1 and v["shared_votes"] >= 50 for v in values)
 
 
 def test_word_cloud_category_terms_carry_subject_ids(client):

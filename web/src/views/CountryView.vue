@@ -155,9 +155,16 @@ const topicWith = computed({
   get: () => (route.query.with as string | undefined) ?? compare.value[0] ?? null,
   set: (value: string | null) => setParam('with', value ?? undefined),
 })
-const bySubject = useAgreementBySubject(() => props.iso3, topicWith, range)
+const bySubject = useAgreementBySubject(() => props.iso3, () => (topicWith.value ? [topicWith.value] : []), range)
+// One country for now: its value for each subject
+const topics = computed(() =>
+  (bySubject.data.value?.subjects ?? []).flatMap((s) => {
+    const v = topicWith.value ? s.values[topicWith.value] : undefined
+    return v?.agreement == null ? [] : [{ subject_id: s.subject_id, label: s.label, agreement: v.agreement, shared_votes: v.shared_votes }]
+  }),
+)
 const subjectRows = computed(() =>
-  (bySubject.data.value?.subjects ?? []).map((s) => ({
+  topics.value.map((s) => ({
     key: s.subject_id,
     label: sentenceCase(s.label),
     value: s.agreement,
@@ -364,8 +371,8 @@ const downloadPdf = () =>
           7.5,
           PDF_COLORS.muted,
         )
-        if (topicWith.value && bySubject.data.value?.subjects.length) {
-          const rows = bySubject.data.value.subjects
+        if (topicWith.value && topics.value.length) {
+          const rows = topics.value
           pdf.subheading(`${t('country.topicsTitle')}: ${name(props.iso3)} – ${name(topicWith.value)}`)
           pdf.paragraph(t('country.topicsText'))
           pdf.table({
@@ -769,7 +776,7 @@ const membershipText = computed(() => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="s in bySubject.data.value?.subjects ?? []" :key="s.subject_id">
+              <tr v-for="s in topics" :key="s.subject_id">
                 <td>{{ sentenceCase(s.label) }}</td>
                 <td class="numeric" :data-value="s.agreement ?? ''">{{ s.agreement == null ? '' : n(s.agreement, 'score') }}</td>
                 <td class="numeric" :data-value="s.shared_votes">{{ n(s.shared_votes) }}</td>
