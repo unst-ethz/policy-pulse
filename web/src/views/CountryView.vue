@@ -19,10 +19,10 @@ import {
 import AgreementBars from '@/components/AgreementBars.vue'
 import ChartFrame from '@/components/ChartFrame.vue'
 import CountryList from '@/components/CountryList.vue'
-import CountryPicker from '@/components/CountryPicker.vue'
 import FacetLayout from '@/components/facets/FacetLayout.vue'
 import QueryState from '@/components/QueryState.vue'
 import ScaleLegend from '@/components/ScaleLegend.vue'
+import SubjectHeatmap from '@/components/SubjectHeatmap.vue'
 import TimelineChart from '@/components/TimelineChart.vue'
 import type { TimelineSeries } from '@/charts/types'
 import VoteBar from '@/components/VoteBar.vue'
@@ -73,12 +73,17 @@ const requested = computed({
   get: () => listParam('compare'),
   set: (value: string[]) => setParam('compare', value),
 })
-const profile = useProfile(() => props.iso3, scope, requested)
+// The profile's own default comparison is unused here: the defaults below come from its rankings
+const profile = useProfile(() => props.iso3, scope, () => [])
 const p = computed(() => profile.data.value)
 
-// What the comparison charts use: what was asked for, else the profile's default (the P5).
+// What the comparison charts use: what was asked for, else the two states that vote most and the
+// two that vote least like it, for a contrast from the start. Only while nothing was picked, so
+// changing the filters never replaces a choice.
 const compare = computed(() =>
-  requested.value.length ? requested.value : (p.value?.comparison ?? []).filter((c) => c !== props.iso3),
+  requested.value.length
+    ? requested.value
+    : [...new Set([...(p.value?.most_aligned ?? []).slice(0, 2), ...(p.value?.least_aligned ?? []).slice(0, 2)].map((r) => r.country))],
 )
 const compareModel = computed({
   get: () => compare.value,
@@ -151,27 +156,19 @@ const series = computed<TimelineSeries[]>(() =>
 )
 
 // --- by topic -----------------------------------------------------------------------------
-const topicWith = computed({
-  get: () => (route.query.with as string | undefined) ?? compare.value[0] ?? null,
-  set: (value: string | null) => setParam('with', value ?? undefined),
-})
-const bySubject = useAgreementBySubject(() => props.iso3, () => (topicWith.value ? [topicWith.value] : []), range)
-// One country for now: its value for each subject
-const topics = computed(() =>
-  (bySubject.data.value?.subjects ?? []).flatMap((s) => {
-    const v = topicWith.value ? s.values[topicWith.value] : undefined
-    return v?.agreement == null ? [] : [{ subject_id: s.subject_id, label: s.label, agreement: v.agreement, shared_votes: v.shared_votes }]
-  }),
+const bySubject = useAgreementBySubject(() => props.iso3, compare, range)
+// Fixed 0-1 scale with the neutral middle at 0.5, the same colours as the map
+const topicScale = computed(() => divergingScale(colors.no, colors['scale-mid'], colors.yes))
+const topicColumns = computed(() => series.value.length
+  ? compare.value.map((c) => ({ key: c, label: name(c), color: seriesColors.value[c] ?? seriesColor(0) }))
+  : compare.value.map((c, i) => ({ key: c, label: name(c), color: seriesColor(i) })),
 )
-const subjectRows = computed(() =>
-  topics.value.map((s) => ({
-    key: s.subject_id,
-    label: sentenceCase(s.label),
-    value: s.agreement,
-    detail: t('country.sharedVotes', { n: s.shared_votes }),
-    to: { name: 'resolutions', query: { subject: s.subject_id, country: props.iso3, mode: 'voted' } },
-  })),
+const topicRows = computed(() =>
+  (bySubject.data.value?.subjects ?? []).map((s) => ({ key: s.subject_id, label: sentenceCase(s.label), values: s.values })),
 )
+// A cell opens what lowers its score: the resolutions on the topic where the two voted differently
+const openTopic = (subject: string, other: string) =>
+  router.push({ name: 'resolutions', query: { ...years.value, subject, group: [props.iso3, other], together: 'split', allvoted: '1' } })
 
 // --- sponsorship ---------------------------------------------------------------------------
 const sponsorship = useSponsorship(() => props.iso3, scope)
@@ -223,6 +220,15 @@ const mapLegend = computed(() => ({
         ? { at: average.value, label: t('country.average', { name: name(props.iso3), value: n(average.value, 'score') }) }
         : undefined,
     noData: { color: colors.surface, label: t('country.noSharedVote') },
+  },
+}))
+const topicLegend = computed(() => ({
+  items: topicColumns.value.map((c) => ({ label: c.label, color: c.color, shape: 'line' as const })),
+  scale: {
+    colors: Array.from({ length: 11 }, (_, i) => topicScale.value(i / 10)),
+    low: t('country.alwaysOpposed'),
+    high: t('country.alwaysAgreed'),
+    noData: { color: colors.surface, label: t('country.tooFewVotes') },
   },
 }))
 const timelineLegend = computed(() => ({
@@ -308,7 +314,6 @@ const downloadPdf = () =>
         [t('report.years'), yearsText],
         [t('report.subjects'), subjectLabels.value.join('; ') || t('report.allSubjects')],
         [t('report.comparedWith'), compare.value.map(name).join(', ') || '–'],
-        [t('report.topicsWith'), topicWith.value ? name(topicWith.value) : '–'],
         [t('report.dataAsOf'), dataDate],
         [t('report.generated'), d(new Date(), 'long')],
         [t('report.link'), window.location.href],
@@ -371,17 +376,8 @@ const downloadPdf = () =>
           7.5,
           PDF_COLORS.muted,
         )
-        if (topicWith.value && topics.value.length) {
-          const rows = topics.value
-          pdf.subheading(`${t('country.topicsTitle')}: ${name(props.iso3)} – ${name(topicWith.value)}`)
-          pdf.paragraph(t('country.topicsText'))
-          pdf.table({
-            head: [t('report.subjectCol'), '', t('country.agreementCol'), t('report.sharedVotesCol')],
-            rows: rows.map((s) => [sentenceCase(s.label), '', score(s.agreement), n(s.shared_votes)]),
-            numeric: [2, 3],
-            bar: { column: 1, values: rows.map((s) => s.agreement) },
-          })
-        }
+        await chart('topics')
+        pdf.paragraph(t('country.topicsNote', { n: bySubject.data.value?.min_votes ?? 30 }), 7.5, PDF_COLORS.muted)
       }
 
       if (show('notable') && p.value) {
@@ -476,7 +472,6 @@ const downloadReport = () =>
       },
       settings: {
         compare_with: compare.value,
-        topics_compared_with: topicWith.value,
         special_sessions: specialSessions.value,
         map_centred_on_average: centred.value,
       },
@@ -690,6 +685,7 @@ const membershipText = computed(() => {
           <p>{{ t('country.bilateralLead') }}</p>
         </div>
       </div>
+      <CountryList v-model="compareModel" :label="t('country.compareWith')" :colors="seriesColors" :exclude="[iso3]" />
       <ChartFrame
         id="timeline"
         :export-title="t('country.timelineExportTitle', { name: name(iso3) })"
@@ -703,7 +699,6 @@ const membershipText = computed(() => {
             {{ t('country.specialSessions') }}
           </label>
         </template>
-        <CountryList v-model="compareModel" :label="t('country.compareWith')" :colors="seriesColors" :exclude="[iso3]" />
         <QueryState
           :loading="timeline.isLoading.value"
           :fetching="timeline.isFetching.value"
@@ -750,39 +745,56 @@ const membershipText = computed(() => {
 
       <ChartFrame
         id="topics"
+        :export-title="t('country.topicsExportTitle', { name: name(iso3) })"
+        :legend="topicLegend"
         :title="t('country.topicsTitle')"
         :description="t('country.topicsText')"
       >
-        <template #controls>
-          <CountryPicker v-model="topicWith" :label="t('country.compareWith')" :exclude="[iso3]" class="with" />
-        </template>
         <QueryState
           :loading="bySubject.isLoading.value"
           :fetching="bySubject.isFetching.value"
           :error="bySubject.error.value"
-          :empty="!topicWith || subjectRows.length === 0"
-          :empty-text="topicWith ? t('country.topicsEmpty') : t('country.pickCountry')"
+          :empty="!compare.length || topicRows.length === 0"
+          :empty-text="compare.length ? t('country.topicsEmpty') : t('country.addCountry')"
+          min-height="200px"
           @retry="bySubject.refetch()"
         >
-          <AgreementBars :rows="subjectRows" />
+          <SubjectHeatmap :columns="topicColumns" :rows="topicRows" :color="topicScale" @select="openTopic" />
         </QueryState>
+        <ScaleLegend
+          :color="topicScale"
+          :low="t('country.alwaysOpposed')"
+          :high="t('country.alwaysAgreed')"
+          :no-data="t('country.tooFewVotes')"
+        />
         <template #table>
           <table class="data-table">
             <thead>
               <tr>
                 <th scope="col">{{ t('report.subjectCol') }}</th>
-                <th scope="col" class="numeric">{{ t('country.agreementCol') }}</th>
-                <th scope="col" class="numeric">{{ t('report.sharedVotesCol') }}</th>
+                <template v-for="c in topicColumns" :key="c.key">
+                  <th scope="col" class="numeric">{{ c.label }}</th>
+                  <th scope="col" class="numeric">{{ t('country.sharedVotesOf', { name: c.label }) }}</th>
+                </template>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="s in topics" :key="s.subject_id">
-                <td>{{ sentenceCase(s.label) }}</td>
-                <td class="numeric" :data-value="s.agreement ?? ''">{{ s.agreement == null ? '' : n(s.agreement, 'score') }}</td>
-                <td class="numeric" :data-value="s.shared_votes">{{ n(s.shared_votes) }}</td>
+              <tr v-for="row in topicRows" :key="row.key">
+                <td>{{ row.label }}</td>
+                <template v-for="c in topicColumns" :key="c.key">
+                  <td class="numeric" :data-value="row.values[c.key]?.agreement ?? ''">
+                    {{ row.values[c.key]?.agreement == null ? '' : n(row.values[c.key]!.agreement!, 'score') }}
+                  </td>
+                  <td class="numeric" :data-value="row.values[c.key]?.shared_votes ?? ''">
+                    {{ row.values[c.key] ? n(row.values[c.key]!.shared_votes) : '' }}
+                  </td>
+                </template>
               </tr>
             </tbody>
           </table>
+        </template>
+        <template #note>
+          <p>{{ t('country.topicsNote', { n: bySubject.data.value?.min_votes ?? 30 }) }}</p>
         </template>
       </ChartFrame>
     </section>
@@ -1059,10 +1071,6 @@ const membershipText = computed(() => {
 
 .check input {
   accent-color: var(--ink);
-}
-
-.with {
-  width: 240px;
 }
 
 .reception {

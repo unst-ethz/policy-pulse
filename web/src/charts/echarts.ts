@@ -1,11 +1,12 @@
 /** ECharts, registered piecewise so only what the app draws ends up in the bundle. */
-import { BarChart, LineChart, MapChart, ScatterChart } from 'echarts/charts'
+import { BarChart, HeatmapChart, LineChart, MapChart, ScatterChart } from 'echarts/charts'
 import {
   GeoComponent,
   GridComponent,
   LegendComponent,
   MarkLineComponent,
   TooltipComponent,
+  VisualMapContinuousComponent,
 } from 'echarts/components'
 import * as echarts from 'echarts/core'
 import { SVGRenderer } from 'echarts/renderers'
@@ -14,6 +15,7 @@ import type { FeatureCollection } from 'geojson'
 
 echarts.use([
   BarChart,
+  HeatmapChart,
   LineChart,
   MapChart,
   ScatterChart,
@@ -22,6 +24,7 @@ echarts.use([
   LegendComponent,
   MarkLineComponent,
   TooltipComponent,
+  VisualMapContinuousComponent,
   SVGRenderer,
 ])
 
