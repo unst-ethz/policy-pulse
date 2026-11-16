@@ -1,0 +1,363 @@
+<?xml version='1.0' encoding='utf-8'?>
+<collection xmlns="http://www.loc.gov/MARC21/slim"><record>
+  <controlfield tag="001">35651</controlfield>
+  <controlfield tag="005">20261109110617.0</controlfield>
+  <datafield tag="020" ind1=" " ind2=" ">
+    <subfield code="a">HRCvote</subfield>
+  </datafield>
+  <datafield tag="040" ind1=" " ind2=" ">
+    <subfield code="a">CH-GeUNH</subfield>
+    <subfield code="b">eng</subfield>
+  </datafield>
+  <datafield tag="245" ind1="1" ind2="0">
+    <subfield code="a">Situation of human rights in the Bolivarian Republic of Venezuela :</subfield>
+    <subfield code="b">resolution /</subfield>
+    <subfield code="c">adopted by the Human Rights Council at its 63rd session</subfield>
+  </datafield>
+  <datafield tag="269" ind1=" " ind2=" ">
+    <subfield code="a">20260924</subfield>
+  </datafield>
+  <datafield tag="500" ind1=" " ind2=" ">
+    <subfield code="a">Main sponsors : Chile, Argentina, Canada, Ecuador, Guatemala, Paraguay, Uruguay</subfield>
+  </datafield>
+  <datafield tag="591" ind1=" " ind2=" ">
+    <subfield code="a">RECORDED</subfield>
+  </datafield>
+  <datafield tag="791" ind1=" " ind2=" ">
+    <subfield code="a">A/HRC/RES/63/24</subfield>
+    <subfield code="b">A/HRC/</subfield>
+    <subfield code="c">63</subfield>
+    <subfield code="q">AHRCRES6324</subfield>
+    <subfield code="r">AHRC63</subfield>
+  </datafield>
+  <datafield tag="793" ind1="0" ind2=" ">
+    <subfield code="v">PLENARY MEETING</subfield>
+  </datafield>
+  <datafield tag="856" ind1="4" ind2=" ">
+    <subfield code="u">http://undocs.org/A/HRC/63/L.18</subfield>
+    <subfield code="y">Draft resolution</subfield>
+    <subfield code="q">Electronic Collections</subfield>
+  </datafield>
+  <datafield tag="856" ind1="4" ind2=" ">
+    <subfield code="u">http://undocs.org/A/HRC/RES/63/24</subfield>
+    <subfield code="y">Resolution</subfield>
+    <subfield code="q">Electronic Collections</subfield>
+  </datafield>
+  <datafield tag="930" ind1=" " ind2=" ">
+    <subfield code="a">VOT</subfield>
+  </datafield>
+  <datafield tag="952" ind1=" " ind2=" ">
+    <subfield code="a">Adopted at the 42nd meeting</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">1</subfield>
+    <subfield code="b">ALB</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">ALBANIA</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">2</subfield>
+    <subfield code="b">AGO</subfield>
+    <subfield code="d">A</subfield>
+    <subfield code="e">ANGOLA</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">3</subfield>
+    <subfield code="b">BEN</subfield>
+    <subfield code="d">A</subfield>
+    <subfield code="e">BENIN</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">4</subfield>
+    <subfield code="b">BOL</subfield>
+    <subfield code="d">A</subfield>
+    <subfield code="e">BOLIVIA</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">5</subfield>
+    <subfield code="b">BRA</subfield>
+    <subfield code="d">A</subfield>
+    <subfield code="e">BRAZIL</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">6</subfield>
+    <subfield code="b">BGR</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">BULGARIA</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">7</subfield>
+    <subfield code="b">BDI</subfield>
+    <subfield code="d">N</subfield>
+    <subfield code="e">BURUNDI</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">8</subfield>
+    <subfield code="b">CHL</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">CHILE</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">9</subfield>
+    <subfield code="b">CHN</subfield>
+    <subfield code="d">N</subfield>
+    <subfield code="e">CHINA</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">10</subfield>
+    <subfield code="b">COL</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">COLOMBIA</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">11</subfield>
+    <subfield code="b">CIV</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">COTE D'IVOIRE</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">12</subfield>
+    <subfield code="b">CUB</subfield>
+    <subfield code="d">N</subfield>
+    <subfield code="e">CUBA</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">13</subfield>
+    <subfield code="b">CYP</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">CYPRUS</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">14</subfield>
+    <subfield code="b">CZE</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">CZECH REPUBLIC</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">15</subfield>
+    <subfield code="b">COD</subfield>
+    <subfield code="d">A</subfield>
+    <subfield code="e">DEMOCRATIC REPUBLIC OF THE CONGO</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">16</subfield>
+    <subfield code="b">DOM</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">DOMINICAN REPUBLIC</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">17</subfield>
+    <subfield code="b">ECU</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">ECUADOR</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">18</subfield>
+    <subfield code="b">EGY</subfield>
+    <subfield code="d">N</subfield>
+    <subfield code="e">EGYPT</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">19</subfield>
+    <subfield code="b">EST</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">ESTONIA</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">20</subfield>
+    <subfield code="b">ETH</subfield>
+    <subfield code="d">A</subfield>
+    <subfield code="e">ETHIOPIA</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">21</subfield>
+    <subfield code="b">FRA</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">FRANCE</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">22</subfield>
+    <subfield code="b">GMB</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">GAMBIA</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">23</subfield>
+    <subfield code="b">GHA</subfield>
+    <subfield code="d">A</subfield>
+    <subfield code="e">GHANA</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">24</subfield>
+    <subfield code="b">ISL</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">ICELAND</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">25</subfield>
+    <subfield code="b">IND</subfield>
+    <subfield code="d">A</subfield>
+    <subfield code="e">INDIA</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">26</subfield>
+    <subfield code="b">IDN</subfield>
+    <subfield code="d">A</subfield>
+    <subfield code="e">INDONESIA</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">27</subfield>
+    <subfield code="b">IRQ</subfield>
+    <subfield code="d">A</subfield>
+    <subfield code="e">IRAQ</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">28</subfield>
+    <subfield code="b">ITA</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">ITALY</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">29</subfield>
+    <subfield code="b">JPN</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">JAPAN</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">30</subfield>
+    <subfield code="b">KEN</subfield>
+    <subfield code="d">A</subfield>
+    <subfield code="e">KENYA</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">31</subfield>
+    <subfield code="b">KWT</subfield>
+    <subfield code="d">A</subfield>
+    <subfield code="e">KUWAIT</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">32</subfield>
+    <subfield code="b">MWI</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">MALAWI</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">33</subfield>
+    <subfield code="b">MHL</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">MARSHALL ISLANDS</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">34</subfield>
+    <subfield code="b">MUS</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">MAURITIUS</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">35</subfield>
+    <subfield code="b">MEX</subfield>
+    <subfield code="d">A</subfield>
+    <subfield code="e">MEXICO</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">36</subfield>
+    <subfield code="b">NLD</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">NETHERLANDS</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">37</subfield>
+    <subfield code="b">MKD</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">NORTH MACEDONIA</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">38</subfield>
+    <subfield code="b">PAK</subfield>
+    <subfield code="d">A</subfield>
+    <subfield code="e">PAKISTAN</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">39</subfield>
+    <subfield code="b">QAT</subfield>
+    <subfield code="d">A</subfield>
+    <subfield code="e">QATAR</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">40</subfield>
+    <subfield code="b">KOR</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">REPUBLIC OF KOREA</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">41</subfield>
+    <subfield code="b">SVN</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">SLOVENIA</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">42</subfield>
+    <subfield code="b">ZAF</subfield>
+    <subfield code="d">A</subfield>
+    <subfield code="e">SOUTH AFRICA</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">43</subfield>
+    <subfield code="b">ESP</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">SPAIN</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">44</subfield>
+    <subfield code="b">CHE</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">SWITZERLAND</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">45</subfield>
+    <subfield code="b">THA</subfield>
+    <subfield code="d">A</subfield>
+    <subfield code="e">THAILAND</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">46</subfield>
+    <subfield code="b">GBR</subfield>
+    <subfield code="d">Y</subfield>
+    <subfield code="e">UNITED KINGDOM</subfield>
+  </datafield>
+  <datafield tag="967" ind1=" " ind2=" ">
+    <subfield code="a">47</subfield>
+    <subfield code="b">VNM</subfield>
+    <subfield code="d">N</subfield>
+    <subfield code="e">VIET NAM</subfield>
+  </datafield>
+  <datafield tag="980" ind1=" " ind2=" ">
+    <subfield code="a">Voting Collection</subfield>
+  </datafield>
+  <datafield tag="981" ind1=" " ind2=" ">
+    <subfield code="a">Human Rights Council</subfield>
+  </datafield>
+  <datafield tag="985" ind1=" " ind2=" ">
+    <subfield code="a">VOTING</subfield>
+  </datafield>
+  <datafield tag="991" ind1=" " ind2=" ">
+    <subfield code="a">A/HRC/63/1-</subfield>
+    <subfield code="b">4.</subfield>
+    <subfield code="c">Human rights situations that require the Council’s attention. -</subfield>
+    <subfield code="d">VENEZUELA (BOLIVARIAN REPUBLIC OF)</subfield>
+  </datafield>
+  <datafield tag="992" ind1="1" ind2=" ">
+    <subfield code="a">20260924</subfield>
+  </datafield>
+  <datafield tag="993" ind1=" " ind2=" ">
+    <subfield code="a">Draft resolution A/HRC/63/L.18</subfield>
+  </datafield>
+  <datafield tag="996" ind1=" " ind2=" ">
+    <subfield code="b">25</subfield>
+    <subfield code="c">5</subfield>
+    <subfield code="d">17</subfield>
+    <subfield code="e">0</subfield>
+    <subfield code="f">47</subfield>
+  </datafield>
+</record>
+</collection>
