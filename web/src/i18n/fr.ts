@@ -19,7 +19,7 @@ const fr: typeof en = {
     source:
       "Votes issus de la Bibliothèque numérique des Nations Unies, sujets du Thésaurus UNBIS.",
     method: 'Comment les scores sont calculés',
-    team: "Un prototype de l'UN-ETH Student Team de l'ETH Zurich.",
+    team: "Un prototype de l'UN Student Team de l'ETH Zurich.",
   },
   vote: {
     Y: 'Pour',
@@ -488,7 +488,7 @@ const fr: typeof en = {
     keywords: "Les mots-clés ont été extraits automatiquement des titres et regroupés en thèmes, lieux et acteurs, et actions. Ils décrivent les titres, pas les textes complets.",
     mapsTitle: 'Cartes',
     teamTitle: 'Qui a réalisé ce site',
-    team: "Policy Pulse est un prototype de l'UN-ETH Student Team de l'ETH Zurich, réalisé avec des partenaires des Nations Unies.",
+    team: "Policy Pulse est un prototype de l'UN Student Team de l'ETH Zurich, réalisé avec des partenaires des Nations Unies.",
   },
   notFound: {
     title: "Cette page n'existe pas",

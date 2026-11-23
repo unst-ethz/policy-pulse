@@ -1,6 +1,6 @@
 # Policy Pulse
 
-Policy Pulse is a project by the UN-ETH Student Team on creating a powerful interactive data analysis platform for UN voting records.
+Policy Pulse is a project of the UN-ETH Student Team that aims to create a powerful interactive data analysis platform for UN voting records.
 
 Website: http://unst-dev.vsos.ethz.ch/
 

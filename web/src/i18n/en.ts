@@ -17,7 +17,7 @@ export default {
     source:
       'Votes from the United Nations Digital Library, subjects from the UNBIS Thesaurus.',
     method: 'How the scores are calculated',
-    team: 'A prototype by the UN-ETH Student Team at ETH Zurich.',
+    team: 'A prototype by the UN Student Team at ETH Zurich.',
   },
   vote: {
     Y: 'Yes',
@@ -487,7 +487,7 @@ export default {
     keywords: 'Keywords were extracted automatically from resolution titles and grouped into themes, places and actors, and actions. They describe titles, not full texts.',
     mapsTitle: 'Maps',
     teamTitle: 'Who made this',
-    team: 'Policy Pulse is a prototype by the UN-ETH Student Team at ETH Zurich, built with partners at the United Nations.',
+    team: 'Policy Pulse is a prototype by the UN Student Team at ETH Zurich, built with partners at the United Nations.',
   },
   notFound: {
     title: 'This page does not exist',
