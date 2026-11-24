@@ -33,10 +33,8 @@ class ResolutionQueryEngine:
     # Data handle
     #
     # The engine instance is stable for the life of the process: `app/data.py` publishes it once
-    # and three features close over it at callback-registration time
-    # (trends_page.py -> agreement_choropleth / agreement_by_subject / multilateral_scatter).
-    # Rebinding a *new* engine would leave those three serving stale data forever while every
-    # other tab moved on, so a reload replaces the snapshot inside this instance instead.
+    # and callers may hold on to it. Rebinding a *new* engine would leave those serving stale data,
+    # so a reload replaces the snapshot inside this instance instead.
     # ------------------------------------------------------------------
 
     @property
@@ -55,9 +53,8 @@ class ResolutionQueryEngine:
         self.logger.info(f"Swapped in new data: {snapshot.describe()}")
         return previous
 
-    # Read-only views onto the current snapshot, kept under their historical names because
-    # features read them directly (resolution_list.py, recent_resolutions_panel.py,
-    # wordcloud_interactive.py, general_stats_panel.py) and so do the tests.
+    # Read-only views onto the current snapshot, kept under their historical names because the
+    # API and the tests read them directly.
 
     @property
     def resolution_table(self) -> pd.DataFrame:

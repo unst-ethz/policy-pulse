@@ -16,7 +16,6 @@ logs/
 data/
 
 # not needed to run the app
-notebooks/
 tests/
 slides/
 plans/

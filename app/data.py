@@ -1,16 +1,13 @@
-import sys
 import time
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
-# Re-exported, not used here: the feature modules reach these through `app.data`
-# (`data.get_country_region(...)` in multilateral_scatter.py, profile_page.py) rather than
-# importing app.features.country_utils themselves. noqa: F401 keeps a linter from removing an
-# import whose only purpose is the re-export — doing so breaks those call sites at *callback*
-# time, not at import time, so nothing catches it until the tab is opened.
-from .features.country_utils import (  # noqa: F401
+# Re-exported: the API reaches these through `app.data`. noqa: F401 keeps a linter from removing
+# an import whose only purpose is the re-export.
+from .country_utils import (  # noqa: F401
+    _load_m49,
     get_country_region,
     get_country_subregion,
 )
@@ -341,15 +338,12 @@ def get_participation_year_range(iso3_code: str) -> tuple[int, int] | None:
     return first_year, last_year
 
 
-# Build M49 region tree for AntdTreeSelect
 def get_region_tree_data() -> list[dict]:
-    """Build nested treeData for AntdTreeSelect from M49 regional groupings CSV.
+    """Build the nested M49 region tree from the regional groupings CSV.
 
     Returns a nested hierarchy: World → Region → Sub-region → [Intermediate Region] → Country.
     Each node has: key, title, value, and children (list of child nodes).
     """
-    from .features.country_utils import _load_m49
-
     df = _load_m49()
 
     # Collect nodes by code for deduplication and parent lookup
@@ -494,23 +488,8 @@ SUBJECT_ID_TO_LABEL_MAP = {
 }
 
 
-def available_subjects() -> list[dict[str, Any]]:
-    data = repo.get_data()
-
-    # data["subject"]: pd.DataFrame, totally 7341 subjects
-    subject_options_list = data["subject"].to_dict("records")
-
-    subject_options = [
-        {"label": r["label_en"], "value": r["subject_id"]} for r in subject_options_list
-    ]
-    # ! not sure about sequence of subjects
-    subject_options = subject_options[::-1]
-
-    return subject_options
-
-
 def get_subject_tree_data() -> list[dict]:
-    """Build nested treeData for AntdTreeSelect from the thesaurus hierarchy.
+    """Build the nested subject tree from the thesaurus hierarchy.
 
     Uses the broader_table (direct SKOS.broader / hasTopConcept pairs only),
     not the closure_table, so the source reflects the actual declared hierarchy.
@@ -615,10 +594,9 @@ def get_latest_year():
 def _rebuild_derived_state() -> None:
     """Rebuild everything in this module that is derived from the repository.
 
-    `query_engine` is *not* rebuilt — its snapshot is swapped instead, because three features
-    close over the engine instance when their callbacks are registered. Everything here is a
-    module global that functions read at call time (or that page layouts read per view), so
-    rebinding is enough.
+    `query_engine` is *not* rebuilt — its snapshot is swapped instead, so anything holding the
+    engine sees the new data. Everything here is a module global that the API reads at call time,
+    so rebinding is enough.
     """
     global _NAME_INDEX, REGION_TREE_DATA, TOP_LEVEL_SUBJECTS, SUBJECT_ID_TO_LABEL_MAP
     global SUBJECT_TREE_DATA, available_countries, _VOTING_ACTIVITY
@@ -633,37 +611,8 @@ def _rebuild_derived_state() -> None:
     SUBJECT_ID_TO_LABEL_MAP = {
         row["subject_id"]: row["label_en"] for _, row in subject_df.iterrows()
     }
-    # Both trees are read inside `filters.layout()` / page layout functions, so a rebuilt tree
-    # reaches the UI on the next page view.
     REGION_TREE_DATA = get_region_tree_data()
     SUBJECT_TREE_DATA = get_subject_tree_data()
-
-
-def _invalidate_feature_caches() -> None:
-    """Drop every cache a feature module derives from the repository.
-
-    Each module exposes its own `invalidate()`. They are looked up in `sys.modules` rather than
-    imported, for two reasons: these modules import `app.data`, so a top-level import here would
-    be circular; and importing a *page* module has side effects — `trends_page` calls
-    `register_page()` at import time, which raises unless a Dash app already exists. A module
-    that was never imported holds no cache to clear, so skipping it is also the correct answer.
-
-    If you memoise anything derived from `query_engine` or `repo` — an `lru_cache`, a lazily
-    built index — give its module an `invalidate()` and list it here, or it will serve pre-reload
-    data for the life of the process. Caches derived only from the static CSV assets
-    (`country_utils`) do not belong here; a reload cannot change them. Neither do caches keyed on
-    the snapshot itself (`analysis.keywords.keyword_index`): a reload swaps the snapshot, which
-    misses them by construction.
-    """
-    module_names = (
-        f"{__package__}.features.recent_resolutions_panel",
-        f"{__package__}.features.general_stats_panel",
-        f"{__package__}.pages.trends_page",
-    )
-    for module_name in module_names:
-        module = sys.modules.get(module_name)
-        if module is not None:
-            module.invalidate()
 
 
 def reload_if_stale() -> bool:
@@ -691,8 +640,6 @@ def reload_if_stale() -> bool:
     query_engine.swap(snapshot)
     repo = new_repo
     _rebuild_derived_state()
-
-    _invalidate_feature_caches()
 
     repo.logger.info(
         "Reload complete in %.1fs: %s", time.monotonic() - started, snapshot.describe()

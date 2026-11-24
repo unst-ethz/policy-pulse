@@ -1,10 +1,10 @@
 # Build: docker build -t policy-pulse .
-# Run:   docker run --rm -p 8050:8050 --env-file .env policy-pulse
+# Run:   docker run --rm -p 8000:8000 --env-file .env policy-pulse
 #
 # Connection settings (MONGODB_URI/MONGODB_DATABASE) are injected at *run* time via
 # --env-file or the orchestrator's environment, never baked into the image. Note this image only
-# copies `app/` and `config/` — not the whole build context — so a local `.env`, the notebooks and
-# the reference datasets cannot end up in a published layer.
+# copies `app/` and `config/` — not the whole build context — so a local `.env` and the reference
+# datasets cannot end up in a published layer.
 FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
 
 WORKDIR /app
@@ -49,9 +49,9 @@ ENV PATH="/app/.venv/bin:${PATH}"
 COPY --chown=appuser:appuser app ./app
 COPY --chown=appuser:appuser config ./config
 
-EXPOSE 8050
+EXPOSE 8000
 
 # --preload loads the data once in the master process before forking workers, which then share it
 # copy-on-write. The data load opens and closes its own MongoDB client inside the master, so no
 # client is inherited across the fork.
-CMD ["gunicorn", "--bind", "0.0.0.0:8050", "--workers", "2", "--timeout", "120", "--preload", "app.__main__:server"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "120", "--preload", "-k", "uvicorn_worker.UvicornWorker", "app.api.main:app"]

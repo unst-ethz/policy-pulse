@@ -1,7 +1,7 @@
 """The HTTP API against the real data.
 
 The numbers come from `un_data_stream.analysis`, which the unit tests check against hand-derived
-values and which the Dash pages call too. These tests cover what the HTTP layer adds: parameter
+values. These tests cover what the HTTP layer adds: parameter
 parsing and validation, the filter selection, JSON shapes (no NaN), errors, and caching headers.
 """
 
@@ -101,28 +101,6 @@ def test_resolution_list_filters_and_paginates(client):
     assert all(r["date"].startswith("2020") for r in first["items"] + second["items"])
     dates = [r["date"] for r in first["items"]]
     assert dates == sorted(dates, reverse=True)
-
-
-def test_resolution_list_matches_the_dash_filter(client):
-    """Same criteria, same set: the API and the Dash resolution tab share `filter_resolutions`."""
-    from app.features import filtered_resolutions
-
-    store = {
-        "start_date": "2000-01-01",
-        "end_date": "2010-12-31",
-        "subject_ids": None,
-        "country1_alpha3": "CHE",
-        "country_filter_mode": "voted",
-        "keyword": "nuclear, women",
-    }
-    expected = filtered_resolutions.resolutions_for(store, "resolution_list")
-    page = get(
-        client,
-        "/api/v1/resolutions?start_date=2000-01-01&end_date=2010-12-31&country=CHE"
-        "&country_mode=voted&keyword=nuclear,%20women&limit=500",
-    )
-    assert page["total"] == len(expected)
-    assert {r["undl_id"] for r in page["items"]} == set(expected["undl_id"])
 
 
 def test_votes_are_included_on_request(client):

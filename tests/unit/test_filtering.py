@@ -146,19 +146,3 @@ def test_export_names_vote_columns_and_ignores_the_country_filter(engine):
     # 105 stays although DDD did not vote on it
     assert _ids(df) == ["101", "104", "105"]
     assert list(df.columns) == filtering.EXPORT_COLUMNS + ["Land AAA"]
-
-
-def test_filter_store_dicts_translate(engine):
-    criteria = ResolutionFilter.from_filter_store(
-        {
-            "start_date": "2000-01-01",
-            "end_date": "2000-12-31",
-            "subject_ids": [],
-            "country1_alpha3": "AAA",
-            "country_filter_mode": None,
-            "keyword": None,
-        }
-    )
-    assert criteria == ResolutionFilter(
-        start_date="2000-01-01", end_date="2000-12-31", country="AAA"
-    )

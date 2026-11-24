@@ -91,9 +91,8 @@ def test_vote_columns_are_categorical(outcomes, votes):
 def test_session_comes_from_session_label_as_string(outcomes, votes):
     """Postgres has a numeric `session` and a `session_label`; the app needs the label.
 
-    Special sessions are only representable in the label ('10sp', '10emsp'), and
-    app/features/agreement_graph.py detects them with a substring match, so the column must stay
-    a string.
+    Special sessions are only representable in the label ('10sp', '10emsp'), so the column must
+    stay a string.
     """
     table, _ = DataRepository._build_resolution_table(outcomes, votes)
 
