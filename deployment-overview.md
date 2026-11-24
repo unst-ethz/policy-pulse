@@ -27,11 +27,11 @@ Site is up again
 
 **GitHub Actions** — Automatically builds a Docker image whenever we push to `main` using the `Dockerfile`. The image contains our code and dependencies.
 
-**uv** — Dependency manager. The image installs from `uv.lock` (`uv sync --locked --no-dev`), so a deploy gets exactly the versions the lockfile pins, and the `notebooks` group (marimo/altair) is left out. There is no `requirements.txt` any more — editing dependencies means editing `pyproject.toml` and committing the refreshed `uv.lock`.
+**uv** — Dependency manager. The image installs from `uv.lock` (`uv sync --locked --no-dev`), so a deploy gets exactly the versions the lockfile pins. There is no `requirements.txt` any more — editing dependencies means editing `pyproject.toml` and committing the refreshed `uv.lock`.
 
 **Watchtower** — A service running on our VM that checks every 60 seconds if there's a new image. When it finds one, it pulls it and restarts the app.
 
-**Nginx** — A reverse proxy that sits in front of our app. It handles incoming web requests and forwards them to our Dash app. Can use Nginx to add SSL later.
+**Nginx** — A reverse proxy that sits in front of our app. It handles incoming web requests and forwards them to the API. Can use Nginx to add SSL later.
 
 **Gunicorn** — The server that runs our Python app. We use the `--preload` flag, which loads the resolution data once and then spawns worker processes that share it copy-on-write.
 
@@ -74,7 +74,7 @@ The container needs the MongoDB connection settings at **run** time — they are
 the image:
 
 ```bash
-docker run --rm -p 8050:8050 --env-file .env policy-pulse
+docker run --rm -p 8000:8000 --env-file .env policy-pulse
 ```
 
 `MONGODB_URI`, `MONGODB_DATABASE`. If either is missing the app refuses to start with a message
@@ -89,31 +89,11 @@ up in a published layer (`.dockerignore` excludes it as well).
 
 ## The HTTP API
 
-The same image also runs the API (`app/api/`), which the upcoming Vue frontend will use. It is
-not deployed on the VM yet. Running it means overriding the command:
-
-```bash
-docker run --rm -p 8000:8000 --env-file .env policy-pulse \
-  gunicorn --bind 0.0.0.0:8000 --workers 2 --timeout 120 --preload \
-  -k uvicorn_worker.UvicornWorker app.api.main:app
-```
-
-Same model as the Dash app: `--preload` loads the data once and the workers share it
-copy-on-write, and each worker starts its own reload poller after the fork (in the FastAPI
-lifespan). `GET /api/health` is the liveness probe. Set `POLICY_PULSE_CORS_ORIGINS` to the
+The image runs the API (`app/api/`) that the Vue frontend in `web/` calls: gunicorn with uvicorn
+workers on port 8000 (see the Dockerfile's `CMD`). `--preload` loads the data once and the workers
+share it copy-on-write, and each worker starts its own reload poller after the fork (in the
+FastAPI lifespan). `GET /api/health` is the liveness probe. Set `POLICY_PULSE_CORS_ORIGINS` to the
 frontend's origin(s).
-
----
-
-## Code Requirement
-
-Your Dash app must expose the server object for Gunicorn:
-```python
-app = dash.Dash(__name__)
-server = app.server  # ← Required for deployment
-```
-
-Without this line, the deployment will fail.
 
 ---
 

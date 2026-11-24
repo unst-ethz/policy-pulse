@@ -1,6 +1,6 @@
 """The resolution filter every view works from, and the list operations built on it.
 
-One implementation shared by the Dash tabs and the API: date range and thesaurus subjects (via the
+One implementation for every API route: date range and thesaurus subjects (via the
 query engine), a country participation filter, and the keyword expression (see `keywords.py`).
 """
 
@@ -72,19 +72,6 @@ class ResolutionFilter:
     group_vote: GroupVote | None = None
     group_all_voted: bool = False  # with `group_vote`: only where every state in `group` voted
 
-    @classmethod
-    def from_filter_store(cls, filter_data: dict) -> "ResolutionFilter":
-        """Build from the Dash filter store's dict."""
-        subject_ids = filter_data.get("subject_ids")
-        return cls(
-            start_date=filter_data.get("start_date"),
-            end_date=filter_data.get("end_date"),
-            subject_ids=tuple(subject_ids) if subject_ids else None,
-            country=filter_data.get("country1_alpha3"),
-            country_mode=filter_data.get("country_filter_mode") or "none",
-            keyword=filter_data.get("keyword"),
-        )
-
 
 def filter_resolutions(
     engine: ResolutionQueryEngine,
@@ -98,7 +85,7 @@ def filter_resolutions(
     """The resolutions matching `criteria`, oldest first as stored.
 
     `apply_country` / `apply_keyword` let a view opt out of filters that mean nothing to it (the
-    Dash word cloud has no country context; the agreement tabs ignore keywords).
+    word cloud has no country context; the agreement views ignore keywords).
     `membership_mask` is required for `country_mode == "member"`. `columns=None` keeps the whole
     frame, vote columns included.
     """

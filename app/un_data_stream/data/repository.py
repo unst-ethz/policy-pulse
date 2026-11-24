@@ -29,8 +29,7 @@ from .processor import DataProcessor
 # "whatever isn't known metadata".
 #
 # `session` is the one real rename: the store keeps a numeric `session` plus a `session_label`
-# holding the format the app has always used ('10', '10sp', '10emsp'), and special-session
-# detection (`app/features/agreement_graph.py`) depends on the label form.
+# holding the format the app has always used ('10', '10sp', '10emsp').
 RESOLUTION_COLUMNS: Dict[str, str] = {
     "undl_id": "undl_id",
     "resolution": "resolution",

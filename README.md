@@ -6,33 +6,30 @@ Website: http://unst-dev.vsos.ethz.ch/
 
 ## Development
 
-- `app/` is the website (Dash) and the HTTP API (`app/api/`), `notebooks/` is data exploration,
+- `app/` is the data layer and the HTTP API (`app/api/`), `web/` is the Vue 3 frontend,
   `tests/` covers the data layer, the analyses and the API
 - Dependencies are managed with [uv](https://docs.astral.sh/uv/): `uv sync`
 
 ```bash
 uv sync                  # install dependencies
 uv run init-env          # start a local database with a copy of the production data (see below)
-uv run start-app         # Dash website: http://127.0.0.1:8050
 uv run start-api         # HTTP API: http://127.0.0.1:8000/api/docs
 uv run pytest            # tests (integration tests skip themselves without the database)
 ```
 
-The Vue 3 prototype that will replace the Dash site lives in `web/` (see [web/README.md](web/README.md)):
-with the API running, `cd web && npm install && npm run dev` serves it on http://localhost:5173.
-
-We are moving from the Dash prototype to a Vue 3 frontend on top of an HTTP API; the plan and its
-status are in [plans/frontend_maturation_plan.md](plans/frontend_maturation_plan.md).
+The Vue 3 frontend lives in `web/` (see [web/README.md](web/README.md)): with the API running,
+`cd web && npm install && npm run dev` serves it on http://localhost:5173. The plan and its status
+are in [plans/frontend_maturation_plan.md](plans/frontend_maturation_plan.md).
 
 ## Code layout
 
 ```
 app/un_data_stream/data/       loading from MongoDB, the precomputed vote arrays, periodic reload
 app/un_data_stream/analysis/   every analysis, framework-free: filtering, keywords, agreement,
-                               word cloud, country profile, overview — used by Dash *and* the API
+                               word cloud, country profile, overview
 app/data.py                    the loaded data plus country names, membership periods, trees
+app/country_utils.py           M49 regions (config/m49_regional_groupings.csv)
 app/api/                       FastAPI: routes, query parameters, response schemas
-app/features/, app/pages/      the Dash UI (to be retired once the Vue frontend reaches parity)
 web/                           the Vue 3 frontend (prototype), on top of app/api
 ```
 
@@ -52,7 +49,7 @@ interactive documentation at `/api/docs` lists every endpoint with its parameter
   get a `304` until the data is reloaded.
 - Browsers may call it from the origins in `POLICY_PULSE_CORS_ORIGINS` (comma-separated; defaults
   to the Vite dev server, `http://localhost:5173`).
-- Startup loads the data like the Dash app does (about 25 s), so `--reload` restarts are slow.
+- Startup loads the data (about 25 s), so `--reload` restarts are slow.
 
 ## Local database
 
@@ -62,7 +59,7 @@ The app is a read-only consumer of a MongoDB database that the separate `undl-in
 uv run init-env
 ```
 
-That writes a `.env` if you don't have one, pulls and starts the database, waits for it to be healthy, then connects through the app's own settings and counts the core collections, so it fails loudly if the database came up empty rather than leaving you to discover it as a blank page. When it prints `Ready`, `uv run start-app` will work.
+That writes a `.env` if you don't have one, pulls and starts the database, waits for it to be healthy, then connects through the app's own settings and counts the core collections, so it fails loudly if the database came up empty rather than leaving you to discover it as a blank page. When it prints `Ready`, `uv run start-api` will work.
 
 > **Not yet a snapshot.** The MongoDB dev snapshot image (a weekly dump of production, phase 5 of undl-ingest's `docs/mongodb_migration_plan.md`) does not exist yet, so `docker-compose.yml` starts an *empty* `mongodb-atlas-local` and `init-env` stops at its data check. Until then, fill it yourself, e.g. with undl-ingest's `scripts/copy_postgres_to_mongo.py` against the Postgres snapshot. The sections below describe how it works once the snapshot image is in place.
 
@@ -114,7 +111,3 @@ production.
 
 The publishing side lives in `undl-ingest` (`deploy/undl-snapshot`, `snapshot/`); its
 `deploy/README.md` documents why the snapshot works this way and how to trigger one early.
-
-Unrelated to all this, `notebooks/janic/postgres/` builds an **empty-schema** Postgres image. It
-belongs to the ingestion prototype that has since moved to `undl-ingest` and is kept only as a
-record — it is not what you want for frontend work.

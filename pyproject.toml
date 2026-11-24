@@ -8,29 +8,21 @@ authors = [
 ]
 requires-python = ">=3.11,<3.12"
 dependencies = [
-    "dash==4.0.0rc4",
     "fastapi>=0.159.1",
-    "feffery-antd-components>=0.4.5",
     "gunicorn>=23,<24",
-    "matplotlib==3.10.7",
     "numpy==2.3.5",
     "pandas==2.3.3",
-    "plotly==6.3.0",
     "pymongo>=4.10,<5",
     "python-dotenv>=1.2.3",
     "pyyaml==6.0.3",
     "rapidfuzz==3.13.0",
     "uvicorn-worker>=0.4.0",
     "uvicorn[standard]>=0.52.4",
-    "wordcloud==1.9.4",
 ]
 
 [project.scripts]
-# `uv run start-app` — the local dev server. Production uses gunicorn against
-# `app.__main__:server` (see the Dockerfile), not this.
-start-app = "app.__main__:main"
-# `uv run start-api` — the HTTP API (FastAPI) on :8000, for the upcoming Vue frontend. Production
-# runs `app.api.main:app` under gunicorn with uvicorn workers instead; see deployment-overview.md.
+# `uv run start-api` — the HTTP API (FastAPI) on :8000, for the Vue frontend in web/. Production
+# runs `app.api.main:app` under gunicorn with uvicorn workers instead (see the Dockerfile).
 start-api = "app.api.main:main"
 # `uv run init-env` — one command from a fresh clone to a local MongoDB holding a copy of the
 # production data (docker-compose.yml + the snapshot image). Dev only; see README.
@@ -54,9 +46,6 @@ module-root = ""
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-# notebooks/ is marimo-generated and intentionally frozen as a record of the ingestion
-# prototyping; formatting it would churn generated code nobody edits by hand.
-extend-exclude = ["notebooks"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
@@ -68,17 +57,6 @@ select = ["E", "F", "I"]
 # the tests — is clean at 100 columns and stays enforced. Shrink this list when you touch a file;
 # don't add to it. The counts are the debt at adoption time. # TODO: improve this
 [tool.ruff.lint.per-file-ignores]
-"app/features/case_study.py" = ["E501"]              # 54 — long UI copy, one string per step
-"app/features/feature_description.py" = ["E501"]     # 18 — same, feature blurbs
-"app/pages/trends_page.py" = ["E501"]                # 19
-"app/features/agreement_choropleth.py" = ["E501"]    # 9
-"app/features/wordcloud_interactive.py" = ["E501"]   # 7 — help-text prose only
-"app/features/multilateral_scatter.py" = ["E501"]    # 8
-"app/features/resolution_list.py" = ["E501"]         # 3
-"app/features/agreement_graph.py" = ["E501"]         # 3
-"app/features/filters.py" = ["E501"]                 # 2
-"app/features/agreement_by_subject.py" = ["E501"]    # 2
-"app/pages/profile_page.py" = ["E501"]               # 1
 "app/data.py" = ["E501"]                             # 4
 "app/un_data_stream/analysis/query_engine.py" = ["E501"]     # 2
 "tests/integration/test_agreement_query.py" = ["E501"]       # 1
@@ -89,10 +67,4 @@ dev = [
     "pytest>=9.1.1",
     "pytest-mock>=3.15.1",
     "ruff>=0.14,<1",
-]
-# Exploration tooling for notebooks/, deliberately not a runtime dependency: `uv sync --no-dev`
-# (what the Docker image runs) leaves both out. Install with `uv sync --group notebooks`.
-notebooks = [
-    "altair>=6.2.2",
-    "marimo>=0.24.0",
 ]
