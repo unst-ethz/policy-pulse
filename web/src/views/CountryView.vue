@@ -1073,8 +1073,15 @@ const membershipText = computed(() => {
   accent-color: var(--ink);
 }
 
+/* The reception table fills its panel; the area bars beside it set the row height. */
+.notable:has(> .reception) {
+  grid-template-rows: auto auto 1fr;
+  align-content: stretch;
+}
+
 .reception {
-  max-height: 360px;
+  contain: size;
+  min-height: 280px;
   overflow: auto;
 }
 
