@@ -89,7 +89,9 @@ const active = computed(() => props.count ?? activeCount(props.allowed, filters.
   top: 76px;
   max-height: calc(100vh - 92px);
   overflow-y: auto;
-  padding-inline-end: var(--space-2);
+  /* room for focus rings/checkbox edges; overflow-y also clips the x axis */
+  padding-inline: var(--space-1) var(--space-2);
+  margin-inline-start: calc(-1 * var(--space-1));
 }
 
 .main {
