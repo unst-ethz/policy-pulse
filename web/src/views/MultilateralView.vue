@@ -11,11 +11,10 @@ import QueryState from '@/components/QueryState.vue'
 import { REGIONS, type ScatterPoint } from '@/charts/types'
 import { onlyFilters, useFilters } from '@/composables/useFilters'
 import { useThemeColors } from '@/composables/useThemeColors'
+import { GROUPS } from '@/groups'
 
 type Metric = 'yes_rate' | 'no_rate' | 'abstention_rate'
 const METRICS: Metric[] = ['yes_rate', 'no_rate', 'abstention_rate']
-// The permanent Security Council members: known reference points for a first look
-const P5 = ['USA', 'CHN', 'RUS', 'GBR', 'FRA']
 const MAX_MARKED = 5
 
 const { t, n } = useI18n()
@@ -37,7 +36,7 @@ const region = param<string>('region', REGIONS, null)
 const marked = computed<string[]>({
   get: () => {
     const raw = route.query.mark
-    if (raw === undefined) return P5
+    if (raw === undefined) return [...GROUPS.p5] // known reference points for a first look
     return ([] as (string | null)[]).concat(raw).filter((c): c is string => !!c)
   },
   set: (value) => router.replace({ query: { ...route.query, mark: value.length ? value : '' } }),
@@ -132,7 +131,7 @@ const explanations = computed(() => {
         </label>
       </template>
       <div class="marked">
-        <CountryList v-model="marked" :label="t('alignment.marked')" :max="MAX_MARKED" :colors="markedColors" />
+        <CountryList v-model="marked" :label="t('alignment.marked')" :max="MAX_MARKED" :colors="markedColors" groups />
       </div>
       <QueryState
         :loading="result.isLoading.value"

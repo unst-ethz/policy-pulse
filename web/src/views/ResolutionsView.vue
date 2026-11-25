@@ -3,13 +3,11 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { csvUrl, type Lang, type ListOptions, useCountryIndex, useResolutions } from '@/api/queries'
-import CountryList from '@/components/CountryList.vue'
 import QueryState from '@/components/QueryState.vue'
 import ResolutionTable from '@/components/ResolutionTable.vue'
 import FacetLayout from '@/components/facets/FacetLayout.vue'
-import InfoTip from '@/components/InfoTip.vue'
 import KeywordField from '@/components/KeywordField.vue'
-import { countActive, useFilters } from '@/composables/useFilters'
+import { countActive, useFilters, voteColumns } from '@/composables/useFilters'
 
 const PAGE_SIZE = 50
 const SORTS: ListOptions['sort'][] = ['date_desc', 'date_asc', 'consensus_asc', 'consensus_desc']
@@ -31,13 +29,8 @@ const sort = computed<ListOptions['sort']>(() => {
   const s = route.query.sort as ListOptions['sort']
   return SORTS.includes(s) ? s : 'date_desc'
 })
-const votes = computed<string[]>({
-  get: () => {
-    const v = route.query.votes
-    return (Array.isArray(v) ? v : v ? [v] : []).filter((x): x is string => !!x)
-  },
-  set: (value) => setQuery({ votes: value.length ? value : undefined }),
-})
+// The States picked in the filters, as vote columns
+const votes = computed(() => voteColumns(filters.value))
 
 const options = computed<ListOptions>(() => ({
   sort: sort.value,
@@ -48,7 +41,7 @@ const options = computed<ListOptions>(() => ({
 
 const result = useResolutions(filters, options)
 const pages = computed(() => Math.max(1, Math.ceil((result.data.value?.total ?? 0) / PAGE_SIZE)))
-const voteColumns = computed(() => votes.value.map((iso3) => ({ iso3, label: name(iso3) })))
+const columns = computed(() => votes.value.map((iso3) => ({ iso3, label: name(iso3) })))
 const download = computed(() => csvUrl(filters.value, votes.value, locale.value as Lang))
 
 </script>
@@ -61,9 +54,9 @@ const download = computed(() => csvUrl(filters.value, votes.value, locale.value 
     </div>
 
     <FacetLayout
-      :allowed="['years', 'adoption', 'subjects', 'terms', 'group', 'country', 'sponsor']"
-      :defaults="['years', 'subjects']"
-      storage-key="policy-pulse:facets"
+      :allowed="['years', 'adoption', 'subjects', 'terms', 'states', 'sponsor']"
+      :defaults="['years', 'subjects', 'states']"
+      storage-key="policy-pulse:facets:resolutions"
       :count="countActive(filters)"
       :done-label="t('facets.show', { n: n(result.data.value?.total ?? 0) })"
     >
@@ -93,12 +86,6 @@ const download = computed(() => csvUrl(filters.value, votes.value, locale.value 
         </label>
         <a class="button" :href="download" download>{{ t('resolutions.download') }}</a>
       </div>
-      <div class="votes-of">
-        <span>{{ t('resolutions.showVotes') }}</span>
-        <InfoTip :text="t('resolutions.showVotesInfo')" :about="t('resolutions.showVotes')" />
-        <CountryList v-model="votes" :label="t('resolutions.showVotes')" :max="4" />
-      </div>
-
       <div class="panel flush">
         <QueryState
           :loading="result.isLoading.value"
@@ -109,7 +96,7 @@ const download = computed(() => csvUrl(filters.value, votes.value, locale.value 
           min-height="240px"
           @retry="result.refetch()"
         >
-          <ResolutionTable :items="result.data.value?.items ?? []" :vote-columns="voteColumns" sponsors />
+          <ResolutionTable :items="result.data.value?.items ?? []" :vote-columns="columns" sponsors />
         </QueryState>
       </div>
 
@@ -149,15 +136,6 @@ const download = computed(() => csvUrl(filters.value, votes.value, locale.value 
   grid-auto-flow: column;
   align-items: center;
   gap: var(--space-2);
-}
-
-.votes-of {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
-  color: var(--ink-2);
 }
 
 .flush {

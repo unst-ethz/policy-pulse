@@ -57,6 +57,7 @@ function outcome(r: Resolution): string {
 <style scoped>
 .table-wrap {
   overflow-x: auto;
+  position: relative; /* else the vote cells' absolute visually-hidden labels escape it and widen the page */
 }
 
 .resolutions td {

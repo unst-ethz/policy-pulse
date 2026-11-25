@@ -685,7 +685,7 @@ const membershipText = computed(() => {
           <p>{{ t('country.bilateralLead') }}</p>
         </div>
       </div>
-      <CountryList v-model="compareModel" :label="t('country.compareWith')" :colors="seriesColors" :exclude="[iso3]" />
+      <CountryList v-model="compareModel" :label="t('country.compareWith')" :colors="seriesColors" :exclude="[iso3]" groups />
       <ChartFrame
         id="timeline"
         :export-title="t('country.timelineExportTitle', { name: name(iso3) })"

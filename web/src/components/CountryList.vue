@@ -2,14 +2,16 @@
 /**
  * An editable list of countries (e.g. the comparison set): chips you can remove plus a picker to
  * add one. Each chip shows the colour its country has in the chart, so the list is the legend.
+ * With `groups`, a quick select adds a whole group of States (e.g. the P5) at once.
  */
 import { useI18n } from 'vue-i18n'
 import { useCountryIndex } from '@/api/queries'
+import { GROUPS } from '@/groups'
 import CountryPicker from './CountryPicker.vue'
 
 const props = withDefaults(
-  defineProps<{ label: string; max?: number; colors?: Record<string, string>; exclude?: string[] }>(),
-  { max: 5, colors: () => ({}), exclude: () => [] },
+  defineProps<{ label: string; max?: number; colors?: Record<string, string>; exclude?: string[]; groups?: boolean }>(),
+  { max: 5, colors: () => ({}), exclude: () => [], groups: false },
 )
 const model = defineModel<string[]>({ required: true })
 const { t } = useI18n()
@@ -19,6 +21,19 @@ function add(iso3: string | null) {
   if (iso3 && !model.value.includes(iso3) && model.value.length < props.max) {
     model.value = [...model.value, iso3]
   }
+}
+
+// A group is added to the list when it fits, else it replaces the list (e.g. the country page's
+// automatic comparisons); greyed out only when all of it is listed already
+const additions = (key: keyof typeof GROUPS) =>
+  GROUPS[key].filter((c) => !model.value.includes(c) && !props.exclude.includes(c))
+function addGroup(select: HTMLSelectElement) {
+  const key = select.value as keyof typeof GROUPS
+  select.value = '' // back to the prompt
+  if (!key) return
+  const extra = additions(key)
+  const members = GROUPS[key].filter((c) => !props.exclude.includes(c))
+  model.value = model.value.length + extra.length <= props.max ? [...model.value, ...extra] : members.slice(0, props.max)
 }
 
 function remove(iso3: string) {
@@ -47,6 +62,17 @@ function remove(iso3: string) {
       class="add"
       @update:model-value="add"
     />
+    <select
+      v-if="groups"
+      class="input group"
+      :aria-label="t('groups.prompt')"
+      @change="addGroup($event.target as HTMLSelectElement)"
+    >
+      <option value="">{{ t('groups.prompt') }}</option>
+      <option v-for="key in Object.keys(GROUPS) as (keyof typeof GROUPS)[]" :key="key" :value="key" :disabled="!additions(key).length">
+        {{ t(`groups.${key}`) }}
+      </option>
+    </select>
   </div>
 </template>
 
@@ -98,7 +124,8 @@ function remove(iso3: string) {
   color: var(--ink);
 }
 
-.add {
+.add,
+.group {
   width: 200px;
 }
 </style>

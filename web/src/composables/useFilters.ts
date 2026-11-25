@@ -13,9 +13,9 @@ export type CountryMode = 'voted' | 'member' | 'none'
 /** How a resolution was adopted, as the API names it. */
 export type Adoption = 'recorded' | 'non_recorded' | 'without_vote'
 export const ADOPTIONS: Adoption[] = ['recorded', 'non_recorded', 'without_vote']
-/** How a group of states voted: all alike, split, or a majority one way. */
-export type GroupVote = 'alike' | 'split' | 'yes' | 'no' | 'abstain'
-export const GROUP_VOTES: GroupVote[] = ['alike', 'split', 'yes', 'no', 'abstain']
+/** How a group of states voted: all alike, split, opposed (yes against no), or a majority one way. */
+export type GroupVote = 'alike' | 'split' | 'opposed' | 'yes' | 'no' | 'abstain'
+export const GROUP_VOTES: GroupVote[] = ['alike', 'split', 'opposed', 'yes', 'no', 'abstain']
 
 export interface Filters {
   from: number | null
@@ -56,6 +56,9 @@ function year(value: LocationQuery[string] | undefined): number | null {
 
 export function parseFilters(query: LocationQuery): Filters {
   const mode = one(query.mode) as CountryMode | null
+  // Links from before the States facet: `votes` (columns only) becomes the unfiltered States
+  const legacy = !query.country && !query.group ? many(query.votes) : []
+  if (legacy.length) query = { ...query, ...(legacy.length === 1 ? { country: legacy[0]! } : { group: legacy }) }
   return {
     from: year(query.from),
     to: year(query.to),
@@ -147,6 +150,35 @@ export function toggleTerm(keyword: string, term: string): string {
   return (kept.length < parts.length ? kept : [...parts, `"${term}"`]).join(' & ')
 }
 
+/** The States picked in the States facet: one is the `country`, two or more the `group`. */
+export const statesOf = (filters: Filters): string[] =>
+  filters.group.length ? filters.group : filters.country ? [filters.country] : []
+
+/** The resolution list shows a vote column per picked State, up to this many. */
+export const MAX_VOTE_COLUMNS = 6
+/** The picked States as vote columns: none when there are too many to show (e.g. a whole region). */
+export const voteColumns = (filters: Filters): string[] => {
+  const states = statesOf(filters)
+  return states.length <= MAX_VOTE_COLUMNS ? states : []
+}
+
+/**
+ * The patch that picks `states`. Crossing between one State and several resets the way of
+ * voting, since the two have different options (a member's view vs. how a group voted).
+ */
+export function withStates(filters: Filters, states: string[]): Partial<Filters> {
+  const before = statesOf(filters).length
+  const one = states.length === 1
+  const many = states.length > 1
+  return {
+    country: one ? states[0]! : null,
+    mode: one && before === 1 ? filters.mode : 'none',
+    group: many ? states : [],
+    together: many && before > 1 ? filters.together : null,
+    allVoted: many && before > 1 ? filters.allVoted : false,
+  }
+}
+
 /** Whether the group-vote filter narrows the list (a group and a way of voting). */
 export const groupActive = (filters: Filters) => filters.group.length > 0 && !!filters.together
 
@@ -187,7 +219,7 @@ export function useFilters() {
     const next = { ...filters.value, ...patch }
     const kept = Object.fromEntries(
       Object.entries(route.query).filter(
-        ([key]) => !['from', 'to', 'subject', 'country', 'mode', 'q', 'sponsor', 'original', 'adopted', 'group', 'together', 'allvoted', 'historical', 'page'].includes(key),
+        ([key]) => !['from', 'to', 'subject', 'country', 'mode', 'q', 'sponsor', 'original', 'adopted', 'group', 'together', 'allvoted', 'historical', 'page', 'votes'].includes(key),
       ),
     )
     const query: Record<string, unknown> = { ...kept, ...serializeFilters(next) }

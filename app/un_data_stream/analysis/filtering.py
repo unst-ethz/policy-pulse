@@ -14,8 +14,8 @@ from .keywords import keyword_index, matched_ids
 from .query_engine import ResolutionQueryEngine
 
 CountryMode = Literal["voted", "member", "none"]
-# How a group of states voted: all alike, split, or a majority one way
-GroupVote = Literal["alike", "split", "yes", "no", "abstain"]
+# How a group of states voted: all alike, split, opposed (some yes, some no), or a majority one way
+GroupVote = Literal["alike", "split", "opposed", "yes", "no", "abstain"]
 
 # Votes a country can cast; the vote columns also hold "X" for "did not vote".
 CAST_VOTES = ("Y", "N", "A")
@@ -140,6 +140,7 @@ def group_vote_masks(
 
     Only states that cast a vote count, and a row needs at least two of them; `all_voted`
     instead needs every state of the group. A majority is more than half of the votes cast.
+    `opposed` is a split with both a yes and a no; for two states, exactly Y/N or N/Y.
     """
     votes = df[[c for c in group if c in df.columns]]
     yes, no, abstain = ((votes == v).sum(axis=1) for v in CAST_VOTES)
@@ -150,6 +151,7 @@ def group_vote_masks(
     return {
         "alike": judged & alike,
         "split": judged & ~alike,
+        "opposed": judged & (yes > 0) & (no > 0),
         "yes": judged & (yes * 2 > cast),
         "no": judged & (no * 2 > cast),
         "abstain": judged & (abstain * 2 > cast),
