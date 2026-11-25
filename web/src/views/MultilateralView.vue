@@ -2,23 +2,27 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { useMultilateral } from '@/api/queries'
+import { useHistoricalStates, useMultilateral } from '@/api/queries'
 import AlignmentScatter from '@/components/AlignmentScatter.vue'
 import ChartFrame from '@/components/ChartFrame.vue'
-import CountryPicker from '@/components/CountryPicker.vue'
-import FilterBar from '@/components/FilterBar.vue'
+import CountryList from '@/components/CountryList.vue'
+import FacetLayout from '@/components/facets/FacetLayout.vue'
 import QueryState from '@/components/QueryState.vue'
-import type { ScatterPoint } from '@/charts/types'
-import { useFilters } from '@/composables/useFilters'
+import { REGIONS, type ScatterPoint } from '@/charts/types'
+import { onlyFilters, useFilters } from '@/composables/useFilters'
+import { useThemeColors } from '@/composables/useThemeColors'
 
 type Metric = 'yes_rate' | 'no_rate' | 'abstention_rate'
 const METRICS: Metric[] = ['yes_rate', 'no_rate', 'abstention_rate']
-const REGIONS = ['Africa', 'Americas', 'Asia', 'Europe', 'Oceania']
+// The permanent Security Council members: known reference points for a first look
+const P5 = ['USA', 'CHN', 'RUS', 'GBR', 'FRA']
+const MAX_MARKED = 5
 
 const { t, n } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { filters } = useFilters()
+const colors = useThemeColors()
 
 function param<T extends string>(key: string, allowed: readonly T[], fallback: T | null) {
   return computed<T | null>({
@@ -29,16 +33,46 @@ function param<T extends string>(key: string, allowed: readonly T[], fallback: T
 
 const metric = param<Metric>('y', METRICS, 'abstention_rate')
 const region = param<string>('region', REGIONS, null)
-const focus = computed<string | null>({
-  get: () => (route.query.focus as string | undefined) ?? null,
-  set: (value) => router.replace({ query: { ...route.query, focus: value ?? undefined } }),
+// `mark` absent means the P5; an empty `mark=` keeps an emptied list empty
+const marked = computed<string[]>({
+  get: () => {
+    const raw = route.query.mark
+    if (raw === undefined) return P5
+    return ([] as (string | null)[]).concat(raw).filter((c): c is string => !!c)
+  },
+  set: (value) => router.replace({ query: { ...route.query, mark: value.length ? value : '' } }),
 })
+function toggle(iso3: string) {
+  if (marked.value.includes(iso3)) marked.value = marked.value.filter((c) => c !== iso3)
+  else if (marked.value.length < MAX_MARKED) marked.value = [...marked.value, iso3]
+}
 
-const listFilters = computed(() => ({ ...filters.value, country: null, mode: 'none' as const }))
+// Only the sidebar's filters apply (a keyword or group carried over in the URL would filter
+// invisibly); `historical` only hides points, so it stays out of the request.
+const listFilters = computed(() => ({
+  ...onlyFilters(filters.value, ['from', 'to', 'subjects', 'sponsor', 'original']),
+  mode: 'none' as const,
+}))
 const result = useMultilateral(listFilters, 10)
 
+const historical = useHistoricalStates()
+const countries = computed(() =>
+  (result.data.value?.countries ?? []).filter((c) => filters.value.historical || !historical.value.has(c.country)),
+)
+
+// Over the countries shown, so hidden historical States don't shift it
+const meanAlignment = computed(() =>
+  countries.value.length ? countries.value.reduce((sum, c) => sum + c.alignment, 0) / countries.value.length : null,
+)
+
+const regionColor = (r: string) =>
+  (REGIONS as readonly string[]).includes(r) ? colors[`region-${r.toLowerCase()}` as keyof typeof colors] : colors.abstain
+const markedColors = computed(() =>
+  Object.fromEntries(countries.value.filter((c) => marked.value.includes(c.country)).map((c) => [c.country, regionColor(c.region)])),
+)
+
 const points = computed<ScatterPoint[]>(() =>
-  (result.data.value?.countries ?? [])
+  countries.value
     .filter((c) => c[metric.value!] != null)
     .map((c) => ({
       country: c.country,
@@ -50,7 +84,26 @@ const points = computed<ScatterPoint[]>(() =>
     })),
 )
 const yLabel = computed(() => t(`alignment.metrics.${metric.value}`))
-const rows = computed(() => [...(result.data.value?.countries ?? [])].sort((a, b) => b.alignment - a.alignment))
+const rows = computed(() => [...countries.value].sort((a, b) => b.alignment - a.alignment))
+
+// One sentence per marked country: which side of the average it falls on
+const explanations = computed(() => {
+  const mean = meanAlignment.value
+  if (mean == null) return []
+  return marked.value.flatMap((iso3) => {
+    const p = points.value.find((q) => q.country === iso3)
+    if (!p) return []
+    return [{
+      country: iso3,
+      color: regionColor(p.region),
+      text: t(p.x >= mean ? 'alignment.explainWith' : 'alignment.explainAgainst', {
+        name: p.name,
+        x: n(p.x, 'score'),
+        mean: n(mean, 'score'),
+      }),
+    }]
+  })
+})
 </script>
 
 <template>
@@ -60,8 +113,12 @@ const rows = computed(() => [...(result.data.value?.countries ?? [])].sort((a, b
       <p>{{ t('alignment.lead') }}</p>
     </div>
 
-    <FilterBar :fields="['years', 'subjects', 'keyword']" />
-
+    <FacetLayout
+      :allowed="['years', 'subjects', 'sponsor', 'historical']"
+      :defaults="['years', 'subjects']"
+      storage-key="policy-pulse:facets:alignment"
+      :applied="listFilters"
+    >
     <ChartFrame
       :title="t('alignment.chartTitle', { metric: yLabel.toLocaleLowerCase() })"
       :description="result.data.value ? t('alignment.chartText', { n: n(result.data.value.resolution_count) }) : undefined"
@@ -74,20 +131,8 @@ const rows = computed(() => [...(result.data.value?.countries ?? [])].sort((a, b
           </select>
         </label>
       </template>
-      <div class="emphasis">
-        <div class="regions" role="group" :aria-label="t('alignment.region')">
-          <span>{{ t('alignment.region') }}</span>
-          <button
-            v-for="r in REGIONS"
-            :key="r"
-            type="button"
-            :aria-pressed="region === r"
-            @click="region = region === r ? null : r"
-          >
-            {{ t(`regions.${r}`) }}
-          </button>
-        </div>
-        <CountryPicker v-model="focus" :label="t('alignment.focus')" class="focus" />
+      <div class="marked">
+        <CountryList v-model="marked" :label="t('alignment.marked')" :max="MAX_MARKED" :colors="markedColors" />
       </div>
       <QueryState
         :loading="result.isLoading.value"
@@ -95,17 +140,23 @@ const rows = computed(() => [...(result.data.value?.countries ?? [])].sort((a, b
         :error="result.error.value"
         :empty="points.length === 0"
         :empty-text="t('alignment.empty')"
-        min-height="520px"
+        min-height="560px"
         @retry="result.refetch()"
       >
         <AlignmentScatter
           :points="points"
           :y-label="yLabel"
-          :mean-x="result.data.value?.mean_alignment ?? null"
+          :mean-x="meanAlignment"
           :region="region"
-          :selected="focus"
-          @select="(c) => (focus = c)"
+          :marked="marked"
+          @select="toggle"
+          @region="(r) => (region = region === r ? null : r)"
         />
+        <ul v-if="explanations.length" class="explain">
+          <li v-for="e in explanations" :key="e.country">
+            <span class="dot" :style="{ background: e.color }" aria-hidden="true" />{{ e.text }}
+          </li>
+        </ul>
       </QueryState>
       <template #table>
         <table class="data-table">
@@ -133,6 +184,7 @@ const rows = computed(() => [...(result.data.value?.countries ?? [])].sort((a, b
         <p>{{ t('alignment.note', { n: result.data.value?.min_votes ?? 10 }) }}</p>
       </template>
     </ChartFrame>
+    </FacetLayout>
   </div>
 </template>
 
@@ -143,51 +195,26 @@ const rows = computed(() => [...(result.data.value?.countries ?? [])].sort((a, b
   gap: var(--space-2);
 }
 
-.emphasis {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  justify-content: space-between;
-  gap: var(--space-3);
+.marked {
   margin-bottom: var(--space-3);
 }
 
-.regions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
+.explain {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
   font-size: var(--text-sm);
   color: var(--ink-2);
 }
 
-.regions button {
-  padding: 3px 12px;
-  border: 1px solid var(--rule-strong);
-  border-radius: 999px;
-  background: var(--surface);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.regions button[aria-pressed='true'] {
-  border-color: var(--yes);
-  box-shadow: inset 0 0 0 1px var(--yes);
-  font-weight: 600;
-}
-
-/* The pressed chip doubles as the legend for the emphasised (blue) dots. */
-.regions button[aria-pressed='true']::before {
-  content: '';
+.explain .dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-inline-end: 6px;
+  width: 9px;
+  height: 9px;
+  margin-inline-end: var(--space-2);
   border-radius: 50%;
-  background: var(--yes);
-}
-
-.focus {
-  width: 240px;
+  border: 2px solid var(--ink);
 }
 </style>

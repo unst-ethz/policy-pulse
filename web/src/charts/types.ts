@@ -9,6 +9,9 @@ export interface TimelineSeries {
   points: { x: number; year: number; session: string; special: boolean; agreement: number | null; votes: number }[]
 }
 
+/** The five UN geoscheme regions, in legend order; each has a `--region-*` colour token. */
+export const REGIONS = ['Africa', 'Americas', 'Asia', 'Europe', 'Oceania'] as const
+
 export interface ScatterPoint {
   country: string
   name: string

@@ -799,8 +799,6 @@ export interface components {
             resolution_count: number;
             /** Min Votes */
             min_votes: number;
-            /** Mean Alignment */
-            mean_alignment: number | null;
             /** Countries */
             countries: components["schemas"]["MultilateralCountry"][];
         };

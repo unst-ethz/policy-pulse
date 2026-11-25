@@ -18,6 +18,11 @@ const NAMES = [
   'abstain',
   'absent',
   'scale-mid',
+  'region-africa',
+  'region-americas',
+  'region-asia',
+  'region-europe',
+  'region-oceania',
   'font-sans',
 ] as const
 
