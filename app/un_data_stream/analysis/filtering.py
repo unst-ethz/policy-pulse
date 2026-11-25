@@ -191,11 +191,22 @@ PairAgreement = Literal["AGREED", "DISAGREED", "STRONGLY_DISAGREED"]
 def sort_resolutions(df: pd.DataFrame, order: str | None) -> pd.DataFrame:
     """Sort by one of `SORT_ORDERS` (default newest first); missing values last.
 
-    Ties (same date, same score) are broken by `undl_id`, so the order, and with it every page
-    of a paginated list, doesn't depend on the row order the data happened to load in.
+    Ties (same date, same score) are broken by the resolution number (the symbol's last number,
+    so A/RES/81/13 sits next to /12 and /100 after /99), then the full symbol (keeping parts
+    like 68/95[A] and [B] together), then `undl_id`, so the order, and with it every page of a
+    paginated list, doesn't depend on the row order the data happened to load in.
     """
     sort_by, ascending = SORT_ORDERS.get(order or "", SORT_ORDERS["date_desc"])
-    return df.sort_values([sort_by, "undl_id"], ascending=ascending, na_position="last")
+    number = df["resolution"].str.extract(r"(\d+)\D*$", expand=False).astype(float)
+    return (
+        df.assign(_number=number)
+        .sort_values(
+            [sort_by, "_number", "resolution", "undl_id"],
+            ascending=ascending,
+            na_position="last",
+        )
+        .drop(columns="_number")
+    )
 
 
 def filter_by_pair_agreement(
