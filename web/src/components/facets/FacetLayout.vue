@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * A page with its facets: in a sticky column beside the content on wide screens, behind a
+ * A page with its facets: in a column beside the content on wide screens, behind a
  * "Filters (n)" button in a drawer otherwise. The sidebar is rendered in one place only, so each
  * facet's queries and state exist once. `applied` is what the page actually filters on (its own
  * context included), handed to the facets so their counts match the page.
@@ -41,7 +41,7 @@ const active = computed(() => props.count ?? activeCount(props.allowed, filters.
 
 <template>
   <div class="layout">
-    <aside v-if="wide" class="side">
+    <aside v-if="wide">
       <FacetSidebar :allowed="allowed" :defaults="defaults" :storage-key="storageKey" :count="count" />
     </aside>
 
@@ -81,17 +81,6 @@ const active = computed(() => props.count ?? activeCount(props.allowed, filters.
   .layout {
     grid-template-columns: minmax(0, 1fr);
   }
-}
-
-/* Sticks below the site header and scrolls on its own when taller than the screen */
-.side {
-  position: sticky;
-  top: 76px;
-  max-height: calc(100vh - 92px);
-  overflow-y: auto;
-  /* room for focus rings/checkbox edges; overflow-y also clips the x axis */
-  padding-inline: var(--space-1) var(--space-2);
-  margin-inline-start: calc(-1 * var(--space-1));
 }
 
 .main {
