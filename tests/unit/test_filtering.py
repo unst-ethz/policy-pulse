@@ -97,6 +97,7 @@ def test_ties_sort_the_same_whatever_the_input_order():
     df = pd.DataFrame(
         {
             "undl_id": ["3", "1", "4", "2"],
+            "resolution": ["A/RES/81/2", "A/RES/81/2", "A/RES/81/2", "A/RES/80/1"],
             "date": pd.to_datetime(["2026-01-01"] * 3 + ["2025-01-01"]),
             "consensus_score": [0.5, 0.5, None, 0.5],
         }
@@ -112,6 +113,27 @@ def test_unscored_resolutions_sort_last(engine):
     df = filtering.filter_resolutions(engine, ResolutionFilter())
     for order in ("consensus_asc", "consensus_desc"):
         assert filtering.sort_resolutions(df, order)["undl_id"].iloc[-1] == "105"
+
+
+def test_same_date_sorts_by_resolution_number():
+    symbols = ["A/RES/81/12", "A/RES/81/100", "A/RES/81/13", "A/RES/68/95[B]", "A/RES/68/95[A]"]
+    df = pd.DataFrame(
+        {
+            "undl_id": ["9", "8", "7", "6", "5"],
+            "resolution": symbols,
+            "date": pd.to_datetime(["2026-01-01"] * 3 + ["2013-12-05"] * 2),
+        }
+    )
+    newest = filtering.sort_resolutions(df, "date_desc")["resolution"].tolist()
+    assert newest == [
+        "A/RES/81/100",
+        "A/RES/81/13",
+        "A/RES/81/12",
+        "A/RES/68/95[B]",
+        "A/RES/68/95[A]",
+    ]
+    oldest = filtering.sort_resolutions(df, "date_asc")["resolution"].tolist()
+    assert oldest == newest[::-1]
 
 
 @pytest.mark.parametrize(

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
+from .filtering import sort_resolutions
 from .query_engine import ResolutionQueryEngine
 
 NO_CATEGORY = "No Category"
@@ -92,5 +93,5 @@ def recent_resolutions(engine: ResolutionQueryEngine) -> pd.DataFrame:
 
     if "date" in df.columns:
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
-        df = df.sort_values(by=["date"], ascending=False, na_position="last")
+        df = sort_resolutions(df, "date_desc")
     return df
