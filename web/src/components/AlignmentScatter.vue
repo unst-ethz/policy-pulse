@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * Each country's multilateral alignment (x) against a vote share (y), one colour per region with a
- * legend. Emphasising a region fades the others; marked countries get an ink ring and a direct
+ * legend. Clicking a legend entry emphasises that region and fades the others; marked countries get an ink ring and a direct
  * label. Above the plot two labels point away from the average line (with / against the majority);
  * below it the average's value and the axis title. Those are HTML so they wrap, lined up with the
  * plot through fixed grid margins (`GRID`), which turn the average into a CSS position.
@@ -20,7 +20,7 @@ const props = defineProps<{
   region: string | null
   marked: string[]
 }>()
-const emit = defineEmits<{ select: [iso3: string] }>()
+const emit = defineEmits<{ select: [iso3: string]; region: [region: string] }>()
 
 const { t, n } = useI18n()
 const colors = useThemeColors()
@@ -145,9 +145,16 @@ function onClick(params: { data?: unknown }) {
 
 <template>
   <div class="figure" :style="position">
-    <ul class="legend">
-      <li v-for="r in regions" :key="r" :class="{ faded: region != null && region !== r }">
-        <span class="dot" :style="{ background: regionColor(r) }" aria-hidden="true" />{{ t(`regions.${r}`, r) }}
+    <ul class="legend" :aria-label="t('alignment.region')">
+      <li v-for="r in regions" :key="r">
+        <button
+          type="button"
+          :class="{ faded: region != null && region !== r }"
+          :aria-pressed="region === r"
+          @click="emit('region', r)"
+        >
+          <span class="dot" :style="{ background: regionColor(r) }" aria-hidden="true" />{{ t(`regions.${r}`, r) }}
+        </button>
       </li>
     </ul>
     <p v-if="meanAt != null" class="direction">
@@ -189,6 +196,27 @@ function onClick(params: { data?: unknown }) {
   list-style: none;
   font-size: var(--text-xs);
   color: var(--ink-2);
+}
+
+.legend button {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.legend button:hover {
+  border-color: var(--rule-strong);
+}
+
+.legend button[aria-pressed='true'] {
+  border-color: var(--ink-2);
+  font-weight: 600;
 }
 
 .legend .faded {

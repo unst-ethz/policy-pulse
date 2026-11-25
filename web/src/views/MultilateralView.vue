@@ -131,23 +131,8 @@ const explanations = computed(() => {
           </select>
         </label>
       </template>
-      <div class="emphasis">
-        <div class="regions" role="group" :aria-label="t('alignment.region')">
-          <span>{{ t('alignment.region') }}</span>
-          <button
-            v-for="r in REGIONS"
-            :key="r"
-            type="button"
-            :aria-pressed="region === r"
-            :style="{ '--chip': regionColor(r) }"
-            @click="region = region === r ? null : r"
-          >
-            {{ t(`regions.${r}`) }}
-          </button>
-        </div>
-        <div class="marked">
-          <CountryList v-model="marked" :label="t('alignment.marked')" :max="MAX_MARKED" :colors="markedColors" />
-        </div>
+      <div class="marked">
+        <CountryList v-model="marked" :label="t('alignment.marked')" :max="MAX_MARKED" :colors="markedColors" />
       </div>
       <QueryState
         :loading="result.isLoading.value"
@@ -165,6 +150,7 @@ const explanations = computed(() => {
           :region="region"
           :marked="marked"
           @select="toggle"
+          @region="(r) => (region = region === r ? null : r)"
         />
         <ul v-if="explanations.length" class="explain">
           <li v-for="e in explanations" :key="e.country">
@@ -209,41 +195,8 @@ const explanations = computed(() => {
   gap: var(--space-2);
 }
 
-.emphasis {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: var(--space-3);
-}
-
-.regions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--ink-2);
-}
-
-.regions button {
-  padding: 3px 12px;
-  border: 1px solid var(--rule-strong);
-  border-radius: 999px;
-  background: var(--surface);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.regions button[aria-pressed='true'] {
-  border-color: var(--chip);
-  box-shadow: inset 0 0 0 1px var(--chip);
-  font-weight: 600;
-}
-
 .marked {
-  flex-basis: 100%;
+  margin-bottom: var(--space-3);
 }
 
 .explain {

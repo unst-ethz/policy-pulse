@@ -441,7 +441,7 @@ export default {
     title: 'Multilateral',
     lead: 'Who votes with the majority, and who abstains or votes no? Each dot is a State: the further right, the more often it votes like the others.',
     chartTitle: 'Agreement with all other States against {metric}',
-    chartText: 'Over {n} resolutions. Click a dot to mark or unmark a country.',
+    chartText: 'Over {n} resolutions. Click a region in the legend to highlight it, or a dot to mark or unmark a country.',
     label: 'Countries by alignment',
     x: 'Agreement with all others',
     y: 'Vertical axis',

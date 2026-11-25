@@ -442,7 +442,7 @@ const fr: typeof en = {
     title: 'Multilatéral',
     lead: "Qui vote avec la majorité, et qui s'abstient ou vote contre ? Chaque point est un État : plus il est à droite, plus il vote comme les autres.",
     chartTitle: 'Accord avec tous les autres États selon la {metric}',
-    chartText: 'Sur {n} résolutions. Cliquez sur un point pour marquer un pays ou retirer la marque.',
+    chartText: 'Sur {n} résolutions. Cliquez sur une région de la légende pour la mettre en évidence, ou sur un point pour marquer un pays ou retirer la marque.',
     label: 'Pays selon leur alignement',
     x: 'Accord avec tous les autres',
     y: 'Axe vertical',
