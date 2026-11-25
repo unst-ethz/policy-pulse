@@ -7,6 +7,9 @@
  * across the whole app. Validated with the data-viz palette checker (CVD + contrast) in both modes.
  *
  * The one accent is the gold of the General Assembly Hall wall, used for selection and focus only.
+ *
+ * Region hues identify the five regions in the multilateral scatter. They skip the vote blue/red
+ * and the accent gold, and pass the palette checker on all pairs (CVD ΔE >= 9) in both modes.
  */
 :root {
   color-scheme: light;
@@ -33,6 +36,12 @@
   --yes-cell: #1c5cab;
   --no-cell: #b8302f;
   --abstain-cell: #5f5e59;
+
+  --region-africa: #9b4415;
+  --region-americas: #169269;
+  --region-asia: #635eae;
+  --region-europe: #ee5c98;
+  --region-oceania: #ba8e20;
 
   --danger-ink: #a12626;
 
@@ -92,6 +101,11 @@
     --yes-cell: #2f6fc2;
     --no-cell: #c43c3b;
     --abstain-cell: #6b6a64;
+    --region-africa: #c43e03;
+    --region-americas: #0e7c50;
+    --region-asia: #9174ea;
+    --region-europe: #d559a9;
+    --region-oceania: #b58a37;
     --danger-ink: #f08a8a;
   }
 }
@@ -117,5 +131,10 @@
   --yes-cell: #2f6fc2;
   --no-cell: #c43c3b;
   --abstain-cell: #6b6a64;
+  --region-africa: #c43e03;
+  --region-americas: #0e7c50;
+  --region-asia: #9174ea;
+  --region-europe: #d559a9;
+  --region-oceania: #b58a37;
   --danger-ink: #f08a8a;
 }

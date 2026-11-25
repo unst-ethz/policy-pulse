@@ -33,7 +33,8 @@ export const router = createRouter({
     },
     // The old word-cloud page: the cloud now sits above the resolution list
     { path: '/topics', redirect: (to) => ({ name: 'resolutions', query: to.query }) },
-    { path: '/alignment', name: 'alignment', component: () => import('./views/AlignmentView.vue') },
+    { path: '/multilateral', name: 'multilateral', component: () => import('./views/MultilateralView.vue') },
+    { path: '/alignment', redirect: (to) => ({ name: 'multilateral', query: to.query }) },
     { path: '/about', name: 'about', component: () => import('./views/AboutView.vue') },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('./views/NotFoundView.vue') },
   ],
