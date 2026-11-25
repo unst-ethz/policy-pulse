@@ -5,6 +5,7 @@ import pytest
 
 from app.un_data_stream.analysis import filtering
 from app.un_data_stream.analysis.filtering import ResolutionFilter
+from app.un_data_stream.analysis.keywords import KeywordIndex, matched_ids
 
 from .conftest import PEACE
 
@@ -168,3 +169,21 @@ def test_export_names_vote_columns_and_ignores_the_country_filter(engine):
     # 105 stays although DDD did not vote on it
     assert _ids(df) == ["101", "104", "105"]
     assert list(df.columns) == filtering.EXPORT_COLUMNS + ["Land AAA"]
+
+
+def test_symbol_search_matches_at_number_boundaries():
+    df = pd.DataFrame(
+        {
+            "undl_id": ["1", "2", "3", "4"],
+            "resolution": ["A/RES/81/11", "A/RES/81/11[A]", "A/RES/81/110", "A/RES/ES-10/19"],
+            "title": ["Peace"] * 4,
+        }
+    )
+    index = KeywordIndex()
+    assert matched_ids(df, "A/RES/81/11", index) == {"1", "2"}
+    assert matched_ids(df, "81/11", index) == {"1", "2"}
+    assert matched_ids(df, "a/res/es-10/19", index) == {"4"}
+    assert matched_ids(df, "A/RES/81/11, A/RES/81/110", index) == {"1", "2", "3"}
+    assert matched_ids(df, "1/11", index) == set()
+    assert matched_ids(df, "A/RES/", index) == {"1", "2", "3", "4"}
+    assert matched_ids(df, "/81/11", index) == {"1", "2"}

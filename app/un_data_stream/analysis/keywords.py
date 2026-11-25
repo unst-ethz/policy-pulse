@@ -269,6 +269,8 @@ def matched_ids(df: pd.DataFrame, keyword_expression: str | None, index: Keyword
 
     A term matches a resolution if it occurs in the title of a row of `df`, or (via the `default`
     keyword index) in its keywords. Index hits are not restricted to `df`; callers intersect.
+    A term with a "/" also matches symbols containing it, without cutting a number in half:
+    "81/11" finds A/RES/81/11 and 81/11[A], not 81/110 or 181/11; "A/RES/" finds every one.
     """
     if (
         df.empty
@@ -295,6 +297,12 @@ def matched_ids(df: pd.DataFrame, keyword_expression: str | None, index: Keyword
                 df["title"].str.lower().str.contains(parsed_token.lower(), regex=False, na=False)
             )
             token_ids |= set(df.loc[title_match, "undl_id"].tolist())
+            if "/" in parsed_token and "resolution" in df.columns:
+                start = r"(?<!\d)" if parsed_token[0].isdigit() else ""
+                end = r"(?!\d)" if parsed_token[-1].isdigit() else ""
+                pattern = start + re.escape(parsed_token) + end
+                symbol_match = df["resolution"].str.contains(pattern, case=False, na=False)
+                token_ids |= set(df.loc[symbol_match, "undl_id"].tolist())
             token_ids |= index.search(parsed_token, exact=exact_mode)
             if clause_ids is None:
                 clause_ids = token_ids
