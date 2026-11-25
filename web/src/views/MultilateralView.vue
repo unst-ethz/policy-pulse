@@ -60,6 +60,11 @@ const countries = computed(() =>
   (result.data.value?.countries ?? []).filter((c) => filters.value.historical || !historical.value.has(c.country)),
 )
 
+// Over the countries shown, so hidden historical States don't shift it
+const meanAlignment = computed(() =>
+  countries.value.length ? countries.value.reduce((sum, c) => sum + c.alignment, 0) / countries.value.length : null,
+)
+
 const regionColor = (r: string) =>
   (REGIONS as readonly string[]).includes(r) ? colors[`region-${r.toLowerCase()}` as keyof typeof colors] : colors.abstain
 const markedColors = computed(() =>
@@ -83,7 +88,7 @@ const rows = computed(() => [...countries.value].sort((a, b) => b.alignment - a.
 
 // One sentence per marked country: which side of the average it falls on
 const explanations = computed(() => {
-  const mean = result.data.value?.mean_alignment
+  const mean = meanAlignment.value
   if (mean == null) return []
   return marked.value.flatMap((iso3) => {
     const p = points.value.find((q) => q.country === iso3)
@@ -156,7 +161,7 @@ const explanations = computed(() => {
         <AlignmentScatter
           :points="points"
           :y-label="yLabel"
-          :mean-x="result.data.value?.mean_alignment ?? null"
+          :mean-x="meanAlignment"
           :region="region"
           :marked="marked"
           @select="toggle"

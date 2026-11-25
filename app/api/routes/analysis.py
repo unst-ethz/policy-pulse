@@ -208,7 +208,6 @@ def multilateral(
     return schemas.Multilateral(
         resolution_count=len(df),
         min_votes=min_votes,
-        mean_alignment=num(stats["multilateral_alignment"].mean()) if len(stats) else None,
         countries=[
             schemas.MultilateralCountry(
                 country=r["country"],

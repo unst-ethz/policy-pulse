@@ -2,7 +2,9 @@
 /**
  * Each country's multilateral alignment (x) against a vote share (y), one colour per region with a
  * legend. Emphasising a region fades the others; marked countries get an ink ring and a direct
- * label. A line under the x axis says which way is with the majority, so it reads without help.
+ * label. Above the plot two labels point away from the average line (with / against the majority);
+ * below it the average's value and the axis title. Those are HTML so they wrap, lined up with the
+ * plot through fixed grid margins (`GRID`), which turn the average into a CSS position.
  */
 import { computed } from 'vue'
 import VChart from 'vue-echarts'
@@ -23,10 +25,31 @@ const emit = defineEmits<{ select: [iso3: string] }>()
 const { t, n } = useI18n()
 const colors = useThemeColors()
 
+// Plot margins in px; the HTML rows around the chart use the same ones to line up with it
+const GRID = { left: 48, right: 24, top: 12, bottom: 28 }
+
 const regionColor = (region: string) =>
   (REGIONS as readonly string[]).includes(region)
     ? colors[`region-${region.toLowerCase()}` as keyof typeof colors]
     : colors.abstain
+
+const xs = computed(() => props.points.map((p) => p.x))
+const xMin = computed(() => (xs.value.length ? Math.floor(Math.min(...xs.value) * 20) / 20 : 0))
+const xMax = computed(() => (xs.value.length ? Math.ceil(Math.max(...xs.value) * 20) / 20 : 1))
+const regions = computed(() => [
+  ...REGIONS,
+  ...new Set(props.points.map((p) => p.region).filter((r) => !(REGIONS as readonly string[]).includes(r))),
+])
+
+// The average as a fraction of the plot width
+const meanAt = computed(() =>
+  props.meanX == null ? null : (props.meanX - xMin.value) / (xMax.value - xMin.value || 1),
+)
+const position = computed(() => ({
+  '--plot-left': `${GRID.left}px`,
+  '--plot-right': `${GRID.right}px`,
+  '--mean': meanAt.value ?? 0.5,
+}))
 
 const option = computed(() => {
   const axis = {
@@ -38,12 +61,7 @@ const option = computed(() => {
   }
   const toData = (p: ScatterPoint) => ({ value: [p.x, p.y], name: p.name, country: p.country, votes: p.votes })
   const faded = (region: string) => props.region != null && props.region !== region
-  const xs = props.points.map((p) => p.x)
-  const xMin = xs.length ? Math.floor(Math.min(...xs) * 20) / 20 : 0
-  const xMax = xs.length ? Math.ceil(Math.max(...xs) * 20) / 20 : 1
-  const others = [...new Set(props.points.map((p) => p.region))].filter((r) => !(REGIONS as readonly string[]).includes(r))
-
-  const regionSeries = [...REGIONS, ...others].map((region, i) => ({
+  const regionSeries = regions.value.map((region, i) => ({
     type: 'scatter',
     name: t(`regions.${region}`, region),
     symbolSize: 9,
@@ -61,7 +79,7 @@ const option = computed(() => {
             silent: true,
             symbol: 'none',
             lineStyle: { color: colors['ink-2'], type: 'solid', width: 1 },
-            label: { formatter: t('alignment.mean'), color: colors['ink-2'], fontSize: 12 },
+            label: { show: false },
             data: [{ xAxis: props.meanX }],
           },
         }
@@ -70,17 +88,7 @@ const option = computed(() => {
 
   return {
     animation: false,
-    legend: {
-      top: 0,
-      left: 0,
-      icon: 'circle',
-      itemWidth: 10,
-      itemHeight: 10,
-      selectedMode: false,
-      textStyle: { color: colors['ink-2'], fontFamily: colors['font-sans'], fontSize: 12 },
-      data: regionSeries.map((s) => s.name),
-    },
-    grid: { left: 8, right: 24, top: 56, bottom: 8, containLabel: true },
+    grid: { ...GRID, containLabel: false },
     tooltip: {
       trigger: 'item',
       backgroundColor: colors.surface,
@@ -89,7 +97,7 @@ const option = computed(() => {
       formatter: (p: { data: { name: string; value: [number, number]; votes: number } }) =>
         `<b>${p.data.name}</b><br>${t('alignment.x')}: ${n(p.data.value[0], 'score')}<br>${props.yLabel}: ${n(p.data.value[1], 'percent')}<br>${t('alignment.votes', { n: p.data.votes })}`,
     },
-    xAxis: { type: 'value', name: t('alignment.x'), nameLocation: 'middle', nameGap: 28, min: xMin, max: xMax, ...axis },
+    xAxis: { type: 'value', min: xMin.value, max: xMax.value, ...axis },
     // No axis name: the chart title names the vertical axis, and a name here gets clipped.
     yAxis: {
       type: 'value',
@@ -122,7 +130,7 @@ const option = computed(() => {
           .map((p) => ({
             ...toData(p),
             itemStyle: { color: regionColor(p.region) },
-            label: { position: p.x > (xMin + xMax) / 2 ? 'left' : 'right' },
+            label: { position: p.x > (xMin.value + xMax.value) / 2 ? 'left' : 'right' },
           })),
       },
     ],
@@ -136,13 +144,24 @@ function onClick(params: { data?: unknown }) {
 </script>
 
 <template>
-  <div class="scatter">
-    <VChart :option="option" autoresize :aria-label="t('alignment.label')" @click="onClick" />
+  <div class="figure" :style="position">
+    <ul class="legend">
+      <li v-for="r in regions" :key="r" :class="{ faded: region != null && region !== r }">
+        <span class="dot" :style="{ background: regionColor(r) }" aria-hidden="true" />{{ t(`regions.${r}`, r) }}
+      </li>
+    </ul>
+    <p v-if="meanAt != null" class="direction">
+      <span>{{ t('alignment.against') }}</span>
+      <span>{{ t('alignment.with') }}</span>
+    </p>
+    <div class="scatter">
+      <VChart :option="option" autoresize :aria-label="t('alignment.label')" @click="onClick" />
+    </div>
+    <p v-if="meanAt != null" class="mean">
+      <span>{{ t('alignment.meanValue', { value: n(meanX!, 'score') }) }}</span>
+    </p>
+    <p class="axis-title">{{ t('alignment.x') }}</p>
   </div>
-  <p class="direction">
-    <span>{{ t('alignment.against') }}</span>
-    <span>{{ t('alignment.with') }}</span>
-  </p>
 </template>
 
 <style scoped>
@@ -151,17 +170,80 @@ function onClick(params: { data?: unknown }) {
   height: 560px;
 }
 
-.direction {
-  display: flex;
+/* Spans the plot, the margins included, so `--plot-left/right` line up with the chart's grid */
+.direction,
+.mean,
+.axis-title {
   max-width: none;
-  justify-content: space-between;
-  gap: var(--space-4);
-  margin: var(--space-1) 0 0;
+  margin: 0;
   font-size: var(--text-xs);
   color: var(--muted);
 }
 
-.direction span:last-child {
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+}
+
+.legend .faded {
+  opacity: 0.4;
+}
+
+.legend .dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-inline-end: 6px;
+  border-radius: 50%;
+}
+
+/* Two columns that meet at the average line, each label pointing away from it. The meeting point
+   only moves off the line when a side would get narrower than 110px (on phones, or when filters
+   push the average to an edge), so both labels stay readable. */
+.direction {
+  display: grid;
+  grid-template-columns:
+    clamp(
+      calc(var(--plot-left) + 110px),
+      calc(var(--plot-left) + (100% - var(--plot-left) - var(--plot-right)) * var(--mean)),
+      calc(100% - 110px)
+    )
+    1fr;
+  align-items: end;
+}
+
+.direction span:first-child {
+  padding-inline: var(--plot-left) var(--space-2);
   text-align: end;
+}
+
+.direction span:last-child {
+  padding-inline: var(--space-2) 0;
+}
+
+/* The average's value, centred under its line */
+.mean {
+  position: relative;
+  height: 1.5em;
+}
+
+.mean span {
+  position: absolute;
+  left: calc(var(--plot-left) + (100% - var(--plot-left) - var(--plot-right)) * var(--mean));
+  transform: translateX(-50%);
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+
+.axis-title {
+  padding-inline: var(--plot-left) var(--plot-right);
+  text-align: center;
+  color: var(--ink-2);
 }
 </style>

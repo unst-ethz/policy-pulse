@@ -456,7 +456,7 @@ export default {
     with: 'Tend to vote with the majority →',
     explainWith: '{name} votes with the majority more often than the average State (agreement {x}, average {mean}).',
     explainAgainst: '{name} votes with the majority less often than the average State (agreement {x}, average {mean}).',
-    mean: 'Average',
+    meanValue: 'Average {value}',
     votes: '{n} votes cast',
     empty: 'Too few recorded votes for these filters. Widen the years.',
     regionCol: 'Region',

@@ -457,7 +457,7 @@ const fr: typeof en = {
     with: 'Tendent à voter avec la majorité →',
     explainWith: "{name} vote avec la majorité plus souvent que l'État moyen (accord {x}, moyenne {mean}).",
     explainAgainst: "{name} vote avec la majorité moins souvent que l'État moyen (accord {x}, moyenne {mean}).",
-    mean: 'Moyenne',
+    meanValue: 'Moyenne {value}',
     votes: '{n} votes exprimés',
     empty: 'Trop peu de votes enregistrés pour ces filtres. Élargissez les années.',
     regionCol: 'Région',

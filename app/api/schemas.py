@@ -189,7 +189,6 @@ class MultilateralCountry(BaseModel):
 class Multilateral(BaseModel):
     resolution_count: int
     min_votes: int
-    mean_alignment: float | None
     countries: list[MultilateralCountry]
 
 
