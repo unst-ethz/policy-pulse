@@ -180,7 +180,7 @@ export default {
     former: 'Former states',
   },
   home: {
-    title: 'How every member state voted in the UN General Assembly',
+    title: 'How every Member State voted in the UN General Assembly',
     lead: '{resolutions} resolutions from {from} to {to}: search them, compare countries, and see where the world agrees and where it splits.',
     latestVote: 'Latest recorded vote',
     openResolution: 'Open this resolution',
@@ -270,7 +270,7 @@ export default {
   },
   countries: {
     title: 'Countries',
-    lead: 'Every member state and former state with votes in the data. Names follow the UN, and predecessor states (such as the Soviet Union) are listed under former states.',
+    lead: 'Every Member State and former state with votes in the data. Names follow the UN, and predecessor states (such as the Soviet Union) are listed under former states.',
     search: 'Find a country',
     searchHint: 'Name, former name or code',
     empty: 'No country matches. Try a former name or the three-letter code.',
@@ -298,7 +298,7 @@ export default {
     agreement: 'Agreement {value}',
     agreementCol: 'Agreement',
     mapNote: 'Agreement is 1 for identical votes, 0.5 when one abstained, 0 for yes against no.',
-    globalLead: 'How {name} votes compared with every other member state.',
+    globalLead: 'How {name} votes compared with every other Member State.',
     bilateralLead: 'Agreement with the states picked here, over time and by topic.',
     closest: 'Votes most alike',
     furthest: 'Votes least alike',
@@ -466,7 +466,7 @@ export default {
     lead: 'Where the votes come from, what the scores mean, and what they leave out.',
     dataTitle: 'Sources',
     data: 'Resolutions and votes come from the United Nations Digital Library. Subjects come from the UNBIS Thesaurus. The data is refreshed automatically when the Library publishes new records.',
-    coverage: '{count} resolutions adopted between {from} and {to}, by {countries} member states and former states.',
+    coverage: '{count} resolutions adopted between {from} and {to}, by {countries} Member States and former states.',
     updated: 'Last updated {date}.',
     recorded:
       'Most resolutions are adopted without a recorded vote. Only those adopted by recorded vote have individual votes, so every agreement figure is based on recorded votes only.',

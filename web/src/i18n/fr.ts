@@ -299,7 +299,7 @@ const fr: typeof en = {
     agreement: 'Accord {value}',
     agreementCol: 'Accord',
     mapNote: "L'accord vaut 1 pour des votes identiques, 0,5 si l'un s'est abstenu, 0 pour pour contre contre.",
-    globalLead: 'Comment {name} vote par rapport à tous les autres États membres.',
+    globalLead: 'Comment {name} vote par rapport à tous les autres États Membres.',
     bilateralLead: 'Concordance avec les États choisis ici, dans le temps et par thème.',
     closest: 'Votent le plus pareil',
     furthest: 'Votent le moins pareil',
