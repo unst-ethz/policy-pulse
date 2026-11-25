@@ -123,6 +123,7 @@ export default {
     groupVotes: {
       alike: 'All voted alike',
       split: 'They split',
+      opposed: 'Strongly disagreed (yes vs. no)',
       yes: 'Most voted yes',
       no: 'Most voted no',
       abstain: 'Most abstained',

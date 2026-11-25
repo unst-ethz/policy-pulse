@@ -324,7 +324,7 @@ class AdoptionCount(BaseModel):
 
 
 class GroupVoteCount(BaseModel):
-    group_vote: Literal["alike", "split", "yes", "no", "abstain"]
+    group_vote: Literal["alike", "split", "opposed", "yes", "no", "abstain"]
     resolutions: int
 
 

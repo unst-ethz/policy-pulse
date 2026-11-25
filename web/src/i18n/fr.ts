@@ -124,6 +124,7 @@ const fr: typeof en = {
     wholeRegion: 'Toute la région : {name}',
     groupVotes: {
       alike: 'Tous ont voté pareil',
+      opposed: 'En fort désaccord (oui contre non)',
       split: 'Ils se sont divisés',
       yes: 'Majorité de oui',
       no: 'Majorité de non',

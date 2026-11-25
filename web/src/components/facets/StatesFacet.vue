@@ -59,10 +59,11 @@ function addMembers(select: HTMLSelectElement) {
 }
 const complete = (option: string) => members(option).every((iso3) => states.value.includes(iso3))
 
-// The chosen way stays listed even if the group shrank below three, so it can be changed
-const groupVotes = computed(() =>
-  GROUP_VOTES.filter((v) => !MAJORITIES.includes(v) || states.value.length >= 3 || filters.value.together === v),
-)
+// "Opposed" (Y/N or N/Y) is offered for a pair only, majorities from three States up. The chosen
+// way stays listed even when the count changes, so it can be changed.
+const offered = (v: GroupVote) =>
+  v === 'opposed' ? states.value.length === 2 : !MAJORITIES.includes(v) || states.value.length >= 3
+const groupVotes = computed(() => GROUP_VOTES.filter((v) => offered(v) || filters.value.together === v))
 const counts = computed(
   () => new Map((facets.data.value?.group_votes ?? []).map((g) => [g.group_vote, g.resolutions])),
 )
