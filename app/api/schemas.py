@@ -113,7 +113,7 @@ class ResolutionDetail(Resolution):
     non_voting: int | None
     subjects: list[Subject]
     keywords: dict[str, list[str]] = Field(description="Keyword terms per dimension")
-    all_votes: dict[str, Vote] = Field(description="Every country's vote (X = did not vote)")
+    all_votes: dict[str, Vote] = Field(description="Every country's vote (X = did not participate)")
     sponsors: list[Sponsor] = Field(description="Original sponsors first; empty when unknown")
     sponsorship_note: str | None = Field(description="Why the sponsors are unknown, if they are")
 

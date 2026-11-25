@@ -965,7 +965,7 @@ export interface components {
             };
             /**
              * All Votes
-             * @description Every country's vote (X = did not vote)
+             * @description Every country's vote (X = did not participate)
              */
             all_votes: {
                 [key: string]: "Y" | "N" | "A" | "X";
