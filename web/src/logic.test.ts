@@ -7,8 +7,10 @@ import {
   onlyFilters,
   parseFilters,
   serializeFilters,
+  statesOf,
   toApiParams,
   toggleTerm,
+  withStates,
 } from './composables/useFilters'
 import { composeChart, crc32, slug, toCsv, zip } from './export'
 import { cleanTitle, sentenceCase } from './format'
@@ -119,6 +121,36 @@ describe('URL filters', () => {
 
   it('counts active filters the way the clear button reports them', () => {
     expect(countActive(parseFilters({ from: '2000', to: '2010', q: 'a', country: 'CHE', sponsor: 'CHE' }))).toBe(3)
+  })
+})
+
+describe('States facet', () => {
+  const pick = (query: Record<string, string | string[]>, states: string[]) => {
+    const f = parseFilters(query)
+    return { ...f, ...withStates(f, states) }
+  }
+
+  it('keeps one State as the country and several as the group', () => {
+    expect(pick({}, ['CHE'])).toMatchObject({ country: 'CHE', mode: 'none', group: [] })
+    expect(pick({}, ['CHE', 'FRA'])).toMatchObject({ country: null, group: ['CHE', 'FRA'], together: null })
+    expect(statesOf(pick({}, ['CHE', 'FRA']))).toEqual(['CHE', 'FRA'])
+    expect(statesOf(pick({ country: 'CHE' }, []))).toEqual([])
+  })
+
+  it('keeps the way of voting within one or several States, and resets it across', () => {
+    expect(pick({ country: 'CHE', mode: 'voted' }, ['FRA'])).toMatchObject({ mode: 'voted' })
+    expect(pick({ country: 'CHE', mode: 'voted' }, ['CHE', 'FRA'])).toMatchObject({ mode: 'none', together: null })
+    const group = { group: ['CHE', 'FRA'], together: 'split', allvoted: '1' }
+    expect(pick(group, ['CHE', 'FRA', 'DEU'])).toMatchObject({ together: 'split', allVoted: true })
+    expect(pick(group, ['CHE'])).toMatchObject({ country: 'CHE', mode: 'none', together: null, allVoted: false })
+  })
+
+  it('reads old `votes` links as unfiltered States', () => {
+    expect(statesOf(parseFilters({ votes: ['CHE', 'USA'] }))).toEqual(['CHE', 'USA'])
+    expect(parseFilters({ votes: 'CHE' })).toMatchObject({ country: 'CHE', mode: 'none' })
+    expect(countActive(parseFilters({ votes: ['CHE', 'USA'] }))).toBe(0)
+    // a link that already has States keeps them
+    expect(statesOf(parseFilters({ country: 'FRA', votes: 'CHE' }))).toEqual(['FRA'])
   })
 })
 
