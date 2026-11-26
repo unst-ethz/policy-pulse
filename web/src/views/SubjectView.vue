@@ -145,17 +145,12 @@ const fill = (iso3: string) => {
 const mapTooltip = (iso3: string) => {
   const c = byCountry.value.get(iso3)
   if (!c) return `<b>${name(iso3)}</b><br><span style="color:${colors.muted}">${t('subject.fewVotes', { n: MIN_VOTES })}</span>`
-  // Zero shares are left out: "no 0%" is noise next to the ones that happened.
-  const rates = (
-    [
-      ['subject.mapYes', c.yes_rate],
-      ['subject.mapNo', c.no_rate],
-      ['subject.mapAbstain', c.abstention_rate],
-    ] as const
-  )
-    .filter(([, rate]) => rate)
-    .map(([key, rate]) => t(key, { value: n(rate ?? 0, 'percentShort') }))
-  return `<b>${name(iso3)}</b><br>${rates.join(', ')}<br><span style="color:${colors.muted}">${t('subject.mapVotes', { n: n(c.votes_cast) })}</span>`
+  const rates = t('subject.mapTooltip', {
+    yes: n(c.yes_rate ?? 0, 'percentShort'),
+    no: n(c.no_rate ?? 0, 'percentShort'),
+    abstain: n(c.abstention_rate ?? 0, 'percentShort'),
+  })
+  return `<b>${name(iso3)}</b><br>${rates}<br><span style="color:${colors.muted}">${t('subject.mapVotes', { n: n(c.votes_cast) })}</span>`
 }
 function ranked(key: 'no_rate' | 'abstention_rate') {
   return voters.value
