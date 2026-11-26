@@ -50,7 +50,7 @@ export interface paths {
         };
         /**
          * Countries
-         * @description Every country with vote data, sorted by name.
+         * @description Every Member State and former State with vote data, sorted by name.
          */
         get: operations["countries_api_v1_countries_get"];
         put?: never;
@@ -87,7 +87,7 @@ export interface paths {
         };
         /**
          * Region Tree
-         * @description M49 World → region → sub-region → [intermediate region] → country, plus historical states.
+         * @description M49 World → region → sub-region → [intermediate region] → State, plus historical States.
          *
          *     Leaves are ISO3 codes with localised names; region names are English (M49 publishes them so).
          */
@@ -146,7 +146,7 @@ export interface paths {
         };
         /**
          * List Resolutions
-         * @description Filtered, sorted, paginated resolutions; optionally with some countries' votes.
+         * @description Filtered, sorted, paginated resolutions; optionally with some States' votes.
          */
         get: operations["list_resolutions_api_v1_resolutions_get"];
         put?: never;
@@ -166,7 +166,7 @@ export interface paths {
         };
         /**
          * Export Resolutions
-         * @description The filtered resolutions as CSV, with a named vote column per requested country.
+         * @description The filtered resolutions as CSV, with a named vote column per requested State.
          *
          *     Applies dates, subjects and keyword; `country_mode` only with `apply_country`, as by default
          *     in the Dash download.
@@ -232,7 +232,7 @@ export interface paths {
         };
         /**
          * Resolution Detail
-         * @description One resolution with every country's vote, its subjects and keywords.
+         * @description One resolution with every State's vote, its subjects and keywords.
          */
         get: operations["resolution_detail_api_v1_resolutions__undl_id__get"];
         put?: never;
@@ -252,7 +252,7 @@ export interface paths {
         };
         /**
          * Agreement Map
-         * @description Mean pairwise agreement of `country` with every other country over the selection.
+         * @description Mean pairwise agreement of `country` with every other State over the selection.
          *
          *     `consensus` gives the 1st/99th percentile and mean consensus of the selected resolutions,
          *     for a colour scale centred on the average.
@@ -277,7 +277,7 @@ export interface paths {
          * Agreement Timeline
          * @description Mean agreement per General Assembly session over the *whole* history (no filters).
          *
-         *     A session's value is null below `min_votes` shared votes and after the compared country's
+         *     A session's value is null below `min_votes` shared votes and after the compared State's
          *     last vote.
          */
         get: operations["agreement_timeline_api_v1_agreement_timeline_get"];
@@ -298,9 +298,9 @@ export interface paths {
         };
         /**
          * Agreement By Subject
-         * @description Agreement with each compared country per thesaurus domain.
+         * @description Agreement with each compared State per thesaurus domain.
          *
-         *     Subjects come by mean agreement over the compared countries, best first. Uses the date
+         *     Subjects come by mean agreement over the compared States, best first. Uses the date
          *     range only: subjects are the dimension being compared.
          */
         get: operations["agreement_by_subject_api_v1_agreement_by_subject_get"];
@@ -321,9 +321,9 @@ export interface paths {
         };
         /**
          * Multilateral
-         * @description Each country's mean agreement with all others, and its Yes/No/Abstain shares.
+         * @description Each State's mean agreement with all others, and its Yes/No/Abstain shares.
          *
-         *     Countries with fewer than `min_votes` votes cast in the selection are left out.
+         *     States with fewer than `min_votes` votes cast in the selection are left out.
          */
         get: operations["multilateral_api_v1_multilateral_get"];
         put?: never;
@@ -366,7 +366,7 @@ export interface paths {
         };
         /**
          * Country Profile
-         * @description A country's record over a period (clamped to its participation), as on the profile page.
+         * @description A State's record over a period (clamped to its participation), as on the profile page.
          *
          *     `compare` defaults to the P5 when empty.
          */
@@ -614,7 +614,7 @@ export interface components {
             adopted_without_vote: number;
             /**
              * Non Recorded Votes
-             * @description Adopted by a vote not recorded per country
+             * @description Adopted by a vote not recorded per State
              */
             non_recorded_votes: number;
             /** Multilateral Alignment */
@@ -683,7 +683,7 @@ export interface components {
             by_subject: components["schemas"]["SubjectCount"][];
             /**
              * Reception
-             * @description Other countries' votes on the recorded-vote resolutions it sponsored, most votes against first
+             * @description Other States' votes on the recorded-vote resolutions it sponsored, most votes against first
              */
             reception: components["schemas"]["SponsorReception"][];
             /**
@@ -900,7 +900,7 @@ export interface components {
             undl_link: string | null;
             /**
              * Votes
-             * @description Votes of the requested countries
+             * @description Votes of the requested States
              * @default {}
              */
             votes: {
@@ -943,7 +943,7 @@ export interface components {
             undl_link: string | null;
             /**
              * Votes
-             * @description Votes of the requested countries
+             * @description Votes of the requested States
              * @default {}
              */
             votes: {
@@ -973,7 +973,7 @@ export interface components {
             };
             /**
              * All Votes
-             * @description Every country's vote (X = did not participate)
+             * @description Every State's vote (X = did not participate)
              */
             all_votes: {
                 [key: string]: "Y" | "N" | "A" | "X";
@@ -1100,7 +1100,7 @@ export interface components {
             label: string;
             /**
              * Values
-             * @description Per compared country; a country with fewer than `min_votes` shared votes on the subject is left out
+             * @description Per compared State; a State with fewer than `min_votes` shared votes on the subject is left out
              */
             values: {
                 [key: string]: components["schemas"]["SessionValue"];
@@ -1292,7 +1292,7 @@ export interface operations {
     countries_api_v1_countries_get: {
         parameters: {
             query?: {
-                /** @description Language for country and subject names */
+                /** @description Language for State and subject names */
                 lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
             };
             header?: never;
@@ -1324,7 +1324,7 @@ export interface operations {
     country_api_v1_countries__iso3__get: {
         parameters: {
             query?: {
-                /** @description Language for country and subject names */
+                /** @description Language for State and subject names */
                 lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
             };
             header?: never;
@@ -1358,7 +1358,7 @@ export interface operations {
     region_tree_api_v1_regions_tree_get: {
         parameters: {
             query?: {
-                /** @description Language for country and subject names */
+                /** @description Language for State and subject names */
                 lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
             };
             header?: never;
@@ -1390,7 +1390,7 @@ export interface operations {
     subject_tree_api_v1_subjects_tree_get: {
         parameters: {
             query?: {
-                /** @description Language for country and subject names */
+                /** @description Language for State and subject names */
                 lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
             };
             header?: never;
@@ -1461,7 +1461,7 @@ export interface operations {
                 subject?: string[] | null;
                 /** @description ISO3 code, used by `country_mode` */
                 country?: string | null;
-                /** @description `voted`: only resolutions the country voted on; `member`: only while it was a UN member (or voted); `yes`/`no`/`abstain`: only where it voted that way */
+                /** @description `voted`: only resolutions the State voted on; `member`: only while it was a UN member (or voted); `yes`/`no`/`abstain`: only where it voted that way */
                 country_mode?: "voted" | "member" | "none" | "yes" | "no" | "abstain";
                 /** @description Title/keyword search: "," = OR, "&" = AND, "\"…\"" = exact term */
                 keyword?: string | null;
@@ -1511,9 +1511,9 @@ export interface operations {
             query?: {
                 /** @description ISO3 codes whose votes to include (repeatable or comma-separated) */
                 votes?: string[] | null;
-                /** @description Language for country and subject names */
+                /** @description Language for State and subject names */
                 lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
-                /** @description Also apply `country`/`country_mode` (e.g. a country report) */
+                /** @description Also apply `country`/`country_mode` (e.g. a Member State report) */
                 apply_country?: boolean;
                 /** @description Inclusive */
                 start_date?: string | null;
@@ -1523,7 +1523,7 @@ export interface operations {
                 subject?: string[] | null;
                 /** @description ISO3 code, used by `country_mode` */
                 country?: string | null;
-                /** @description `voted`: only resolutions the country voted on; `member`: only while it was a UN member (or voted); `yes`/`no`/`abstain`: only where it voted that way */
+                /** @description `voted`: only resolutions the State voted on; `member`: only while it was a UN member (or voted); `yes`/`no`/`abstain`: only where it voted that way */
                 country_mode?: "voted" | "member" | "none" | "yes" | "no" | "abstain";
                 /** @description Title/keyword search: "," = OR, "&" = AND, "\"…\"" = exact term */
                 keyword?: string | null;
@@ -1571,7 +1571,7 @@ export interface operations {
     resolution_facets_api_v1_resolutions_facets_get: {
         parameters: {
             query?: {
-                /** @description Language for country and subject names */
+                /** @description Language for State and subject names */
                 lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
                 /** @description Inclusive */
                 start_date?: string | null;
@@ -1581,7 +1581,7 @@ export interface operations {
                 subject?: string[] | null;
                 /** @description ISO3 code, used by `country_mode` */
                 country?: string | null;
-                /** @description `voted`: only resolutions the country voted on; `member`: only while it was a UN member (or voted); `yes`/`no`/`abstain`: only where it voted that way */
+                /** @description `voted`: only resolutions the State voted on; `member`: only while it was a UN member (or voted); `yes`/`no`/`abstain`: only where it voted that way */
                 country_mode?: "voted" | "member" | "none" | "yes" | "no" | "abstain";
                 /** @description Title/keyword search: "," = OR, "&" = AND, "\"…\"" = exact term */
                 keyword?: string | null;
@@ -1661,7 +1661,7 @@ export interface operations {
     resolution_detail_api_v1_resolutions__undl_id__get: {
         parameters: {
             query?: {
-                /** @description Language for country and subject names */
+                /** @description Language for State and subject names */
                 lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
             };
             header?: never;
@@ -1703,7 +1703,7 @@ export interface operations {
                 subject?: string[] | null;
                 /** @description ISO3 code, used by `country_mode` */
                 country?: string | null;
-                /** @description `voted`: only resolutions the country voted on; `member`: only while it was a UN member (or voted); `yes`/`no`/`abstain`: only where it voted that way */
+                /** @description `voted`: only resolutions the State voted on; `member`: only while it was a UN member (or voted); `yes`/`no`/`abstain`: only where it voted that way */
                 country_mode?: "voted" | "member" | "none" | "yes" | "no" | "abstain";
                 /** @description Title/keyword search: "," = OR, "&" = AND, "\"…\"" = exact term */
                 keyword?: string | null;
@@ -1793,7 +1793,7 @@ export interface operations {
                 start_date?: string | null;
                 end_date?: string | null;
                 min_votes?: number;
-                /** @description Language for country and subject names */
+                /** @description Language for State and subject names */
                 lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
             };
             header?: never;
@@ -1826,7 +1826,7 @@ export interface operations {
         parameters: {
             query?: {
                 min_votes?: number;
-                /** @description Language for country and subject names */
+                /** @description Language for State and subject names */
                 lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
                 /** @description Inclusive */
                 start_date?: string | null;
@@ -1836,7 +1836,7 @@ export interface operations {
                 subject?: string[] | null;
                 /** @description ISO3 code, used by `country_mode` */
                 country?: string | null;
-                /** @description `voted`: only resolutions the country voted on; `member`: only while it was a UN member (or voted); `yes`/`no`/`abstain`: only where it voted that way */
+                /** @description `voted`: only resolutions the State voted on; `member`: only while it was a UN member (or voted); `yes`/`no`/`abstain`: only where it voted that way */
                 country_mode?: "voted" | "member" | "none" | "yes" | "no" | "abstain";
                 /** @description Title/keyword search: "," = OR, "&" = AND, "\"…\"" = exact term */
                 keyword?: string | null;
@@ -1895,7 +1895,7 @@ export interface operations {
                 subject?: string[] | null;
                 /** @description ISO3 code, used by `country_mode` */
                 country?: string | null;
-                /** @description `voted`: only resolutions the country voted on; `member`: only while it was a UN member (or voted); `yes`/`no`/`abstain`: only where it voted that way */
+                /** @description `voted`: only resolutions the State voted on; `member`: only while it was a UN member (or voted); `yes`/`no`/`abstain`: only where it voted that way */
                 country_mode?: "voted" | "member" | "none" | "yes" | "no" | "abstain";
                 /** @description Title/keyword search: "," = OR, "&" = AND, "\"…\"" = exact term */
                 keyword?: string | null;
@@ -1952,7 +1952,7 @@ export interface operations {
                 subject?: string[] | null;
                 /** @description Leave states that no longer exist out of the rank and the rankings */
                 exclude_historical?: boolean;
-                /** @description Language for country and subject names */
+                /** @description Language for State and subject names */
                 lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
             };
             header?: never;
@@ -1990,7 +1990,7 @@ export interface operations {
                 end_date?: string | null;
                 /** @description Thesaurus subject ids (repeatable); descendants are included */
                 subject?: string[] | null;
-                /** @description Language for country and subject names */
+                /** @description Language for State and subject names */
                 lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
             };
             header?: never;
@@ -2026,7 +2026,7 @@ export interface operations {
             query?: {
                 start_date?: string | null;
                 end_date?: string | null;
-                /** @description Language for country and subject names */
+                /** @description Language for State and subject names */
                 lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
             };
             header?: never;
@@ -2060,7 +2060,7 @@ export interface operations {
             query?: {
                 start_date?: string | null;
                 end_date?: string | null;
-                /** @description Language for country and subject names */
+                /** @description Language for State and subject names */
                 lang?: "en" | "fr" | "es" | "ar" | "zh" | "ru";
             };
             header?: never;

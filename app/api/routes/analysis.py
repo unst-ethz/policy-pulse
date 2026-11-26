@@ -71,7 +71,7 @@ def _consensus(scores) -> schemas.ConsensusScale | None:
 def agreement_map(
     criteria: Annotated[ResolutionFilter, Depends(resolution_filter)],
 ) -> schemas.AgreementMap:
-    """Mean pairwise agreement of `country` with every other country over the selection.
+    """Mean pairwise agreement of `country` with every other State over the selection.
 
     `consensus` gives the 1st/99th percentile and mean consensus of the selected resolutions,
     for a colour scale centred on the average.
@@ -103,7 +103,7 @@ def agreement_timeline(
 ) -> schemas.AgreementTimeline:
     """Mean agreement per General Assembly session over the *whole* history (no filters).
 
-    A session's value is null below `min_votes` shared votes and after the compared country's
+    A session's value is null below `min_votes` shared votes and after the compared State's
     last vote.
     """
     iso3 = known_country(country, "country")
@@ -152,9 +152,9 @@ def agreement_by_subject(
     min_votes: Annotated[int, Query(ge=1)] = agreement.SUBJECT_MIN_VOTES,
     lang: LangParam = "en",
 ) -> schemas.AgreementBySubject:
-    """Agreement with each compared country per thesaurus domain.
+    """Agreement with each compared State per thesaurus domain.
 
-    Subjects come by mean agreement over the compared countries, best first. Uses the date
+    Subjects come by mean agreement over the compared States, best first. Uses the date
     range only: subjects are the dimension being compared.
     """
     iso3 = known_country(country, "country")
@@ -199,9 +199,9 @@ def multilateral(
     min_votes: Annotated[int, Query(ge=1)] = agreement.MULTILATERAL_MIN_VOTES,
     lang: LangParam = "en",
 ) -> schemas.Multilateral:
-    """Each country's mean agreement with all others, and its Yes/No/Abstain shares.
+    """Each State's mean agreement with all others, and its Yes/No/Abstain shares.
 
-    Countries with fewer than `min_votes` votes cast in the selection are left out.
+    States with fewer than `min_votes` votes cast in the selection are left out.
     """
     df = _selection(criteria)
     stats = agreement.multilateral_overview(data.query_engine, df["undl_id"].tolist(), min_votes)
@@ -290,7 +290,7 @@ def country_profile(
     ] = False,
     lang: LangParam = "en",
 ) -> schemas.CountryProfile:
-    """A country's record over a period (clamped to its participation), as on the profile page.
+    """A State's record over a period (clamped to its participation), as on the profile page.
 
     `compare` defaults to the P5 when empty.
     """
