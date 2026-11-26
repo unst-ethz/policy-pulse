@@ -115,7 +115,10 @@ const fill = (iso3: string) => {
 const mapTooltip = (iso3: string) => {
   if (iso3 === props.iso3) return `<b>${name(iso3)}</b>`
   const score = scores.value.get(iso3)
-  return `<b>${name(iso3)}</b><br>${score == null ? t('country.noSharedVote') : t('country.agreement', { value: n(score, 'score') })}`
+  if (score == null) return `<b>${name(iso3)}</b><br><span style="color:${colors.muted}">${t('country.noSharedVote')}</span>`
+  // Ties share a rank: 1 + the number of States that agree more.
+  const rank = 1 + mapRows.value.filter((r) => (r.score ?? 0) > score).length
+  return `<b>${name(iso3)}</b><br>${t('country.agreementRank', { value: n(score, 'score'), rank, of: mapRows.value.length })}`
 }
 const mapRows = computed(() =>
   mapScores.value

@@ -35,6 +35,13 @@ onMounted(async () => {
   ready.value = true
 })
 
+/** A square in the country's fill, so the tooltip ties back to the colour on the map. */
+function swatch(iso3: string): string {
+  const fill = props.fill(iso3)
+  if (!fill) return ''
+  return `<span style="display:inline-block;width:10px;height:10px;margin-right:6px;border-radius:2px;border:1px solid ${colors['rule-strong']};background:${fill}"></span>`
+}
+
 const option = computed(() => {
   const regions = isos.value.map((iso3) => {
     const fill = props.fill(iso3)
@@ -56,7 +63,6 @@ const option = computed(() => {
       backgroundColor: colors.surface,
       borderColor: colors['rule-strong'],
       textStyle: { color: colors.ink, fontFamily: colors['font-sans'], fontSize: 13 },
-      formatter: (p: { name: string }) => props.tooltip(p.name),
     },
     geo: {
       map: 'world',
@@ -73,6 +79,8 @@ const option = computed(() => {
       label: { show: false },
       emphasis: { label: { show: false } },
       select: { disabled: true },
+      // ECharts ignores the top-level tooltip formatter for components like geo; it must sit here.
+      tooltip: { formatter: (p: { name: string }) => swatch(p.name) + props.tooltip(p.name) },
       itemStyle: { areaColor: colors.surface, borderColor: colors['rule-strong'], borderWidth: 0.5 },
       regions,
     },

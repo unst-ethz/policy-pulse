@@ -144,13 +144,13 @@ const fill = (iso3: string) => {
 }
 const mapTooltip = (iso3: string) => {
   const c = byCountry.value.get(iso3)
-  if (!c) return `<b>${name(iso3)}</b><br>${t('subject.fewVotes', { n: MIN_VOTES })}`
-  return `<b>${name(iso3)}</b><br>${t('subject.mapTooltip', {
+  if (!c) return `<b>${name(iso3)}</b><br><span style="color:${colors.muted}">${t('subject.fewVotes', { n: MIN_VOTES })}</span>`
+  const rates = t('subject.mapTooltip', {
     yes: n(c.yes_rate ?? 0, 'percentShort'),
     no: n(c.no_rate ?? 0, 'percentShort'),
     abstain: n(c.abstention_rate ?? 0, 'percentShort'),
-    n: n(c.votes_cast),
-  })}`
+  })
+  return `<b>${name(iso3)}</b><br>${rates}<br><span style="color:${colors.muted}">${t('subject.mapVotes', { n: n(c.votes_cast) })}</span>`
 }
 function ranked(key: 'no_rate' | 'abstention_rate') {
   return voters.value
