@@ -42,7 +42,8 @@ const options = computed<ListOptions>(() => ({
 const result = useResolutions(filters, options)
 const pages = computed(() => Math.max(1, Math.ceil((result.data.value?.total ?? 0) / PAGE_SIZE)))
 const columns = computed(() => votes.value.map((iso3) => ({ iso3, label: name(iso3) })))
-const download = computed(() => csvUrl(filters.value, votes.value, locale.value as Lang))
+// The export skips the single-State filter unless asked, but the list applies it
+const download = computed(() => `${csvUrl(filters.value, votes.value, locale.value as Lang)}&apply_country=true`)
 
 </script>
 
