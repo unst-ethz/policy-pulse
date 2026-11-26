@@ -36,5 +36,5 @@ export function yearSpan(start?: string | null, end?: string | null): string {
 }
 
 /** Fixed colours for a comparison list, by position (never re-assigned when an entry is removed). */
-export const SERIES_SLOTS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4'] as const
-export const SERIES_SLOTS_DARK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181'] as const
+export const SERIES_SLOTS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300'] as const
+export const SERIES_SLOTS_DARK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#0ca30c'] as const
