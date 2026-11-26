@@ -52,7 +52,7 @@ def _country(iso3: str, lang: str) -> schemas.Country:
 
 @router.get("/countries", response_model=list[schemas.Country])
 def countries(lang: LangParam = "en") -> list[schemas.Country]:
-    """Every country with vote data, sorted by name."""
+    """Every Member State and former State with vote data, sorted by name."""
     result = [_country(iso3, lang) for iso3 in data.available_countries]
     return sorted(result, key=lambda c: c.name)
 
@@ -75,7 +75,7 @@ def _tree(nodes: list[dict], label) -> list[schemas.TreeNode]:
 
 @router.get("/regions/tree", response_model=list[schemas.TreeNode])
 def region_tree(lang: LangParam = "en") -> list[schemas.TreeNode]:
-    """M49 World → region → sub-region → [intermediate region] → country, plus historical states.
+    """M49 World → region → sub-region → [intermediate region] → State, plus historical States.
 
     Leaves are ISO3 codes with localised names; region names are English (M49 publishes them so).
     """

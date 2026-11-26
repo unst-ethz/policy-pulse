@@ -80,7 +80,7 @@ class Resolution(BaseModel):
     abstentions: int | None
     modality: str | None
     undl_link: str | None
-    votes: dict[str, Vote] = Field(default={}, description="Votes of the requested countries")
+    votes: dict[str, Vote] = Field(default={}, description="Votes of the requested States")
     category: str | None = None
     sponsor_count: int | None = Field(
         default=None, description="null when sponsorship is unknown (no draft could be read)"
@@ -113,7 +113,7 @@ class ResolutionDetail(Resolution):
     non_voting: int | None
     subjects: list[Subject]
     keywords: dict[str, list[str]] = Field(description="Keyword terms per dimension")
-    all_votes: dict[str, Vote] = Field(description="Every country's vote (X = did not participate)")
+    all_votes: dict[str, Vote] = Field(description="Every State's vote (X = did not participate)")
     sponsors: list[Sponsor] = Field(description="Original sponsors first; empty when unknown")
     sponsorship_note: str | None = Field(description="Why the sponsors are unknown, if they are")
 
@@ -163,7 +163,7 @@ class SubjectAgreement(BaseModel):
     subject_id: str
     label: str
     values: dict[str, SessionValue] = Field(
-        description="Per compared country; a country with fewer than `min_votes` shared votes "
+        description="Per compared State; a State with fewer than `min_votes` shared votes "
         "on the subject is left out"
     )
 
@@ -239,7 +239,7 @@ class CountryProfile(BaseModel):
         description='"Y", "N", "A" and "absent" (did not take part), over recorded votes only'
     )
     adopted_without_vote: int
-    non_recorded_votes: int = Field(description="Adopted by a vote not recorded per country")
+    non_recorded_votes: int = Field(description="Adopted by a vote not recorded per State")
     multilateral_alignment: float | None
     multilateral_rank: int | None
     multilateral_ranked: int
@@ -285,7 +285,7 @@ class CountrySponsorship(BaseModel):
     per_year: list[SponsorshipYear]
     by_subject: list[SubjectCount] = Field(description="Per thesaurus domain, most first")
     reception: list[SponsorReception] = Field(
-        description="Other countries' votes on the recorded-vote resolutions it sponsored, "
+        description="Other States' votes on the recorded-vote resolutions it sponsored, "
         "most votes against first"
     )
     not_yes: list[NotableVote] = Field(

@@ -16,7 +16,7 @@ from ..un_data_stream.analysis.filtering import CountryMode, GroupVote, Resoluti
 from ..un_data_stream.analysis.profile import NON_RECORDED_VOTE, RECORDED_VOTE, WITHOUT_VOTE
 
 Lang = Literal["en", "fr", "es", "ar", "zh", "ru"]
-LangParam = Annotated[Lang, Query(description="Language for country and subject names")]
+LangParam = Annotated[Lang, Query(description="Language for State and subject names")]
 
 # How a resolution was adopted, as the API names it -> the data's `modality`
 Adoption = Literal["recorded", "non_recorded", "without_vote"]
@@ -43,7 +43,7 @@ def resolution_filter(
     country_mode: Annotated[
         CountryMode,
         Query(
-            description="`voted`: only resolutions the country voted on; "
+            description="`voted`: only resolutions the State voted on; "
             "`member`: only while it was a UN member (or voted); "
             "`yes`/`no`/`abstain`: only where it voted that way"
         ),

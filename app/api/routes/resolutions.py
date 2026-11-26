@@ -71,7 +71,7 @@ def list_resolutions(
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
 ) -> schemas.ResolutionPage:
-    """Filtered, sorted, paginated resolutions; optionally with some countries' votes."""
+    """Filtered, sorted, paginated resolutions; optionally with some States' votes."""
     if (vote or agreement) and not criteria.country:
         raise HTTPException(422, "`vote` and `agreement` need `country`")
     if bool(pair) != bool(agreement):
@@ -110,10 +110,10 @@ def export_resolutions(
     votes: VotesParam = None,
     lang: LangParam = "en",
     apply_country: Annotated[
-        bool, Query(description="Also apply `country`/`country_mode` (e.g. a country report)")
+        bool, Query(description="Also apply `country`/`country_mode` (e.g. a Member State report)")
     ] = False,
 ) -> Response:
-    """The filtered resolutions as CSV, with a named vote column per requested country.
+    """The filtered resolutions as CSV, with a named vote column per requested State.
 
     Applies dates, subjects and keyword; `country_mode` only with `apply_country`, as by default
     in the Dash download.
@@ -195,7 +195,7 @@ def recent_resolutions(
 
 @router.get("/resolutions/{undl_id}", response_model=schemas.ResolutionDetail)
 def resolution_detail(undl_id: str, lang: LangParam = "en") -> schemas.ResolutionDetail:
-    """One resolution with every country's vote, its subjects and keywords."""
+    """One resolution with every State's vote, its subjects and keywords."""
     snapshot = data.query_engine.snapshot
     table = snapshot.resolution_table
     rows = table[table["undl_id"] == undl_id]
