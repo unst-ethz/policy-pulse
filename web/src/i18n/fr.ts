@@ -173,6 +173,9 @@ const fr: typeof en = {
     modes: {
       voted: 'Votées par le pays',
       member: 'Pendant son adhésion',
+      yes: 'Le pays a voté oui',
+      no: 'Le pays a voté non',
+      abstain: 'Le pays s’est abstenu',
       none: 'Toutes',
     },
     sponsor: 'Parrainées par',

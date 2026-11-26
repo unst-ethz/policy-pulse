@@ -10,7 +10,13 @@ from typing import Iterable
 
 import pandas as pd
 
-from .filtering import MembershipMask, ResolutionFilter, filter_resolutions, group_vote_masks
+from .filtering import (
+    MembershipMask,
+    ResolutionFilter,
+    country_mode_masks,
+    filter_resolutions,
+    group_vote_masks,
+)
 from .query_engine import ResolutionQueryEngine
 from .subjects import domain_pairs
 
@@ -52,6 +58,27 @@ def group_vote_counts(
     )
     masks = group_vote_masks(df, criteria.group, criteria.group_all_voted)
     return {vote: int(mask.sum()) for vote, mask in masks.items()}
+
+
+def country_mode_counts(
+    engine: ResolutionQueryEngine,
+    criteria: ResolutionFilter,
+    membership_mask: MembershipMask | None = None,
+) -> dict[str, int]:
+    """Resolutions per `country_mode` of `country` (see `country_mode_masks`), under every other
+    filter."""
+    if not criteria.country:
+        return {}
+    df = filter_resolutions(
+        engine,
+        replace(criteria, country_mode="none"),
+        membership_mask=membership_mask,
+        columns=None,
+    )
+    if criteria.country not in df.columns:
+        return {}
+    masks = country_mode_masks(df, criteria.country, membership_mask)
+    return {mode: int(mask.sum()) for mode, mask in masks.items()}
 
 
 def domain_counts(

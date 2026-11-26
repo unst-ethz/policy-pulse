@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
  * The States the list is about. Picking them only adds their votes as columns; the radio below is
- * the separate, optional filter: for one State its point of view (voted on, while a member), for
+ * the separate, optional filter: for one State its point of view (voted on, while a member, how
+ * it voted), for
  * several how they voted together (alike, split, or from three States a majority one way).
  */
 import { computed } from 'vue'
@@ -22,7 +23,7 @@ import { GROUPS } from '@/groups'
 import CountryList from '../CountryList.vue'
 import FacetPanel from './FacetPanel.vue'
 
-const MODES: CountryMode[] = ['none', 'voted', 'member']
+const MODES: CountryMode[] = ['none', 'voted', 'member', 'yes', 'no', 'abstain']
 // A majority of two is just both of them: offered from three States up
 const MAJORITIES: GroupVote[] = ['yes', 'no', 'abstain']
 
@@ -67,6 +68,9 @@ const groupVotes = computed(() => GROUP_VOTES.filter((v) => offered(v) || filter
 const counts = computed(
   () => new Map((facets.data.value?.group_votes ?? []).map((g) => [g.group_vote, g.resolutions])),
 )
+const modeCounts = computed(
+  () => new Map((facets.data.value?.country_modes ?? []).map((m) => [m.country_mode, m.resolutions])),
+)
 </script>
 
 <template>
@@ -94,10 +98,17 @@ const counts = computed(
 
     <p v-if="states.length > MAX_VOTE_COLUMNS" class="hint">{{ t('facets.tooManyColumns', { n: MAX_VOTE_COLUMNS }) }}</p>
 
-    <div v-if="states.length === 1" class="options" role="radiogroup" :aria-label="t('filters.mode')">
+    <div
+      v-if="states.length === 1"
+      class="options"
+      :class="{ fetching: facets.isFetching.value }"
+      role="radiogroup"
+      :aria-label="t('filters.mode')"
+    >
       <label v-for="mode in MODES" :key="mode" class="row">
         <input type="radio" name="facet-states-mode" :checked="filters.mode === mode" @change="update({ mode })" />
         <span>{{ mode === 'none' ? t('facets.anyResolution') : t(`filters.modes.${mode}`) }}</span>
+        <span v-if="mode !== 'none'" class="count">{{ n(modeCounts.get(mode) ?? 0) }}</span>
       </label>
     </div>
     <template v-else-if="states.length > 1">

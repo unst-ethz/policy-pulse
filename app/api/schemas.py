@@ -328,6 +328,11 @@ class GroupVoteCount(BaseModel):
     resolutions: int
 
 
+class CountryModeCount(BaseModel):
+    country_mode: Literal["voted", "member", "yes", "no", "abstain"]
+    resolutions: int
+
+
 class DomainCount(BaseModel):
     subject_id: str
     label: str
@@ -343,6 +348,9 @@ class ResolutionFacets(BaseModel):
     )
     group_votes: list[GroupVoteCount] = Field(
         description="With `group`: every filter but `group_vote` applied; empty without a group"
+    )
+    country_modes: list[CountryModeCount] = Field(
+        description="With `country`: every filter but `country_mode` applied; empty without one"
     )
     domains: list[DomainCount] = Field(
         description="Every filter but the subjects applied; most first, empty domains left out"

@@ -44,7 +44,8 @@ def resolution_filter(
         CountryMode,
         Query(
             description="`voted`: only resolutions the country voted on; "
-            "`member`: only while it was a UN member (or voted)"
+            "`member`: only while it was a UN member (or voted); "
+            "`yes`/`no`/`abstain`: only where it voted that way"
         ),
     ] = "none",
     keyword: Annotated[

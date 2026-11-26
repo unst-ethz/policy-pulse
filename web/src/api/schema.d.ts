@@ -574,6 +574,16 @@ export interface components {
                 number
             ] | null;
         };
+        /** CountryModeCount */
+        CountryModeCount: {
+            /**
+             * Country Mode
+             * @enum {string}
+             */
+            country_mode: "voted" | "member" | "yes" | "no" | "abstain";
+            /** Resolutions */
+            resolutions: number;
+        };
         /** CountryProfile */
         CountryProfile: {
             /** Country */
@@ -996,6 +1006,11 @@ export interface components {
              * @description With `group`: every filter but `group_vote` applied; empty without a group
              */
             group_votes: components["schemas"]["GroupVoteCount"][];
+            /**
+             * Country Modes
+             * @description With `country`: every filter but `country_mode` applied; empty without one
+             */
+            country_modes: components["schemas"]["CountryModeCount"][];
             /**
              * Domains
              * @description Every filter but the subjects applied; most first, empty domains left out
@@ -1446,8 +1461,8 @@ export interface operations {
                 subject?: string[] | null;
                 /** @description ISO3 code, used by `country_mode` */
                 country?: string | null;
-                /** @description `voted`: only resolutions the country voted on; `member`: only while it was a UN member (or voted) */
-                country_mode?: "voted" | "member" | "none";
+                /** @description `voted`: only resolutions the country voted on; `member`: only while it was a UN member (or voted); `yes`/`no`/`abstain`: only where it voted that way */
+                country_mode?: "voted" | "member" | "none" | "yes" | "no" | "abstain";
                 /** @description Title/keyword search: "," = OR, "&" = AND, "\"…\"" = exact term */
                 keyword?: string | null;
                 /** @description ISO3 code: only resolutions this state sponsored */
@@ -1458,7 +1473,7 @@ export interface operations {
                 sponsorship_known?: boolean;
                 /** @description ISO3 codes and/or M49 region codes (repeatable or comma-separated), judged together by `group_vote`; a region stands for its states */
                 group?: string[] | null;
-                /** @description With `group`: the states that voted all voted `alike`, `split`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
+                /** @description With `group`: the states that voted all voted `alike`, `split`, split with both a yes and a no (`opposed`), or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
                 group_vote?: ("alike" | "split" | "opposed" | "yes" | "no" | "abstain") | null;
                 /** @description With `group_vote`: only where every state of `group` voted */
                 group_all_voted?: boolean;
@@ -1508,8 +1523,8 @@ export interface operations {
                 subject?: string[] | null;
                 /** @description ISO3 code, used by `country_mode` */
                 country?: string | null;
-                /** @description `voted`: only resolutions the country voted on; `member`: only while it was a UN member (or voted) */
-                country_mode?: "voted" | "member" | "none";
+                /** @description `voted`: only resolutions the country voted on; `member`: only while it was a UN member (or voted); `yes`/`no`/`abstain`: only where it voted that way */
+                country_mode?: "voted" | "member" | "none" | "yes" | "no" | "abstain";
                 /** @description Title/keyword search: "," = OR, "&" = AND, "\"…\"" = exact term */
                 keyword?: string | null;
                 /** @description ISO3 code: only resolutions this state sponsored */
@@ -1520,7 +1535,7 @@ export interface operations {
                 sponsorship_known?: boolean;
                 /** @description ISO3 codes and/or M49 region codes (repeatable or comma-separated), judged together by `group_vote`; a region stands for its states */
                 group?: string[] | null;
-                /** @description With `group`: the states that voted all voted `alike`, `split`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
+                /** @description With `group`: the states that voted all voted `alike`, `split`, split with both a yes and a no (`opposed`), or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
                 group_vote?: ("alike" | "split" | "opposed" | "yes" | "no" | "abstain") | null;
                 /** @description With `group_vote`: only where every state of `group` voted */
                 group_all_voted?: boolean;
@@ -1566,8 +1581,8 @@ export interface operations {
                 subject?: string[] | null;
                 /** @description ISO3 code, used by `country_mode` */
                 country?: string | null;
-                /** @description `voted`: only resolutions the country voted on; `member`: only while it was a UN member (or voted) */
-                country_mode?: "voted" | "member" | "none";
+                /** @description `voted`: only resolutions the country voted on; `member`: only while it was a UN member (or voted); `yes`/`no`/`abstain`: only where it voted that way */
+                country_mode?: "voted" | "member" | "none" | "yes" | "no" | "abstain";
                 /** @description Title/keyword search: "," = OR, "&" = AND, "\"…\"" = exact term */
                 keyword?: string | null;
                 /** @description ISO3 code: only resolutions this state sponsored */
@@ -1578,7 +1593,7 @@ export interface operations {
                 sponsorship_known?: boolean;
                 /** @description ISO3 codes and/or M49 region codes (repeatable or comma-separated), judged together by `group_vote`; a region stands for its states */
                 group?: string[] | null;
-                /** @description With `group`: the states that voted all voted `alike`, `split`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
+                /** @description With `group`: the states that voted all voted `alike`, `split`, split with both a yes and a no (`opposed`), or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
                 group_vote?: ("alike" | "split" | "opposed" | "yes" | "no" | "abstain") | null;
                 /** @description With `group_vote`: only where every state of `group` voted */
                 group_all_voted?: boolean;
@@ -1688,8 +1703,8 @@ export interface operations {
                 subject?: string[] | null;
                 /** @description ISO3 code, used by `country_mode` */
                 country?: string | null;
-                /** @description `voted`: only resolutions the country voted on; `member`: only while it was a UN member (or voted) */
-                country_mode?: "voted" | "member" | "none";
+                /** @description `voted`: only resolutions the country voted on; `member`: only while it was a UN member (or voted); `yes`/`no`/`abstain`: only where it voted that way */
+                country_mode?: "voted" | "member" | "none" | "yes" | "no" | "abstain";
                 /** @description Title/keyword search: "," = OR, "&" = AND, "\"…\"" = exact term */
                 keyword?: string | null;
                 /** @description ISO3 code: only resolutions this state sponsored */
@@ -1700,7 +1715,7 @@ export interface operations {
                 sponsorship_known?: boolean;
                 /** @description ISO3 codes and/or M49 region codes (repeatable or comma-separated), judged together by `group_vote`; a region stands for its states */
                 group?: string[] | null;
-                /** @description With `group`: the states that voted all voted `alike`, `split`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
+                /** @description With `group`: the states that voted all voted `alike`, `split`, split with both a yes and a no (`opposed`), or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
                 group_vote?: ("alike" | "split" | "opposed" | "yes" | "no" | "abstain") | null;
                 /** @description With `group_vote`: only where every state of `group` voted */
                 group_all_voted?: boolean;
@@ -1821,8 +1836,8 @@ export interface operations {
                 subject?: string[] | null;
                 /** @description ISO3 code, used by `country_mode` */
                 country?: string | null;
-                /** @description `voted`: only resolutions the country voted on; `member`: only while it was a UN member (or voted) */
-                country_mode?: "voted" | "member" | "none";
+                /** @description `voted`: only resolutions the country voted on; `member`: only while it was a UN member (or voted); `yes`/`no`/`abstain`: only where it voted that way */
+                country_mode?: "voted" | "member" | "none" | "yes" | "no" | "abstain";
                 /** @description Title/keyword search: "," = OR, "&" = AND, "\"…\"" = exact term */
                 keyword?: string | null;
                 /** @description ISO3 code: only resolutions this state sponsored */
@@ -1833,7 +1848,7 @@ export interface operations {
                 sponsorship_known?: boolean;
                 /** @description ISO3 codes and/or M49 region codes (repeatable or comma-separated), judged together by `group_vote`; a region stands for its states */
                 group?: string[] | null;
-                /** @description With `group`: the states that voted all voted `alike`, `split`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
+                /** @description With `group`: the states that voted all voted `alike`, `split`, split with both a yes and a no (`opposed`), or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
                 group_vote?: ("alike" | "split" | "opposed" | "yes" | "no" | "abstain") | null;
                 /** @description With `group_vote`: only where every state of `group` voted */
                 group_all_voted?: boolean;
@@ -1880,8 +1895,8 @@ export interface operations {
                 subject?: string[] | null;
                 /** @description ISO3 code, used by `country_mode` */
                 country?: string | null;
-                /** @description `voted`: only resolutions the country voted on; `member`: only while it was a UN member (or voted) */
-                country_mode?: "voted" | "member" | "none";
+                /** @description `voted`: only resolutions the country voted on; `member`: only while it was a UN member (or voted); `yes`/`no`/`abstain`: only where it voted that way */
+                country_mode?: "voted" | "member" | "none" | "yes" | "no" | "abstain";
                 /** @description Title/keyword search: "," = OR, "&" = AND, "\"…\"" = exact term */
                 keyword?: string | null;
                 /** @description ISO3 code: only resolutions this state sponsored */
@@ -1892,7 +1907,7 @@ export interface operations {
                 sponsorship_known?: boolean;
                 /** @description ISO3 codes and/or M49 region codes (repeatable or comma-separated), judged together by `group_vote`; a region stands for its states */
                 group?: string[] | null;
-                /** @description With `group`: the states that voted all voted `alike`, `split`, or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
+                /** @description With `group`: the states that voted all voted `alike`, `split`, split with both a yes and a no (`opposed`), or a majority voted `yes`/`no`/`abstain`. Needs two of them voting */
                 group_vote?: ("alike" | "split" | "opposed" | "yes" | "no" | "abstain") | null;
                 /** @description With `group_vote`: only where every state of `group` voted */
                 group_all_voted?: boolean;

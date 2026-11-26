@@ -13,7 +13,8 @@ from . import sponsorship
 from .keywords import keyword_index, matched_ids
 from .query_engine import ResolutionQueryEngine
 
-CountryMode = Literal["voted", "member", "none"]
+# One state's point of view: voted on, while a member, or how it voted
+CountryMode = Literal["voted", "member", "none", "yes", "no", "abstain"]
 # How a group of states voted: all alike, split, opposed (some yes, some no), or a majority one way
 GroupVote = Literal["alike", "split", "opposed", "yes", "no", "abstain"]
 
@@ -98,19 +99,11 @@ def filter_resolutions(
 
     country = criteria.country
     mode = criteria.country_mode or "none"
-    if apply_country and mode in ("voted", "member") and country in df.columns:
-        # No normalization: the vote columns are a category of exactly Y/N/A/X with no nulls
-        # (repository.py), and normalizing would decategorize 20k values on every call.
-        cast_a_vote = df[country].isin(CAST_VOTES)
-        if mode == "voted":
-            df = df[cast_a_vote]
-        else:
-            if membership_mask is None:
-                raise ValueError("country_mode='member' needs a membership_mask")
-            # Member on the day, *or* voted on this resolution. The second half is not
-            # redundant: membership periods are keyed by ISO code, so a state that voted under a
-            # predecessor's code has votes outside its recorded periods.
-            df = df[membership_mask(country, df["date"]) | cast_a_vote]
+    if apply_country and mode != "none" and country in df.columns:
+        masks = country_mode_masks(df, country, membership_mask)
+        if mode not in masks:
+            raise ValueError("country_mode='member' needs a membership_mask")
+        df = df[masks[mode]]
 
     if criteria.sponsor:
         ids = sponsorship.sponsored_ids(
@@ -131,6 +124,27 @@ def filter_resolutions(
     if columns is None:
         return df
     return df[[column for column in columns if column in df.columns]]
+
+
+def country_mode_masks(
+    df: pd.DataFrame, country: str, membership_mask: MembershipMask | None = None
+) -> dict[CountryMode, pd.Series]:
+    """Per `CountryMode` but `none`, which rows of `df` (with vote columns) it keeps.
+
+    `member` only with a `membership_mask`.
+    """
+    # No normalization: the vote columns are a category of exactly Y/N/A/X with no nulls
+    # (repository.py), and normalizing would decategorize 20k values on every call.
+    votes = df[country]
+    cast_a_vote = votes.isin(CAST_VOTES)
+    masks: dict[CountryMode, pd.Series] = {"voted": cast_a_vote}
+    if membership_mask is not None:
+        # Member on the day, *or* voted on this resolution. The second half is not
+        # redundant: membership periods are keyed by ISO code, so a state that voted under a
+        # predecessor's code has votes outside its recorded periods.
+        masks["member"] = membership_mask(country, df["date"]) | cast_a_vote
+    masks.update(yes=votes == "Y", no=votes == "N", abstain=votes == "A")
+    return masks
 
 
 def group_vote_masks(

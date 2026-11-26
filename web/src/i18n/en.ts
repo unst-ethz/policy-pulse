@@ -171,6 +171,9 @@ export default {
     modes: {
       voted: 'It voted on',
       member: 'While a member',
+      yes: 'It voted yes',
+      no: 'It voted no',
+      abstain: 'It abstained',
       none: 'All',
     },
     sponsor: 'Sponsored by',
