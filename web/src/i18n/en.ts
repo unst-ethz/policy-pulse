@@ -419,6 +419,7 @@ export default {
     focused: 'Most focused on this area',
     focusedText: 'The share of everything a State sponsored in these years that falls in this area. States with at least {n} sponsorships here.',
     ofOwn: '{n} of its {total} sponsorships',
+    ofArea: 'on {share} of these resolutions',
     focusedNone: 'No State sponsored {n} or more of these resolutions.',
     noSponsors: 'No sponsorship data for these years.',
     votesTitle: 'How States vote on it',

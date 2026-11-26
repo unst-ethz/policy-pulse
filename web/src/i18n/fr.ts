@@ -421,6 +421,7 @@ const fr: typeof en = {
     focused: 'Les plus centrés sur ce domaine',
     focusedText: 'La part de tout ce qu’un État a parrainé ces années-là qui relève de ce domaine. États ayant au moins {n} parrainages ici.',
     ofOwn: '{n} de ses {total} parrainages',
+    ofArea: 'sur {share} de ces résolutions',
     focusedNone: "Aucun État n'a parrainé {n} de ces résolutions ou plus.",
     noSponsors: 'Pas de données de parrainage pour ces années.',
     votesTitle: 'Comment les États votent',
