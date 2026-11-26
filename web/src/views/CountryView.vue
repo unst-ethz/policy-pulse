@@ -481,7 +481,7 @@ const downloadReport = () =>
       resolutions: {
         file: 'resolutions.csv',
         description:
-          'Resolutions in the selected years and subjects adopted while the country was a UN member, with its vote and those of the compared countries. The timeline covers the whole history and the topic chart every subject, whatever the filters. Membership is applied by date here, while the page counts whole years from the year the country joined, so its totals can be slightly higher.',
+          'Resolutions in the selected years and subjects adopted while the State was a UN Member State, with its vote and those of the compared States. The timeline covers the whole history and the topic chart every subject, whatever the filters. Membership is applied by date here, while the page counts whole years from the year the State joined, so its totals can be slightly higher.',
         api: new URL(resolutionsUrl.value, window.location.href).href,
       },
     }
