@@ -56,7 +56,6 @@ const option = computed(() => {
       backgroundColor: colors.surface,
       borderColor: colors['rule-strong'],
       textStyle: { color: colors.ink, fontFamily: colors['font-sans'], fontSize: 13 },
-      formatter: (p: { name: string }) => props.tooltip(p.name),
     },
     geo: {
       map: 'world',
@@ -73,6 +72,8 @@ const option = computed(() => {
       label: { show: false },
       emphasis: { label: { show: false } },
       select: { disabled: true },
+      // ECharts ignores the top-level tooltip formatter for components like geo; it must sit here.
+      tooltip: { formatter: (p: { name: string }) => props.tooltip(p.name) },
       itemStyle: { areaColor: colors.surface, borderColor: colors['rule-strong'], borderWidth: 0.5 },
       regions,
     },
