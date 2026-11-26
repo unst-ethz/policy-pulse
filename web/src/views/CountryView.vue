@@ -35,6 +35,7 @@ import { provideReport } from '@/composables/useReport'
 import { useThemeColors } from '@/composables/useThemeColors'
 import { download, svgToPng, withLightTheme, zip, type ZipEntry } from '@/export'
 import { createPdf, PDF_COLORS } from '@/pdf'
+import { GROUPS } from '@/groups'
 import { cleanTitle, flatSubjects, sentenceCase, SERIES_SLOTS, SERIES_SLOTS_DARK, yearSpan } from '@/format'
 
 const props = defineProps<{ iso3: string }>()
@@ -73,17 +74,14 @@ const requested = computed({
   get: () => listParam('compare'),
   set: (value: string[]) => setParam('compare', value),
 })
-// The profile's own default comparison is unused here: the defaults below come from its rankings
+// The profile's own default comparison is unused here: the default below is the P5
 const profile = useProfile(() => props.iso3, scope, () => [])
 const p = computed(() => profile.data.value)
 
-// What the comparison charts use: what was asked for, else the two states that vote most and the
-// two that vote least like it, for a contrast from the start. Only while nothing was picked, so
-// changing the filters never replaces a choice.
+// What the comparison charts use: what was asked for, else the P5 (but the country itself), a
+// familiar reference for every State
 const compare = computed(() =>
-  requested.value.length
-    ? requested.value
-    : [...new Set([...(p.value?.most_aligned ?? []).slice(0, 2), ...(p.value?.least_aligned ?? []).slice(0, 2)].map((r) => r.country))],
+  requested.value.length ? requested.value : GROUPS.p5.filter((iso3) => iso3 !== props.iso3),
 )
 const compareModel = computed({
   get: () => compare.value,
@@ -688,7 +686,14 @@ const membershipText = computed(() => {
           <p>{{ t('country.bilateralLead') }}</p>
         </div>
       </div>
-      <CountryList v-model="compareModel" :label="t('country.compareWith')" :colors="seriesColors" :exclude="[iso3]" groups />
+      <CountryList
+        v-model="compareModel"
+        :label="t('country.compareWith')"
+        :max="SERIES_SLOTS.length"
+        :colors="seriesColors"
+        :exclude="[iso3]"
+        groups
+      />
       <ChartFrame
         id="timeline"
         :export-title="t('country.timelineExportTitle', { name: name(iso3) })"
