@@ -106,6 +106,8 @@ const mostActive = computed(() => {
     label: name(s.country),
     value: s.sponsored / max,
     display: n(s.sponsored),
+    // A second line like "Most focused" has, so both lists keep the same row height
+    detail: t('subject.ofArea', { share: n(s.sponsored / Math.max(1, sponsors.data.value?.with_data ?? 0), 'percentShort') }),
     to: countryLink(s.country),
   }))
 })
@@ -460,6 +462,17 @@ const contestedLink = computed(() => ({ ...listLink.value, query: { ...listLink.
 
 .notable h3 {
   font-size: var(--text-lg);
+}
+
+/* One line per name, so side-by-side lists keep the same row height; the full name is in the tooltip */
+.notable :deep(.label) {
+  min-width: 0;
+}
+
+.notable :deep(.label a) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .flush {
