@@ -140,7 +140,7 @@ const fr: typeof en = {
       without_vote: 'Sans vote',
     },
     info: {
-      states: 'Chaque État choisi ajoute à la liste une colonne avec ses votes (six au plus). Un groupe ou une région ajoute tous ses États. Choisir des États ne change pas à lui seul les résolutions affichées ; pour cela, choisissez ci-dessous : pour un État, seulement les résolutions sur lesquelles il a voté ou celles adoptées pendant son adhésion ; pour plusieurs, comment ils ont voté ensemble : tous de la même façon, divisés, ou (à partir de trois) une majorité dans un sens. Seuls les votes enregistrés comptent alors, et les États qui n’ont pas participé au vote sont ignorés, sauf si tous doivent avoir voté. Les nombres tiennent compte de vos autres filtres.',
+      states: 'Chaque État choisi ajoute à la liste une colonne avec ses votes (six au plus). Un groupe ou une région ajoute tous ses États. Choisir des États ne change pas à lui seul les résolutions affichées ; pour cela, choisissez ci-dessous : pour un État, seulement les résolutions sur lesquelles il a voté, celles adoptées pendant son adhésion, ou celles où il a voté oui, non ou s’est abstenu ; pour plusieurs, comment ils ont voté ensemble : tous de la même façon, divisés, ou (à partir de trois) une majorité dans un sens. Seuls les votes enregistrés comptent pour la façon dont les États ont voté, et les États qui n’ont pas participé au vote sont ignorés, sauf si tous doivent avoir voté. Les nombres tiennent compte de vos autres filtres.',
       historical: 'Les États qui n’existent plus, comme l’URSS, la Yougoslavie, la Tchécoslovaquie ou les deux États allemands, sont exclus des listes par État, sauf si vous les incluez. Leurs votes comptent toujours dans les totaux.',
       years: 'L’année où l’Assemblée générale a adopté la résolution. Les barres comptent les résolutions par année avec tous vos autres filtres : elles montrent ce que déplacer ou élargir la période ajouterait.',
       adoption: 'Un vote enregistré indique le vote de chaque État ; seules ces résolutions montrent des votes individuels. Un vote non enregistré ne donne que les totaux. La plupart des résolutions sont adoptées sans vote, par consensus. Les nombres tiennent compte de vos autres filtres.',
@@ -173,6 +173,9 @@ const fr: typeof en = {
     modes: {
       voted: 'Votées par le pays',
       member: 'Pendant son adhésion',
+      yes: 'Le pays a voté oui',
+      no: 'Le pays a voté non',
+      abstain: 'Le pays s’est abstenu',
       none: 'Toutes',
     },
     sponsor: 'Parrainées par',

@@ -1,5 +1,7 @@
 """Facet counts over the synthetic world in conftest.py."""
 
+import pandas as pd
+
 from app.un_data_stream.analysis import facets, filtering
 from app.un_data_stream.analysis.filtering import ResolutionFilter
 
@@ -63,3 +65,13 @@ def test_group_votes_can_require_every_state_to_have_voted(engine):
 
 def test_a_group_of_one_matches_nothing(engine):
     assert ids(engine, group=("AAA",), group_vote="alike") == []
+
+
+def test_country_modes_ignore_their_own_filter(engine):
+    def member_from_2001(_iso3, dates):
+        return dates >= pd.Timestamp("2001-01-01")
+
+    criteria = ResolutionFilter(country="DDD", country_mode="no")
+    counts = facets.country_mode_counts(engine, criteria, member_from_2001)
+    assert counts == {"voted": 4, "member": 5, "yes": 2, "no": 1, "abstain": 1}
+    assert facets.country_mode_counts(engine, ResolutionFilter()) == {}

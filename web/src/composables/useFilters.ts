@@ -9,7 +9,7 @@
 import { type ComputedRef, computed, type InjectionKey, inject } from 'vue'
 import { type LocationQuery, useRoute, useRouter } from 'vue-router'
 
-export type CountryMode = 'voted' | 'member' | 'none'
+export type CountryMode = 'voted' | 'member' | 'yes' | 'no' | 'abstain' | 'none'
 /** How a resolution was adopted, as the API names it. */
 export type Adoption = 'recorded' | 'non_recorded' | 'without_vote'
 export const ADOPTIONS: Adoption[] = ['recorded', 'non_recorded', 'without_vote']
@@ -38,7 +38,7 @@ export interface Filters {
   historical: boolean
 }
 
-const MODES: CountryMode[] = ['voted', 'member', 'none']
+const MODES: CountryMode[] = ['voted', 'member', 'yes', 'no', 'abstain', 'none']
 
 function many(value: LocationQuery[string] | undefined): string[] {
   return (Array.isArray(value) ? value : value ? [value] : []).filter((v): v is string => !!v)

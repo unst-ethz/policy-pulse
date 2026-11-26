@@ -194,6 +194,19 @@ def test_group_vote_filter_and_facet(client):
     get(client, f"{base}?group=XXX&group_vote=alike", status=422)
 
 
+def test_country_mode_filter_and_facet(client):
+    base = "/api/v1/resolutions"
+    query = "country=CHE&country_mode=no&start_date=2000-01-01"
+    counts = {
+        m["country_mode"]: m["resolutions"]
+        for m in get(client, f"{base}/facets?{query}")["country_modes"]
+    }
+    for mode in ("voted", "member", "yes", "no", "abstain"):
+        assert get(client, f"{base}?{query.replace('=no', '=' + mode)}")["total"] == counts[mode]
+    assert counts["yes"] + counts["no"] + counts["abstain"] == counts["voted"] > 0
+    assert get(client, f"{base}/facets?start_date=2000-01-01")["country_modes"] == []
+
+
 def test_country_pages_narrow_to_a_subject(client):
     base = "/api/v1/countries/FRA"
     whole = get(client, f"{base}/profile?start_date=2000-01-01")

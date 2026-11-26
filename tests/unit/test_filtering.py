@@ -50,6 +50,17 @@ def test_member_mode_ors_membership_with_having_voted(engine):
     assert _ids(df) == ["101", "103", "104", "105", "106"]
 
 
+def test_vote_modes_keep_resolutions_the_country_voted_that_way(engine):
+    # DDD: 101 A, 102 X, 103 Y, 104 Y, 105 X, 106 N
+    def ids(mode):
+        criteria = ResolutionFilter(country="DDD", country_mode=mode)
+        return _ids(filtering.filter_resolutions(engine, criteria))
+
+    assert ids("yes") == ["103", "104"]
+    assert ids("no") == ["106"]
+    assert ids("abstain") == ["101"]
+
+
 def test_member_mode_needs_a_membership_mask(engine):
     with pytest.raises(ValueError):
         filtering.filter_resolutions(engine, ResolutionFilter(country="DDD", country_mode="member"))
