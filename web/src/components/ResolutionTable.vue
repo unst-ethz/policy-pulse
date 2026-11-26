@@ -33,10 +33,12 @@ function outcome(r: Resolution): string {
         <tr v-for="r in items" :key="r.undl_id">
           <td class="date">{{ r.date ? d(new Date(r.date), 'short') : '' }}</td>
           <td class="what">
-            <RouterLink :to="{ name: 'resolution', params: { id: r.undl_id } }" class="symbol">
-              {{ r.symbol ?? r.undl_id }}
-            </RouterLink>
-            <span class="title">{{ cleanTitle(r.title) }}</span>
+            <div class="what-stack">
+              <RouterLink :to="{ name: 'resolution', params: { id: r.undl_id } }" class="symbol">
+                {{ r.symbol ?? r.undl_id }}
+              </RouterLink>
+              <span class="title">{{ cleanTitle(r.title) }}</span>
+            </div>
           </td>
           <td class="outcome" :class="{ unrecorded: r.yes == null }">{{ outcome(r) }}</td>
           <td class="numeric">{{ r.consensus_score == null ? '' : n(r.consensus_score, 'score') }}</td>
@@ -71,9 +73,13 @@ function outcome(r: Resolution): string {
 }
 
 .what {
+  min-width: 18rem;
+}
+
+/* grid on the td itself would blockify it out of the table row and misalign it */
+.what-stack {
   display: grid;
   gap: 2px;
-  min-width: 18rem;
 }
 
 .symbol {
